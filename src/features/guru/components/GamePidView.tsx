@@ -19,6 +19,7 @@ import {
   Maximize2,
   Layers,
   BookOpen,
+  Key,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import {
@@ -28,6 +29,7 @@ import {
   getSchoolSlice3dUrl,
   setSchoolSlice3dUrl,
   DEFAULT_SCHOOL_SLICE_3D_URL,
+  getRumahSunyiUrl,
 } from '../../../config/game-pid.config';
 import { useBackHandler, BACK_PRIORITIES } from '../../../hooks/useBackNavigation';
 
@@ -76,7 +78,18 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
   const [schoolSliceUrl, setSchoolSliceUrl] = useState<string>(() => getSchoolSlice3dUrl());
   const [isEditingSchoolUrl, setIsEditingSchoolUrl] = useState(false);
   const [editSchoolUrlInput, setEditSchoolUrlInput] = useState<string>(schoolSliceUrl);
-  const [showEmbeddedPlayer, setShowEmbeddedPlayer] = useState(false);
+
+  // State khusus Rumah Sunyi 3D
+  const [rumahSunyiUrl, setRumahSunyiUrlState] = useState<string>(() => getRumahSunyiUrl());
+
+  // Embedded Player Aktif (School Slice 3D atau Rumah Sunyi 3D)
+  const [embeddedGame, setEmbeddedGame] = useState<{
+    id: string;
+    title: string;
+    url: string;
+    badgeCategory: string;
+  } | null>(null);
+
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [isCsvCopied, setIsCsvCopied] = useState(false);
 
@@ -92,24 +105,30 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
       setSchoolSliceUrl(current);
       setEditSchoolUrlInput(current);
     };
+    const handleRumahSunyiUrlUpdated = () => {
+      const current = getRumahSunyiUrl();
+      setRumahSunyiUrlState(current);
+    };
 
     window.addEventListener('smart_absensi_game_pid_url_updated', handleUrlUpdated);
     window.addEventListener('smart_absensi_school_slice_3d_url_updated', handleSchoolUrlUpdated);
+    window.addEventListener('smart_absensi_rumah_sunyi_url_updated', handleRumahSunyiUrlUpdated);
 
     return () => {
       window.removeEventListener('smart_absensi_game_pid_url_updated', handleUrlUpdated);
       window.removeEventListener('smart_absensi_school_slice_3d_url_updated', handleSchoolUrlUpdated);
+      window.removeEventListener('smart_absensi_rumah_sunyi_url_updated', handleRumahSunyiUrlUpdated);
     };
   }, []);
 
   // Back Navigation Handlers untuk modal interaktif
   useBackHandler({
     id: 'game-pid-embedded-player',
-    isOpen: showEmbeddedPlayer,
+    isOpen: embeddedGame !== null,
     priority: BACK_PRIORITIES.MODAL + 5,
-    title: 'School Slice 3D Player',
+    title: embeddedGame?.title || 'Game 3D Player',
     onBack: () => {
-      setShowEmbeddedPlayer(false);
+      setEmbeddedGame(null);
       return true;
     },
   });
@@ -241,6 +260,22 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
       accentColor: 'from-[#8C5A3C] via-[#C85A32] to-[#2F5D50]',
       actionUrl: schoolSliceUrl,
       thumbnailUrl: '/games/school-slice-3d/thumbnail.jpg',
+      is3d: true,
+    },
+    {
+      id: 'pid_rumah_sunyi',
+      title: 'Rumah Sunyi: Tiga Kunci',
+      category: 'QUIZ',
+      badgeCategory: 'Gim Horor Edukasi 3D POV',
+      description:
+        'Investigasi first-person 3D di mansion 9 ruangan: cari 3 kunci kuningan di antara 12 laci, selesaikan uji materi kuis guru, hindari tatapan Sosok Bayangan Pucat dengan sembunyi di lemari, dan buka pintu keluar.',
+      status: 'AVAILABLE',
+      statusLabel: 'Siap Dimainkan',
+      rewardPoints: 40,
+      icon: Key,
+      accentColor: 'from-[#171310] via-[#c99a45] to-[#b52b21]',
+      actionUrl: rumahSunyiUrl,
+      thumbnailUrl: '/games/rumah-sunyi/thumbnail.jpg',
       is3d: true,
     },
   ];
@@ -384,7 +419,14 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
               {/* Tombol 1: Buka Player Interaktif di Dalam Aplikasi */}
               <button
                 type="button"
-                onClick={() => setShowEmbeddedPlayer(true)}
+                onClick={() =>
+                  setEmbeddedGame({
+                    id: 'pid_school_slice_3d',
+                    title: 'School Slice 3D: Kehidupan Sekolah',
+                    url: schoolSliceUrl,
+                    badgeCategory: 'Gim 3D Cel-Shaded PID',
+                  })
+                }
                 className="w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm bg-linear-to-r from-emerald-400 via-teal-300 to-emerald-500 text-slate-950 hover:brightness-105 active:scale-[0.99] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Play className="w-4 h-4 fill-slate-950 stroke-none" />
@@ -551,7 +593,7 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-2">
             <Gamepad2 className="w-4 h-4 text-[#023246]" />
-            <span>Gim Edukasi Resmi PID</span>
+            <span>Daftar Gim Edukasi Resmi PID ({gamePlans.length})</span>
           </h2>
           <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
             Aktif &amp; Terintegrasi
@@ -601,7 +643,11 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
                     </h3>
                     <p className="text-[10.5px] sm:text-xs text-amber-200 font-semibold drop-shadow-sm flex items-center gap-1 mt-0.5">
                       <Sparkles className="w-3 h-3 text-amber-300" />
-                      <span>Mode Split-Screen 2 Pemain • Kejar-kejaran KBM</span>
+                      <span>
+                        {item.id === 'pid_school_slice_3d'
+                          ? 'Mode Split-Screen 2 Pemain • Kejar-kejaran KBM'
+                          : 'Eksplorasi Mansion 9 Ruangan • 3 Kunci & Lemari Sembunyi'}
+                      </span>
                     </p>
                   </div>
                   <div className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow-md shrink-0">
@@ -620,7 +666,14 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setShowEmbeddedPlayer(true)}
+                    onClick={() =>
+                      setEmbeddedGame({
+                        id: item.id,
+                        title: item.title,
+                        url: item.actionUrl || '',
+                        badgeCategory: item.badgeCategory,
+                      })
+                    }
                     className="py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer min-h-11"
                   >
                     <Play className="w-4 h-4 fill-white stroke-none" />
@@ -629,7 +682,11 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
 
                   <button
                     type="button"
-                    onClick={handleLaunchSchoolSlice}
+                    onClick={() => {
+                      if (typeof window !== 'undefined' && item.actionUrl) {
+                        window.open(item.actionUrl, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
                     className="py-3 px-4 rounded-2xl bg-amber-400 hover:bg-amber-500 active:scale-[0.99] text-slate-950 font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer min-h-11"
                   >
                     <span>Buka Tab Baru Penuh</span>
@@ -637,25 +694,51 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleDownloadCsvTemplate}
-                    className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Unduh Format CSV Soal</span>
-                  </button>
+                {item.id === 'pid_school_slice_3d' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleDownloadCsvTemplate}
+                      className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Unduh Format CSV Soal</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowGuideModal(true)}
-                    className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Panduan Integrasi Soal Guru</span>
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowGuideModal(true)}
+                      className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Panduan Integrasi Soal Guru</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.open(
+                            '/games/rumah-sunyi/standalone/rumah_sunyi_tiga_kunci_standalone.html',
+                            '_blank',
+                            'noopener,noreferrer'
+                          );
+                        }
+                      }}
+                      className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Mode Mandiri (1 Berkas HTML)</span>
+                    </button>
+
+                    <div className="py-2 px-3 rounded-xl bg-amber-50/70 border border-amber-200/60 text-[11px] font-semibold text-amber-900 flex items-center gap-1.5 justify-center">
+                      <Key className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                      <span>5 Paket Kuis Mapel &amp; Editor Guru</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -701,15 +784,15 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
       </button>
 
       {/* =========================================================================
-          MODAL 1: IN-APP EMBEDDED PLAYER FOR SCHOOL SLICE 3D
+          MODAL 1: IN-APP EMBEDDED PLAYER FOR SCHOOL SLICE 3D & RUMAH SUNYI 3D
           Mematuhi INFINIX_NOTE_8_FULLSCREEN_RULE.md (100dvh, thumb-friendly)
          ========================================================================= */}
-      {showEmbeddedPlayer && (
+      {embeddedGame && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
           role="dialog"
           aria-modal="true"
-          aria-label="School Slice 3D In-App Player"
+          aria-label={`${embeddedGame.title} In-App Player`}
         >
           <div className="w-full h-dvh md:h-[94vh] md:max-w-5xl md:rounded-3xl bg-slate-950 flex flex-col overflow-hidden shadow-2xl border border-slate-800">
             {/* Header Player */}
@@ -717,21 +800,21 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
               <div className="flex items-center gap-2.5 min-w-0">
                 <button
                   type="button"
-                  onClick={() => setShowEmbeddedPlayer(false)}
+                  onClick={() => setEmbeddedGame(null)}
                   className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 flex items-center justify-center text-slate-300 hover:text-white transition-all cursor-pointer shrink-0"
                   aria-label="Tutup Player"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <div className="w-8 h-8 rounded-xl bg-linear-to-br from-[#8C5A3C] to-[#C85A32] flex items-center justify-center shrink-0">
-                  <Box className="w-4 h-4 text-white" />
+                <div className="w-8 h-8 rounded-xl bg-linear-to-br from-amber-600 to-amber-800 flex items-center justify-center shrink-0">
+                  <Gamepad2 className="w-4 h-4 text-white" />
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-xs sm:text-sm font-black text-white truncate">
-                    School Slice 3D: Kehidupan Sekolah
+                    {embeddedGame.title}
                   </h3>
                   <p className="text-[10px] sm:text-[11px] text-amber-300 font-mono truncate">
-                    {schoolSliceUrl}
+                    {embeddedGame.url}
                   </p>
                 </div>
               </div>
@@ -739,7 +822,11 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={handleLaunchSchoolSlice}
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.open(embeddedGame.url, '_blank', 'noopener,noreferrer');
+                    }
+                  }}
                   className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
                   title="Buka di tab baru (layar penuh)"
                 >
@@ -748,7 +835,7 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowEmbeddedPlayer(false)}
+                  onClick={() => setEmbeddedGame(null)}
                   className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 flex items-center justify-center transition-all cursor-pointer"
                   aria-label="Tutup"
                 >
@@ -760,8 +847,8 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
             {/* Iframe Viewport Container */}
             <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
               <iframe
-                src={schoolSliceUrl}
-                title="School Slice 3D Game"
+                src={embeddedGame.url}
+                title={embeddedGame.title}
                 className="w-full h-full border-0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; xr-spatial-tracking"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"

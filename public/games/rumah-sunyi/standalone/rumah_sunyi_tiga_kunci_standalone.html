@@ -1,0 +1,3567 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Rumah Sunyi: Tiga Kunci — Gim Horor Edukasi 3D POV (Standalone)</title>
+  <style>
+:root {
+  --bg-charcoal: #0b0a09;
+  --bg-mahogany: #171310;
+  --bg-panel: rgba(20, 16, 13, 0.92);
+  --paper-aged: #dfd6c5;
+  --paper-muted: #b5aa96;
+  --brass-gold: #c99a45;
+  --brass-bright: #eab95c;
+  --blood-red: #b52b21;
+  --blood-glow: #e03c30;
+  --phosphor-green: #4a8c5e;
+  --phosphor-bright: #6bc485;
+  --border-ink: rgba(201, 154, 69, 0.34);
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-mono: "Courier New", Courier, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-charcoal);
+  color: var(--paper-aged);
+  font-family: var(--font-serif);
+}
+
+#game-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 1;
+  touch-action: none;
+}
+
+/* Efek Film Grain & Vignette Analog */
+.film-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  background:
+    radial-gradient(circle at center, transparent 52%, rgba(5, 4, 3, 0.78) 100%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.015) 0px,
+      rgba(255, 255, 255, 0.015) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+}
+
+.danger-pulse {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  box-shadow: inset 0 0 110px rgba(181, 43, 33, 0);
+  transition: box-shadow 0.2s ease;
+}
+
+.danger-pulse.active {
+  box-shadow: inset 0 0 140px rgba(224, 60, 48, 0.65);
+  animation: pulseBorder 0.75s infinite alternate;
+}
+
+@keyframes pulseBorder {
+  from { box-shadow: inset 0 0 80px rgba(181, 43, 33, 0.35); }
+  to { box-shadow: inset 0 0 165px rgba(224, 60, 48, 0.78); }
+}
+
+/* Celah Pintu Lemari Berjalusi */
+.closet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(8, 6, 5, 0.94) 0px,
+      rgba(8, 6, 5, 0.94) 22px,
+      rgba(15, 12, 10, 0.28) 22px,
+      rgba(15, 12, 10, 0.28) 34px
+    ),
+    radial-gradient(circle, transparent 35%, rgba(0, 0, 0, 0.92) 95%);
+}
+
+.closet-overlay.visible {
+  display: flex;
+}
+
+.closet-banner {
+  background: var(--bg-panel);
+  border: 1px solid var(--brass-gold);
+  padding: 14px 24px;
+  text-align: center;
+  max-width: 520px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+}
+
+.closet-timer-ring {
+  font-family: var(--font-mono);
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--phosphor-bright);
+  margin: 6px 0;
+}
+
+/* Overlay Layar Penuh (Layar Awal & Laporan Akhir) */
+.screen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 50% 25%, rgba(42, 31, 23, 0.88), rgba(9, 8, 7, 0.97));
+  overflow-y: auto;
+}
+
+.screen-overlay.hidden {
+  display: none !important;
+}
+
+.dossier-card {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  max-height: 94vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #1b1612 0%, #120f0c 100%);
+  border: 2px solid var(--brass-gold);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.92),
+    inset 0 0 0 6px rgba(11, 10, 9, 0.85),
+    inset 0 0 0 7px rgba(201, 154, 69, 0.22);
+  padding: 24px 28px;
+}
+
+.corner-mark {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: var(--brass-bright);
+  border-style: solid;
+  pointer-events: none;
+}
+.corner-tl { top: 8px; left: 8px; border-width: 2px 0 0 2px; }
+.corner-tr { top: 8px; right: 8px; border-width: 2px 2px 0 0; }
+.corner-bl { bottom: 8px; left: 8px; border-width: 0 0 2px 2px; }
+.corner-br { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+
+.dossier-header {
+  border-bottom: 1px solid var(--border-ink);
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.dossier-tag {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  color: var(--brass-gold);
+  text-transform: uppercase;
+}
+
+.dossier-title {
+  font-size: clamp(1.55rem, 3vw, 2.25rem);
+  color: var(--paper-aged);
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+
+.dossier-subtitle {
+  font-size: 0.92rem;
+  color: var(--paper-muted);
+  margin-top: 4px;
+}
+
+.grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 18px;
+}
+
+@media (max-width: 820px) {
+  .grid-two {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel-box {
+  background: rgba(12, 10, 8, 0.75);
+  border: 1px solid var(--border-ink);
+  padding: 14px 16px;
+}
+
+.panel-heading {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  letter-spacing: 1.5px;
+  color: var(--brass-bright);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Pilihan Tingkat Kesulitan */
+.diff-group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.diff-btn {
+  background: #1a1511;
+  border: 1px solid rgba(201, 154, 69, 0.35);
+  color: var(--paper-muted);
+  padding: 10px 8px;
+  cursor: pointer;
+  text-align: center;
+  font-family: var(--font-serif);
+  transition: all 0.15s ease;
+}
+
+.diff-btn strong {
+  display: block;
+  font-size: 0.98rem;
+  color: var(--paper-aged);
+  margin-bottom: 3px;
+}
+
+.diff-btn span {
+  font-family: var(--font-mono);
+  font-size: 0.73rem;
+}
+
+.diff-btn.active {
+  background: rgba(201, 154, 69, 0.2);
+  border-color: var(--brass-bright);
+  box-shadow: inset 0 0 12px rgba(201, 154, 69, 0.22);
+}
+
+.diff-btn.active strong {
+  color: var(--brass-bright);
+}
+
+.brief-list {
+  list-style: none;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--paper-muted);
+}
+
+.brief-list li {
+  margin-bottom: 6px;
+  padding-left: 14px;
+  position: relative;
+}
+
+.brief-list li::before {
+  content: "▸";
+  position: absolute;
+  left: 0;
+  color: var(--brass-gold);
+}
+
+/* Pengaturan Soal Guru */
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.chip-btn {
+  background: #1d1713;
+  border: 1px solid rgba(201, 154, 69, 0.35);
+  color: var(--paper-aged);
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.chip-btn.active {
+  background: var(--brass-gold);
+  color: #120e0a;
+  font-weight: bold;
+}
+
+.quiz-preview-list {
+  background: rgba(223, 214, 197, 0.06);
+  border-left: 3px solid var(--brass-gold);
+  padding: 8px 12px;
+  font-size: 0.84rem;
+  color: var(--paper-aged);
+  margin-bottom: 10px;
+}
+
+.quiz-preview-item {
+  margin-bottom: 5px;
+  line-height: 1.35;
+}
+
+.quiz-preview-item:last-child {
+  margin-bottom: 0;
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--brass-gold);
+  color: var(--brass-bright);
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: rgba(201, 154, 69, 0.16);
+}
+
+.start-bar {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-ink);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-primary {
+  background: linear-gradient(180deg, #c99a45 0%, #9c7228 100%);
+  border: 1px solid #f0cb7b;
+  color: #120d08;
+  font-family: var(--font-serif);
+  font-weight: bold;
+  font-size: 1.08rem;
+  letter-spacing: 1px;
+  padding: 14px 28px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+/* Editor Soal Guru */
+.editor-panel {
+  margin-top: 14px;
+  border-top: 1px dashed var(--brass-gold);
+  padding-top: 14px;
+  display: none;
+}
+
+.editor-panel.open {
+  display: block;
+}
+
+.editor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 10px;
+}
+
+@media (max-width: 860px) {
+  .editor-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.q-edit-card {
+  background: #14100d;
+  border: 1px solid var(--border-ink);
+  padding: 10px;
+}
+
+.q-edit-card label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--brass-gold);
+  margin: 6px 0 3px;
+}
+
+.q-edit-card input,
+.q-edit-card textarea,
+.q-edit-card select,
+.subject-input {
+  width: 100%;
+  background: #0c0a08;
+  border: 1px solid rgba(201, 154, 69, 0.4);
+  color: var(--paper-aged);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 6px 8px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* HUD Dalam Permainan */
+#hud {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  display: none;
+}
+
+#hud.active {
+  display: block;
+}
+
+.hud-top {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.hud-box {
+  background: rgba(15, 12, 10, 0.86);
+  border: 1px solid var(--border-ink);
+  padding: 8px 12px;
+  pointer-events: auto;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.75);
+}
+
+.hud-keys {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+.key-slot {
+  padding: 3px 8px;
+  border: 1px solid rgba(201, 154, 69, 0.35);
+  color: var(--paper-muted);
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.key-slot.found {
+  border-color: var(--brass-bright);
+  background: rgba(201, 154, 69, 0.26);
+  color: var(--brass-bright);
+  font-weight: bold;
+}
+
+.hud-timer {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  color: var(--paper-aged);
+  margin-top: 4px;
+}
+
+/* Kompas Arah & Panduan Misi Tengah Atas */
+.compass-wrap {
+  flex: 1;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.compass-bar {
+  position: relative;
+  width: 100%;
+  height: 36px;
+  background: rgba(14, 11, 9, 0.9);
+  border: 1px solid var(--brass-gold);
+  overflow: hidden;
+}
+
+.compass-center-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: var(--brass-bright);
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+.compass-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: bold;
+  padding: 2px 6px;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+  background: rgba(10, 8, 6, 0.92);
+}
+
+.marker-key { color: var(--brass-bright); }
+.marker-closet { color: var(--phosphor-bright); }
+.marker-exit { color: #e86f66; }
+.marker-exit.ready { color: var(--brass-bright); box-shadow: 0 0 8px rgba(234, 185, 92, 0.6); }
+
+.mission-guide {
+  width: 100%;
+  background: rgba(17, 13, 10, 0.9);
+  border: 1px solid rgba(201, 154, 69, 0.35);
+  padding: 6px 12px;
+  text-align: center;
+  font-size: 0.84rem;
+  color: var(--paper-aged);
+}
+
+.room-badge {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--brass-gold);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 2px;
+}
+
+/* Mini-map & ECG Kanan Atas */
+.hud-right-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+#minimap-canvas {
+  width: 156px;
+  height: 140px;
+  background: #100e0b;
+  border: 1px solid var(--brass-gold);
+  display: block;
+}
+
+#ecg-canvas {
+  width: 156px;
+  height: 34px;
+  background: #0c0a08;
+  border: 1px solid rgba(201, 154, 69, 0.35);
+  display: block;
+}
+
+.audio-controls {
+  display: flex;
+  gap: 5px;
+  pointer-events: auto;
+}
+
+.mini-btn {
+  background: rgba(20, 16, 13, 0.92);
+  border: 1px solid var(--brass-gold);
+  color: var(--paper-aged);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 4px 7px;
+  cursor: pointer;
+}
+
+.mini-btn.off {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/* Reticle & Peringatan Tengah */
+.reticle {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(223, 214, 197, 0.55);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.reticle.interactive {
+  transform: translate(-50%, -50%) scale(1.45);
+  border-color: var(--brass-bright);
+  background: rgba(201, 154, 69, 0.22);
+}
+
+.alert-banner {
+  position: fixed;
+  top: 122px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  background: rgba(145, 24, 18, 0.94);
+  border: 1px solid #ff8c82;
+  color: #fff3f0;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  font-size: 0.92rem;
+  letter-spacing: 1px;
+  padding: 8px 18px;
+  display: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+}
+
+.alert-banner.visible {
+  display: block;
+}
+
+.toast-msg {
+  position: fixed;
+  bottom: 165px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  background: rgba(18, 14, 11, 0.94);
+  border: 1px solid var(--brass-gold);
+  color: var(--paper-aged);
+  font-size: 0.9rem;
+  padding: 8px 16px;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+  pointer-events: none;
+  text-align: center;
+  max-width: 90vw;
+}
+
+.toast-msg.show {
+  opacity: 1;
+}
+
+/* Kontrol Sentuh PID Bawah */
+.touch-controls {
+  position: fixed;
+  bottom: 18px;
+  left: 18px;
+  right: 18px;
+  z-index: 11;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.touch-controls.stick-right {
+  flex-direction: row-reverse;
+}
+
+.joystick-zone {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background: rgba(18, 14, 11, 0.72);
+  border: 2px solid rgba(201, 154, 69, 0.55);
+  position: relative;
+  pointer-events: auto;
+  touch-action: none;
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.8);
+}
+
+.joystick-knob {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #eab95c, #8c6320);
+  border: 2px solid #fff2d6;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.action-cluster {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.touch-controls.stick-right .action-cluster {
+  align-items: flex-start;
+}
+
+.utility-row {
+  display: flex;
+  gap: 8px;
+}
+
+.pid-btn {
+  background: rgba(20, 16, 13, 0.9);
+  border: 1px solid var(--brass-gold);
+  color: var(--paper-aged);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  padding: 10px 14px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.pid-btn:active {
+  background: rgba(201, 154, 69, 0.3);
+}
+
+.pid-action-btn {
+  background: linear-gradient(180deg, #3b2d1f 0%, #241b12 100%);
+  border: 2px solid var(--brass-bright);
+  color: var(--brass-bright);
+  font-family: var(--font-serif);
+  font-weight: bold;
+  font-size: 1.02rem;
+  padding: 15px 24px;
+  min-width: 195px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.8);
+  touch-action: manipulation;
+}
+
+.pid-action-btn.disabled {
+  opacity: 0.48;
+  border-color: rgba(201, 154, 69, 0.35);
+  color: var(--paper-muted);
+}
+
+/* Modal Uji Kunci Kuningan (Pertanyaan Mata Pelajaran) */
+.quiz-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: rgba(6, 5, 4, 0.88);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.quiz-modal.open {
+  display: flex;
+}
+
+.quiz-card {
+  width: 100%;
+  max-width: 620px;
+  background: #18130f;
+  border: 2px solid var(--brass-bright);
+  padding: 22px 24px;
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.95);
+}
+
+.quiz-question-text {
+  font-size: 1.12rem;
+  line-height: 1.55;
+  color: var(--paper-aged);
+  margin: 12px 0 16px;
+  padding: 12px;
+  background: rgba(223, 214, 197, 0.06);
+  border-left: 3px solid var(--brass-gold);
+}
+
+.quiz-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 9px;
+}
+
+.quiz-opt-btn {
+  background: #211a14;
+  border: 1px solid rgba(201, 154, 69, 0.45);
+  color: var(--paper-aged);
+  text-align: left;
+  padding: 12px 14px;
+  font-family: var(--font-serif);
+  font-size: 0.98rem;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.quiz-opt-btn:hover {
+  background: rgba(201, 154, 69, 0.22);
+  border-color: var(--brass-bright);
+}
+
+.quiz-feedback {
+  margin-top: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  min-height: 20px;
+  color: var(--blood-glow);
+}
+
+/* Stempel Laporan Akhir */
+.stamp-badge {
+  display: inline-block;
+  border: 3px solid currentColor;
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  font-size: 1.05rem;
+  letter-spacing: 2px;
+  transform: rotate(-3deg);
+  margin: 10px 0;
+}
+
+.stamp-win { color: var(--phosphor-bright); }
+.stamp-lose { color: var(--blood-glow); }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.stat-cell {
+  background: rgba(10, 8, 6, 0.8);
+  border: 1px solid var(--border-ink);
+  padding: 12px;
+  text-align: center;
+}
+
+.stat-cell span {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--paper-muted);
+}
+
+.stat-cell strong {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  color: var(--brass-bright);
+  margin-top: 4px;
+}
+
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.160.0"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <canvas id="game-canvas"></canvas>
+  <div class="film-vignette"></div>
+  <div id="danger-pulse" class="danger-pulse"></div>
+  <div id="reticle" class="reticle"></div>
+
+  <!-- Overlay Bersembunyi di Dalam Lemari Berjalusi -->
+  <div id="closet-overlay" class="closet-overlay">
+    <div class="closet-banner">
+      <div class="dossier-tag">PERSEMBUNYIAN LEMARI BERJALUSI</div>
+      <div id="closet-timer-text" class="closet-timer-ring">5.0 dtk</div>
+      <p style="font-size: 0.88rem; color: var(--paper-muted);">
+        Sosok Bayangan Pucat terhenti sejenak. Tunggu hingga hitungan selesai sebelum keluar.
+      </p>
+    </div>
+    <button id="exit-closet-btn" class="pid-action-btn" style="pointer-events: auto;">
+      Keluar dari Lemari Sekarang
+    </button>
+  </div>
+
+  <!-- HUD Dalam Permainan -->
+  <div id="hud">
+    <div class="hud-top">
+      <div class="hud-box">
+        <div class="hud-keys">
+          <span id="key-slot-1" class="key-slot">Kunci 1</span>
+          <span id="key-slot-2" class="key-slot">Kunci 2</span>
+          <span id="key-slot-3" class="key-slot">Kunci 3</span>
+        </div>
+        <div id="hud-timer" class="hud-timer">00:00.00</div>
+      </div>
+
+      <div class="compass-wrap">
+        <div id="compass-bar" class="compass-bar">
+          <div class="compass-center-tick"></div>
+        </div>
+        <div class="mission-guide">
+          <div id="hud-room-name" class="room-badge">LOKASI: SERAMBI UTAMA</div>
+          <div id="hud-mission-guide">Cari 3 Kunci Kuningan dengan mengetuk laci 2×</div>
+        </div>
+      </div>
+
+      <div class="hud-right-col">
+        <canvas id="minimap-canvas" width="156" height="140"></canvas>
+        <canvas id="ecg-canvas" width="156" height="34"></canvas>
+        <div class="audio-controls">
+          <button id="toggle-bgm-btn" class="mini-btn">BGM</button>
+          <button id="toggle-sfx-btn" class="mini-btn">SFX</button>
+          <button id="swap-stick-hud-btn" class="mini-btn">⇄ Stik Kiri</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="alert-banner" class="alert-banner">MATA SOSOK MELIHATMU! SEGERA SEMBUNYI DI LEMARI!</div>
+    <div id="toast-msg" class="toast-msg"></div>
+
+    <!-- Kontrol Multi-Sentuh Papan Interaktif Digital (PID) -->
+    <div id="touch-controls" class="touch-controls">
+      <div id="joystick-zone" class="joystick-zone">
+        <div id="joystick-knob" class="joystick-knob"></div>
+      </div>
+      <div class="action-cluster">
+        <div class="utility-row">
+          <button id="pid-flash-btn" class="pid-btn">Senter (F)</button>
+          <button id="pid-turn-btn" class="pid-btn">Balik 180° (Q)</button>
+        </div>
+        <button id="pid-action-btn" class="pid-action-btn disabled">Dekati Objek Interaktif</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Pertanyaan Mata Pelajaran Guru Saat Menemukan Kunci -->
+  <div id="quiz-modal" class="quiz-modal">
+    <div class="quiz-card">
+      <div class="dossier-tag">GEMBOK KOMBINASI KUNCI KUNINGAN</div>
+      <h2 id="quiz-modal-title" style="margin-top: 4px; color: var(--brass-bright); font-size: 1.25rem;">
+        UJI KUNCI KUNINGAN #1
+      </h2>
+      <div id="quiz-question-text" class="quiz-question-text"></div>
+      <div id="quiz-options" class="quiz-options"></div>
+      <div id="quiz-feedback" class="quiz-feedback"></div>
+    </div>
+  </div>
+
+  <!-- Layar Awal (Dossier Investigasi & Pengaturan Soal Guru) -->
+  <div id="start-screen" class="screen-overlay">
+    <div class="dossier-card">
+      <div class="corner-mark corner-tl"></div>
+      <div class="corner-mark corner-tr"></div>
+      <div class="corner-mark corner-bl"></div>
+      <div class="corner-mark corner-br"></div>
+
+      <div class="dossier-header">
+        <div>
+          <div class="dossier-tag">BERKAS INVESTIGASI #09 • PAPAN INTERAKTIF DIGITAL (PID)</div>
+          <h1 class="dossier-title">RUMAH SUNYI: TIGA KUNCI</h1>
+          <p class="dossier-subtitle">
+            Eksplorasi 9 ruangan mansion, pecahkan 3 soal mata pelajaran dari laci berkunci, dan buka Pintu Keluar Utama.
+          </p>
+        </div>
+        <button id="swap-stick-start-btn" class="btn-secondary">⇄ Stik Kiri</button>
+      </div>
+
+      <div class="grid-two">
+        <!-- Kolom Kiri: Tingkat Kesulitan & Aturan Main -->
+        <div class="panel-box">
+          <div class="panel-heading">
+            <span>1. TINGKAT KESULITAN & REKOR</span>
+          </div>
+          <div class="diff-group">
+            <button class="diff-btn" data-diff="mudah">
+              <strong>Mudah</strong>
+              <span id="best-mudah">Rekor: --:--.--</span>
+            </button>
+            <button class="diff-btn active" data-diff="normal">
+              <strong>Normal</strong>
+              <span id="best-normal">Rekor: --:--.--</span>
+            </button>
+            <button class="diff-btn" data-diff="sulit">
+              <strong>Sulit</strong>
+              <span id="best-sulit">Rekor: --:--.--</span>
+            </button>
+          </div>
+
+          <div class="panel-heading" style="margin-top: 12px;">
+            <span>PANDUAN SINGKAT SISWA</span>
+          </div>
+          <ul class="brief-list">
+            <li><strong>Laci 2× Ketuk:</strong> Ketuk 1× membuka celah laci (berisik), ketuk 2× menggeledah isi & menjawab soal kunci.</li>
+            <li><strong>Sosok Bayangan Pucat:</strong> Diam di lorong utara sampai <em>matanya melihatmu</em>. Matikan senter agar sulit terlihat.</li>
+            <li><strong>Lemari Berjalusi:</strong> Masuk ke lemari menjeda pergerakan hantu selama beberapa detik.</li>
+            <li><strong>Kendali PID:</strong> Gunakan stik analog untuk berjalan, geser layar untuk menengok, dan ikuti kompas arah di atas.</li>
+          </ul>
+        </div>
+
+        <!-- Kolom Kanan: Pengaturan Soal Mata Pelajaran Guru -->
+        <div class="panel-box">
+          <div class="panel-heading">
+            <span>2. SOAL MATA PELAJARAN GURU</span>
+            <span id="active-subject-label" style="color: var(--paper-aged);">Informatika</span>
+          </div>
+          <div class="preset-row">
+            <button class="chip-btn preset-btn active" data-preset="informatika">Informatika</button>
+            <button class="chip-btn preset-btn" data-preset="matematika">Matematika</button>
+            <button class="chip-btn preset-btn" data-preset="ipa">IPA Terpadu</button>
+            <button class="chip-btn preset-btn" data-preset="ips">IPS</button>
+            <button class="chip-btn preset-btn" data-preset="bahasa">B. Indonesia</button>
+          </div>
+
+          <div id="quiz-preview-list" class="quiz-preview-list"></div>
+
+          <button id="toggle-editor-btn" class="btn-secondary">✎ Edit 3 Soal Guru (Kustom)</button>
+        </div>
+      </div>
+
+      <!-- Panel Editor 3 Soal Guru (Dapat Dibuka/Tutup) -->
+      <div id="teacher-editor-panel" class="editor-panel">
+        <div class="panel-heading">
+          <span>EDITOR 3 SOAL UJI KUNCI (TERSIMPAN OTOMATIS DI PERAMBAN)</span>
+        </div>
+        <div style="max-width: 340px;">
+          <label style="font-family: var(--font-mono); font-size: 0.76rem; color: var(--brass-gold);">NAMA MATA PELAJARAN</label>
+          <input id="edit-subject" class="subject-input" type="text" value="Informatika" />
+        </div>
+        <div id="editor-questions-grid" class="editor-grid"></div>
+        <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+          <button id="save-quiz-btn" class="btn-primary" style="padding: 10px 20px; font-size: 0.92rem;">
+            Simpan Perubahan Soal
+          </button>
+        </div>
+      </div>
+
+      <div class="start-bar">
+        <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--paper-muted);">
+          Dukungan Penuh: Layar Sentuh PID Multi-Touch & Keyboard (WASD / E / F / Q)
+        </div>
+        <button id="start-game-btn" class="btn-primary">MULAI INVESTIGASI (MASUK RUMAH)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layar Laporan Akhir -->
+  <div id="end-screen" class="screen-overlay hidden">
+    <div class="dossier-card" style="max-width: 640px; text-align: center;">
+      <div class="corner-mark corner-tl"></div>
+      <div class="corner-mark corner-tr"></div>
+      <div class="corner-mark corner-bl"></div>
+      <div class="corner-mark corner-br"></div>
+
+      <div class="dossier-tag">LAPORAN AKHIR INVESTIGASI</div>
+      <div id="end-stamp" class="stamp-badge stamp-win">MISI BERHASIL</div>
+      <h2 id="end-title" class="dossier-title" style="font-size: 1.7rem;">Pintu Utama Berhasil Dibuka!</h2>
+      <p id="end-desc" class="dossier-subtitle" style="margin-top: 8px;"></p>
+
+      <div class="stats-grid">
+        <div class="stat-cell">
+          <span>WAKTU SELESAI</span>
+          <strong id="stat-time">00:00.00</strong>
+        </div>
+        <div class="stat-cell">
+          <span>KUNCI TERKUMPUL</span>
+          <strong id="stat-keys">3 / 3</strong>
+        </div>
+        <div class="stat-cell">
+          <span>REKOR TERCEPAT</span>
+          <strong id="stat-best">--:--.--</strong>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: center; gap: 12px; margin-top: 18px;">
+        <button id="back-menu-btn" class="btn-secondary">Pengaturan & Soal Guru</button>
+        <button id="retry-btn" class="btn-primary">Main Lagi</button>
+      </div>
+    </div>
+  </div>
+
+  
+  <script type="module">
+import * as THREE from 'three';
+
+const STORAGE_QUIZ_KEY = 'rumah_sunyi_teacher_quiz_v2';
+
+const QUIZ_PRESETS = {
+  informatika: {
+    subject: 'Informatika',
+    questions: [
+      {
+        q: 'Perangkat keras yang berfungsi sebagai otak pemroses utama instruksi pada komputer disebut...',
+        options: ['CPU (Central Processing Unit)', 'RAM (Random Access Memory)', 'Hard Disk Drive', 'Power Supply Unit'],
+        answer: 0
+      },
+      {
+        q: 'Bilangan biner 1010 jika dikonversi ke dalam sistem bilangan desimal bernilai...',
+        options: ['8', '10', '12', '14'],
+        answer: 1
+      },
+      {
+        q: 'Urutan langkah logis dan sistematis untuk menyelesaikan suatu masalah pemrograman disebut...',
+        options: ['Algoritma', 'Kompilator', 'Topologi', 'Enkripsi'],
+        answer: 0
+      }
+    ]
+  },
+  matematika: {
+    subject: 'Matematika',
+    questions: [
+      {
+        q: 'Jika 3x + 7 = 22, maka nilai x yang memenuhi persamaan tersebut adalah...',
+        options: ['3', '4', '5', '6'],
+        answer: 2
+      },
+      {
+        q: 'Sebuah segitiga siku-siku memiliki panjang sisi tegak 6 cm dan 8 cm. Panjang sisi miringnya adalah...',
+        options: ['10 cm', '12 cm', '14 cm', '15 cm'],
+        answer: 0
+      },
+      {
+        q: 'Hasil dari 2^4 + 3^2 adalah...',
+        options: ['17', '21', '25', '27'],
+        answer: 2
+      }
+    ]
+  },
+  ipa: {
+    subject: 'IPA Terpadu',
+    questions: [
+      {
+        q: 'Perubahan wujud benda dari gas langsung menjadi padat tanpa melalui fase cair disebut...',
+        options: ['Menyublim', 'Mengkristal (Deposisi)', 'Mengembun', 'Membeku'],
+        answer: 1
+      },
+      {
+        q: 'Organel sel tumbuhan yang berperan utama dalam proses fotosintesis adalah...',
+        options: ['Mitokondria', 'Ribosom', 'Kloroplas', 'Lisosom'],
+        answer: 2
+      },
+      {
+        q: 'Satuan Internasional (SI) untuk besaran gaya adalah...',
+        options: ['Joule', 'Watt', 'Pascal', 'Newton'],
+        answer: 3
+      }
+    ]
+  },
+  ips: {
+    subject: 'IPS',
+    questions: [
+      {
+        q: 'Garis khayal yang membagi bumi menjadi belahan bumi utara dan belahan bumi selatan adalah...',
+        options: ['Garis Bujur 0°', 'Garis Khatulistiwa (Ekuator)', 'Garis Balik Utara', 'Garis Tanggal Internasional'],
+        answer: 1
+      },
+      {
+        q: 'Peristiwa Rengasdengklok terjadi pada tanggal 16 Agustus 1945 dengan tujuan utama untuk...',
+        options: [
+          'Menyusun teks Undang-Undang Dasar',
+          'Menjauhkan Soekarno-Hatta dari pengaruh Jepang agar segera memproklamasikan kemerdekaan',
+          'Membentuk Badan Keamanan Rakyat',
+          'Menyambut kedatangan pasukan Sekutu'
+        ],
+        answer: 1
+      },
+      {
+        q: 'Kegiatan menyalurkan barang dan jasa dari produsen kepada konsumen disebut...',
+        options: ['Produksi', 'Konsumsi', 'Distribusi', 'Investasi'],
+        answer: 2
+      }
+    ]
+  },
+  bahasa: {
+    subject: 'Bahasa Indonesia',
+    questions: [
+      {
+        q: 'Penulisan kata baku yang sesuai dengan Kamus Besar Bahasa Indonesia (KBBI) adalah...',
+        options: ['Aktifitas', 'Apotik', 'Analisis', 'Resiko'],
+        answer: 2
+      },
+      {
+        q: 'Majas yang memberikan sifat-sifat manusia kepada benda mati disebut majas...',
+        options: ['Hiperbola', 'Personifikasi', 'Metafora', 'Litotes'],
+        answer: 1
+      },
+      {
+        q: 'Bagian struktur teks eksplanasi yang berisi gambaran umum tentang fenomena yang dibahas adalah...',
+        options: ['Pernyataan umum', 'Deretan penjelas', 'Interpretasi', 'Orientasi'],
+        answer: 0
+      }
+    ]
+  }
+};
+
+function loadTeacherQuiz() {
+  try {
+    const raw = localStorage.getItem(STORAGE_QUIZ_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.subject && Array.isArray(parsed.questions) && parsed.questions.length === 3) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Gagal membaca soal dari localStorage:', e);
+  }
+  return JSON.parse(JSON.stringify(QUIZ_PRESETS.informatika));
+}
+
+function saveTeacherQuiz(quizData) {
+  try {
+    localStorage.setItem(STORAGE_QUIZ_KEY, JSON.stringify(quizData));
+  } catch (e) {
+    console.warn('Gagal menyimpan soal ke localStorage:', e);
+  }
+}
+
+const DIFFICULTY_CONFIG = {
+  mudah: {
+    id: 'mudah',
+    label: 'Mudah',
+    ghostSpeed: 3.1,
+    hideDuration: 6.0,
+    sightRange: 13.5,
+    sightConeDeg: 46,
+    desc: 'Hantu lambat • Jeda lemari 6,0 dtk'
+  },
+  normal: {
+    id: 'normal',
+    label: 'Normal',
+    ghostSpeed: 4.15,
+    hideDuration: 5.0,
+    sightRange: 16.5,
+    sightConeDeg: 52,
+    desc: 'Kecepatan sedang • Jeda lemari 5,0 dtk'
+  },
+  sulit: {
+    id: 'sulit',
+    label: 'Sulit',
+    ghostSpeed: 5.1,
+    hideDuration: 3.5,
+    sightRange: 20.0,
+    sightConeDeg: 58,
+    desc: 'Hantu agresif • Jeda lemari 3,5 dtk'
+  }
+};
+
+// Mansion 36m (x: -18..18) x 32m (z: -16..16) dibagi 9 ruangan (3x3 sel: 12m x 10.67m)
+const MANSION_BOUNDS = {
+  minX: -18,
+  maxX: 18,
+  minZ: -16,
+  maxZ: 16,
+  wallHeight: 4.2,
+  doorWidth: 2.8
+};
+
+const ROOMS = [
+  { id: 'nw', name: 'Kamar Tidur Utama', wing: 'Sayap Barat', minX: -18, maxX: -6, minZ: -16, maxZ: -5.33 },
+  { id: 'nc', name: 'Lorong Utara & Galeri', wing: 'Area Tengah', minX: -6, maxX: 6, minZ: -16, maxZ: -5.33 },
+  { id: 'ne', name: 'Dapur Tua & Gudang', wing: 'Sayap Timur', minX: 6, maxX: 18, minZ: -16, maxZ: -5.33 },
+
+  { id: 'cw', name: 'Ruang Kerja Tua', wing: 'Sayap Barat', minX: -18, maxX: -6, minZ: -5.33, maxZ: 5.33 },
+  { id: 'cc', name: 'Lorong Silang Tengah', wing: 'Area Tengah', minX: -6, maxX: 6, minZ: -5.33, maxZ: 5.33 },
+  { id: 'ce', name: 'Ruang Makan', wing: 'Sayap Timur', minX: 6, maxX: 18, minZ: -5.33, maxZ: 5.33 },
+
+  { id: 'sw', name: 'Ruang Tamu Barat', wing: 'Sayap Barat', minX: -18, maxX: -6, minZ: 5.33, maxZ: 16 },
+  { id: 'sc', name: 'Serambi Utama', wing: 'Area Tengah', minX: -6, maxX: 6, minZ: 5.33, maxZ: 16 },
+  { id: 'se', name: 'Ruang Keluarga Timur', wing: 'Sayap Timur', minX: 6, maxX: 18, minZ: 5.33, maxZ: 16 }
+];
+
+function getRoomAt(x, z) {
+  for (const r of ROOMS) {
+    if (x >= r.minX && x <= r.maxX && z >= r.minZ && z <= r.maxZ) {
+      return r;
+    }
+  }
+  return ROOMS[7]; // Serambi Utama fallback
+}
+
+// 12 Laci 2x Ketuk (4 per sayap: Barat, Tengah, Timur)
+const DRAWER_SPOTS = [
+  // Sayap Barat (index 0..3)
+  { id: 'd_nw_1', wing: 'Sayap Barat', room: 'Kamar Tidur Utama', x: -16.2, z: -13.5, rotY: Math.PI / 2 },
+  { id: 'd_cw_1', wing: 'Sayap Barat', room: 'Ruang Kerja Tua', x: -16.2, z: -2.5, rotY: Math.PI / 2 },
+  { id: 'd_cw_2', wing: 'Sayap Barat', room: 'Ruang Kerja Tua', x: -12.0, z: 4.1, rotY: Math.PI },
+  { id: 'd_sw_1', wing: 'Sayap Barat', room: 'Ruang Tamu Barat', x: -16.2, z: 12.2, rotY: Math.PI / 2 },
+
+  // Area Tengah (index 4..7)
+  { id: 'd_nc_1', wing: 'Area Tengah', room: 'Lorong Utara & Galeri', x: -4.6, z: -14.2, rotY: 0 },
+  { id: 'd_nc_2', wing: 'Area Tengah', room: 'Lorong Utara & Galeri', x: 4.6, z: -14.2, rotY: 0 },
+  { id: 'd_cc_1', wing: 'Area Tengah', room: 'Lorong Silang Tengah', x: -4.6, z: -3.8, rotY: Math.PI / 2 },
+  { id: 'd_sc_1', wing: 'Area Tengah', room: 'Serambi Utama', x: 4.5, z: 11.5, rotY: -Math.PI / 2 },
+
+  // Sayap Timur (index 8..11)
+  { id: 'd_ne_1', wing: 'Sayap Timur', room: 'Dapur Tua & Gudang', x: 16.2, z: -13.0, rotY: -Math.PI / 2 },
+  { id: 'd_ce_1', wing: 'Sayap Timur', room: 'Ruang Makan', x: 16.2, z: -1.8, rotY: -Math.PI / 2 },
+  { id: 'd_ce_2', wing: 'Sayap Timur', room: 'Ruang Makan', x: 11.5, z: 4.1, rotY: Math.PI },
+  { id: 'd_se_1', wing: 'Sayap Timur', room: 'Ruang Keluarga Timur', x: 16.2, z: 12.4, rotY: -Math.PI / 2 }
+];
+
+// 9 Lemari Pakaian Berjalusi (1 di setiap ruangan)
+const CLOSET_SPOTS = [
+  { id: 'c_nw', room: 'Kamar Tidur Utama', x: -11.5, z: -14.7, rotY: 0 },
+  { id: 'c_nc', room: 'Lorong Utara & Galeri', x: 0.0, z: -14.7, rotY: 0 },
+  { id: 'c_ne', room: 'Dapur Tua & Gudang', x: 11.5, z: -14.7, rotY: 0 },
+
+  { id: 'c_cw', room: 'Ruang Kerja Tua', x: -16.7, z: 1.8, rotY: Math.PI / 2 },
+  { id: 'c_cc', room: 'Lorong Silang Tengah', x: 4.7, z: 2.2, rotY: -Math.PI / 2 },
+  { id: 'c_ce', room: 'Ruang Makan', x: 16.7, z: 2.0, rotY: -Math.PI / 2 },
+
+  { id: 'c_sw', room: 'Ruang Tamu Barat', x: -11.5, z: 14.7, rotY: Math.PI },
+  { id: 'c_sc', room: 'Serambi Utama', x: -4.7, z: 11.8, rotY: Math.PI / 2 },
+  { id: 'c_se', room: 'Ruang Keluarga Timur', x: 11.5, z: 14.7, rotY: Math.PI }
+];
+
+// Titik Navigasi Rute Aman (Waypoints pusat setiap ruangan + pintu penghubung)
+const NAV_NODES = [
+  { id: 'nw', x: -12, z: -10.5 },
+  { id: 'nc', x: 0, z: -10.5 },
+  { id: 'ne', x: 12, z: -10.5 },
+  { id: 'cw', x: -12, z: 0 },
+  { id: 'cc', x: 0, z: 0 },
+  { id: 'ce', x: 12, z: 0 },
+  { id: 'sw', x: -12, z: 10.5 },
+  { id: 'sc', x: 0, z: 10.5 },
+  { id: 'se', x: 12, z: 10.5 }
+];
+
+const NAV_EDGES = {
+  nw: ['nc', 'cw'],
+  nc: ['nw', 'ne', 'cc'],
+  ne: ['nc', 'ce'],
+  cw: ['nw', 'cc', 'sw'],
+  cc: ['nc', 'cw', 'ce', 'sc'],
+  ce: ['ne', 'cc', 'se'],
+  sw: ['cw', 'sc'],
+  sc: ['cc', 'sw', 'se'],
+  se: ['ce', 'sc']
+};
+
+const BEST_TIME_STORAGE = 'rumah_sunyi_best_times_v2';
+
+function getBestTimes() {
+  try {
+    const raw = localStorage.getItem(BEST_TIME_STORAGE);
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return { mudah: null, normal: null, sulit: null };
+}
+
+function saveBestTime(diffId, seconds) {
+  const current = getBestTimes();
+  const prev = current[diffId];
+  let isNewRecord = false;
+  if (prev === null || seconds < prev) {
+    current[diffId] = seconds;
+    isNewRecord = true;
+    try {
+      localStorage.setItem(BEST_TIME_STORAGE, JSON.stringify(current));
+    } catch (_) {}
+  }
+  return { isNewRecord, best: current[diffId] };
+}
+
+function formatTime(sec) {
+  if (sec === null || sec === undefined || Number.isNaN(sec)) return '--:--.--';
+  const mins = Math.floor(sec / 60);
+  const secs = Math.floor(sec % 60);
+  const cs = Math.floor((sec - Math.floor(sec)) * 100);
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+}
+
+class HorrorAudioEngine {
+  constructor() {
+    this.ctx = null;
+    this.masterGain = null;
+    this.reverbNode = null;
+    this.bgmGain = null;
+    this.sfxGain = null;
+    this.tensionGain = null;
+
+    this.bgmEnabled = true;
+    this.sfxEnabled = true;
+    this.started = false;
+    this.stepToggle = false;
+  }
+
+  init() {
+    if (this.started) {
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+      return;
+    }
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    this.ctx = new AudioCtx();
+
+    // Master Compressor + Gain
+    const compressor = this.ctx.createDynamicsCompressor();
+    compressor.threshold.value = -16;
+    compressor.knee.value = 18;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.01;
+    compressor.release.value = 0.25;
+
+    this.masterGain = this.ctx.createGain();
+    this.masterGain.gain.value = 0.85;
+
+    this.bgmGain = this.ctx.createGain();
+    this.bgmGain.gain.value = this.bgmEnabled ? 0.34 : 0;
+
+    this.sfxGain = this.ctx.createGain();
+    this.sfxGain.gain.value = this.sfxEnabled ? 0.8 : 0;
+
+    // Impulse Response Reverb Ruangan Mansion
+    this.reverbNode = this.ctx.createConvolver();
+    this.reverbNode.buffer = this._createImpulseResponse(2.4, 2.8);
+
+    const reverbWet = this.ctx.createGain();
+    reverbWet.gain.value = 0.32;
+
+    this.bgmGain.connect(compressor);
+    this.sfxGain.connect(compressor);
+    this.sfxGain.connect(this.reverbNode);
+    this.reverbNode.connect(reverbWet);
+    reverbWet.connect(compressor);
+
+    compressor.connect(this.masterGain);
+    this.masterGain.connect(this.ctx.destination);
+
+    this._startAmbientBacksound();
+    this.started = true;
+  }
+
+  _createImpulseResponse(duration, decay) {
+    const rate = this.ctx.sampleRate;
+    const length = Math.floor(rate * duration);
+    const impulse = this.ctx.createBuffer(2, length, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = impulse.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        const env = Math.pow(1 - i / length, decay);
+        data[i] = (Math.random() * 2 - 1) * env;
+      }
+    }
+    return impulse;
+  }
+
+  _startAmbientBacksound() {
+    const now = this.ctx.currentTime;
+
+    // Lapisan 1: Drone Kontrabas Gelap (Sub-bass + LFO)
+    const bassOsc1 = this.ctx.createOscillator();
+    const bassOsc2 = this.ctx.createOscillator();
+    const bassFilter = this.ctx.createBiquadFilter();
+    const droneGain = this.ctx.createGain();
+
+    bassOsc1.type = 'sawtooth';
+    bassOsc1.frequency.setValueAtTime(41.2, now); // E1
+    bassOsc2.type = 'triangle';
+    bassOsc2.frequency.setValueAtTime(61.74, now); // B1
+
+    bassFilter.type = 'lowpass';
+    bassFilter.frequency.setValueAtTime(135, now);
+
+    const lfo = this.ctx.createOscillator();
+    const lfoGain = this.ctx.createGain();
+    lfo.frequency.setValueAtTime(0.14, now);
+    lfoGain.gain.setValueAtTime(45, now);
+    lfo.connect(lfoFilterTarget(bassFilter));
+
+    function lfoFilterTarget(filter) {
+      lfoGain.connect(filter.frequency);
+      return lfoGain;
+    }
+
+    droneGain.gain.setValueAtTime(0.35, now);
+    bassOsc1.connect(bassFilter);
+    bassOsc2.connect(bassFilter);
+    bassFilter.connect(droneGain);
+    droneGain.connect(this.bgmGain);
+
+    bassOsc1.start(now);
+    bassOsc2.start(now);
+    lfo.start(now);
+
+    // Lapisan 2: Angin Lorong Tua (Filtered Pink/Brown Noise)
+    const bufferSize = this.ctx.sampleRate * 4;
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    let lastOut = 0.0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      output[i] = (lastOut + 0.02 * white) / 1.02;
+      lastOut = output[i];
+      output[i] *= 2.6;
+    }
+
+    const windNoise = this.ctx.createBufferSource();
+    windNoise.buffer = noiseBuffer;
+    windNoise.loop = true;
+
+    const windFilter = this.ctx.createBiquadFilter();
+    windFilter.type = 'bandpass';
+    windFilter.frequency.setValueAtTime(280, now);
+    windFilter.Q.setValueAtTime(3.2, now);
+
+    const windGain = this.ctx.createGain();
+    windGain.gain.setValueAtTime(0.24, now);
+
+    windNoise.connect(windFilter);
+    windFilter.connect(windGain);
+    windGain.connect(this.bgmGain);
+    windNoise.start(now);
+
+    // Lapisan 3: Harmoni Gesek Ketegangan (Dissonant String Pad)
+    const padOscA = this.ctx.createOscillator();
+    const padOscB = this.ctx.createOscillator();
+    const padFilter = this.ctx.createBiquadFilter();
+    this.tensionGain = this.ctx.createGain();
+
+    padOscA.type = 'sawtooth';
+    padOscA.frequency.setValueAtTime(164.81, now); // E3
+    padOscB.type = 'sawtooth';
+    padOscB.frequency.setValueAtTime(174.61, now); // F3 (minor second tension)
+
+    padFilter.type = 'lowpass';
+    padFilter.frequency.setValueAtTime(520, now);
+
+    this.tensionGain.gain.setValueAtTime(0.03, now);
+
+    padOscA.connect(padFilter);
+    padOscB.connect(padFilter);
+    padFilter.connect(this.tensionGain);
+    this.tensionGain.connect(this.bgmGain);
+
+    padOscA.start(now);
+    padOscB.start(now);
+  }
+
+  setTensionLevel(level01) {
+    if (!this.started || !this.tensionGain) return;
+    const clamped = Math.max(0, Math.min(1, level01));
+    const target = 0.025 + clamped * 0.28;
+    this.tensionGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.25);
+  }
+
+  toggleBgm() {
+    this.bgmEnabled = !this.bgmEnabled;
+    if (this.bgmGain && this.ctx) {
+      this.bgmGain.gain.setTargetAtTime(this.bgmEnabled ? 0.34 : 0, this.ctx.currentTime, 0.1);
+    }
+    return this.bgmEnabled;
+  }
+
+  toggleSfx() {
+    this.sfxEnabled = !this.sfxEnabled;
+    if (this.sfxGain && this.ctx) {
+      this.sfxGain.gain.setTargetAtTime(this.sfxEnabled ? 0.8 : 0, this.ctx.currentTime, 0.1);
+    }
+    return this.sfxEnabled;
+  }
+
+  playFootstep(isGhost = false) {
+    if (!this.started || !this.sfxEnabled) return;
+    const now = this.ctx.currentTime;
+    this.stepToggle = !this.stepToggle;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+
+    osc.type = isGhost ? 'sawtooth' : 'triangle';
+    const baseFreq = isGhost ? (this.stepToggle ? 56 : 48) : (this.stepToggle ? 115 : 98);
+    osc.frequency.setValueAtTime(baseFreq, now);
+    osc.frequency.exponentialRampToValueAtTime(28, now + 0.11);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(isGhost ? 210 : 340, now);
+
+    gain.gain.setValueAtTime(isGhost ? 0.42 : 0.16, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 0.13);
+  }
+
+  playDrawerCreak(stage = 1) {
+    if (!this.started || !this.sfxEnabled) return;
+    const now = this.ctx.currentTime;
+    const dur = stage === 1 ? 0.36 : 0.52;
+
+    const osc = this.ctx.createOscillator();
+    const mod = this.ctx.createOscillator();
+    const modGain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(stage === 1 ? 155 : 195, now);
+    osc.frequency.linearRampToValueAtTime(stage === 1 ? 110 : 250, now + dur);
+
+    mod.frequency.setValueAtTime(28, now);
+    modGain.gain.setValueAtTime(24, now);
+    mod.connect(modGain);
+    modGain.connect(osc.frequency);
+
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(480, now);
+    filter.Q.setValueAtTime(4.5, now);
+
+    gain.gain.setValueAtTime(0.28, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    mod.start(now);
+    osc.stop(now + dur + 0.02);
+    mod.stop(now + dur + 0.02);
+  }
+
+  playKeyFound() {
+    if (!this.started || !this.sfxEnabled) return;
+    const now = this.ctx.currentTime;
+    const notes = [880, 1174.66, 1318.51];
+    notes.forEach((freq, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      const t = now + idx * 0.085;
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.22, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(t);
+      osc.stop(t + 0.46);
+    });
+  }
+
+  playWrongAnswerLock() {
+    if (!this.started || !this.sfxEnabled) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(52, now + 0.35);
+
+    gain.gain.setValueAtTime(0.45, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.38);
+  }
+
+  playClosetDoor(closing = true) {
+    if (!this.started || !this.sfxEnabled) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(closing ? 130 : 95, now);
+    osc.frequency.exponentialRampToValueAtTime(closing ? 58 : 145, now + 0.22);
+
+    gain.gain.setValueAtTime(0.32, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.23);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.25);
+  }
+
+  playEyeSpotSting() {
+    if (!this.started || !this.sfxEnabled) return;
+    const now = this.ctx.currentTime;
+    // Waterphone / Metallic Terror Sting
+    [554.37, 587.33, 830.61].forEach((freq, i) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = i === 0 ? 'sawtooth' : 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.linearRampToValueAtTime(freq * 0.94, now + 0.95);
+
+      gain.gain.setValueAtTime(0.24, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.98);
+
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(now);
+      osc.stop(now + 1.0);
+    });
+  }
+
+  playJumpscare() {
+    if (!this.started || !this.sfxEnabled) return;
+    const now = this.ctx.currentTime;
+    [92.5, 98.0, 277.18, 554.37, 1108.73].forEach((freq) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.linearRampToValueAtTime(freq * 1.18, now + 0.65);
+
+      gain.gain.setValueAtTime(0.32, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.72);
+
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(now);
+      osc.stop(now + 0.75);
+    });
+  }
+}
+
+
+class PaleShadowEntity {
+  constructor(scene, diffConfig) {
+    this.scene = scene;
+    this.diff = diffConfig;
+
+    // Posisi awal di Lorong Utara & Galeri (diam memindai sampai mata melihat pemain)
+    this.homePos = new THREE.Vector3(0, 0, -11.5);
+    this.position = this.homePos.clone();
+
+    // Status perilaku:
+    // 'dormant_scan' -> diam di tempat (0 m/s), hanya menggerakkan kepala & kerucut mata
+    // 'chasing'      -> mata hantu telah melihat pemain, mengejar aktif
+    // 'paused'       -> pemain bersembunyi di lemari, hantu membeku selama hideDuration detik
+    // 'jumpscare'    -> menangkap pemain
+    this.state = 'dormant_scan';
+    this.pauseTimer = 0;
+    this.scanTime = 0;
+    this.baseYaw = 0; // Menghadap ke Selatan (+Z) memantau lorong utama
+    this.headYaw = 0;
+    this.targetLookYaw = null;
+    this.lookAlertTimer = 0;
+    this.seesPlayer = false;
+    this.stepAccum = 0;
+
+    this.group = new THREE.Group();
+    this.headGroup = new THREE.Group();
+    this.leftArm = new THREE.Group();
+    this.rightArm = new THREE.Group();
+    this.gazeCone = null;
+
+    this._buildMesh();
+    this.group.position.copy(this.position);
+    this.scene.add(this.group);
+  }
+
+  _buildMesh() {
+    const shroudMat = new THREE.MeshStandardMaterial({
+      color: 0x0b0a0c,
+      roughness: 0.92,
+      metalness: 0.05
+    });
+
+    const skullMat = new THREE.MeshStandardMaterial({
+      color: 0xd8d0c1,
+      roughness: 0.65,
+      metalness: 0.05
+    });
+
+    const voidMat = new THREE.MeshBasicMaterial({
+      color: 0x050304
+    });
+
+    const eyeGlowMat = new THREE.MeshBasicMaterial({
+      color: 0xe63b2e
+    });
+
+    // Jubah kain kafan hitam tinggi (2.35m)
+    const robeGeo = new THREE.ConeGeometry(0.46, 2.05, 14, 1, true);
+    const robe = new THREE.Mesh(robeGeo, shroudMat);
+    robe.position.y = 1.05;
+    robe.castShadow = true;
+    this.group.add(robe);
+
+    // Bahu kurus runcing
+    const shoulderGeo = new THREE.BoxGeometry(0.76, 0.16, 0.28);
+    const shoulders = new THREE.Mesh(shoulderGeo, shroudMat);
+    shoulders.position.y = 1.98;
+    this.group.add(shoulders);
+
+    // Kepala tengkorak pucat miring
+    this.headGroup.position.set(0, 2.22, 0.04);
+    this.headGroup.rotation.z = 0.22; // Kepala miring mencekam
+
+    const cranium = new THREE.Mesh(new THREE.SphereGeometry(0.19, 14, 14), skullMat);
+    cranium.scale.set(0.88, 1.15, 0.96);
+    this.headGroup.add(cranium);
+
+    const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.17), skullMat);
+    jaw.position.set(0, -0.14, 0.03);
+    this.headGroup.add(jaw);
+
+    // Rongga mulut menganga gelap
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.11, 0.05), voidMat);
+    mouth.position.set(0, -0.13, 0.11);
+    this.headGroup.add(mouth);
+
+    // Rongga mata hitam + titik merah redup
+    [-0.065, 0.065].forEach((ex) => {
+      const socket = new THREE.Mesh(new THREE.SphereGeometry(0.042, 8, 8), voidMat);
+      socket.position.set(ex, 0.02, 0.155);
+      this.headGroup.add(socket);
+
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.015, 6, 6), eyeGlowMat);
+      pupil.position.set(ex, 0.02, 0.188);
+      this.headGroup.add(pupil);
+    });
+
+    // Kerucut penglihatan mata halus di depan wajah hantu
+    const coneLen = 6.5;
+    const coneRadius = Math.tan(THREE.MathUtils.degToRad(this.diff.sightConeDeg * 0.65)) * coneLen;
+    const coneGeo = new THREE.ConeGeometry(coneRadius, coneLen, 16, 1, true);
+    coneGeo.translate(0, -coneLen / 2, 0);
+    coneGeo.rotateX(-Math.PI / 2);
+
+    const coneMat = new THREE.MeshBasicMaterial({
+      color: 0xc93b2b,
+      transparent: true,
+      opacity: 0.075,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    this.gazeCone = new THREE.Mesh(coneGeo, coneMat);
+    this.gazeCone.position.set(0, 0.02, 0.2);
+    this.headGroup.add(this.gazeCone);
+
+    this.group.add(this.headGroup);
+
+    // Lengan panjang berjari cakar
+    const buildArm = (side) => {
+      const armPivot = new THREE.Group();
+      armPivot.position.set(side * 0.42, 1.94, 0);
+
+      const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.035, 0.72, 8), shroudMat);
+      upper.position.y = -0.36;
+      armPivot.add(upper);
+
+      const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.022, 0.68, 8), skullMat);
+      forearm.position.set(0, -0.96, 0.08);
+      forearm.rotation.x = -0.22;
+      armPivot.add(forearm);
+
+      // 3 Jari cakar panjang
+      for (let c = -1; c <= 1; c++) {
+        const claw = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.18, 5), skullMat);
+        claw.position.set(c * 0.025, -1.34, 0.16);
+        claw.rotation.x = Math.PI + 0.25;
+        armPivot.add(claw);
+      }
+      return armPivot;
+    };
+
+    this.leftArm = buildArm(-1);
+    this.rightArm = buildArm(1);
+    this.group.add(this.leftArm);
+    this.group.add(this.rightArm);
+  }
+
+  reset() {
+    this.position.copy(this.homePos);
+    this.group.position.copy(this.position);
+    this.state = 'dormant_scan';
+    this.pauseTimer = 0;
+    this.scanTime = 0;
+    this.baseYaw = 0;
+    this.headYaw = 0;
+    this.targetLookYaw = null;
+    this.lookAlertTimer = 0;
+    this.seesPlayer = false;
+    this.group.rotation.set(0, 0, 0);
+    this.headGroup.rotation.set(0, 0, 0.22);
+  }
+
+  // Suara berisik membuat kepala hantu menoleh ke sumber suara tanpa berjalan
+  hearNoiseAt(sourcePos, radius) {
+    if (this.state === 'paused' || this.state === 'jumpscare') return;
+    const dist = this.position.distanceTo(sourcePos);
+    if (dist <= radius) {
+      const dx = sourcePos.x - this.position.x;
+      const dz = sourcePos.z - this.position.z;
+      this.targetLookYaw = Math.atan2(dx, dz);
+      this.lookAlertTimer = 3.2;
+    }
+  }
+
+  pauseFromCloset() {
+    this.state = 'paused';
+    this.pauseTimer = this.diff.hideDuration;
+    this.seesPlayer = false;
+  }
+
+  _checkEyeLineOfSight(playerPos, isFlashlightOn, isPlayerHidden, wallMeshes) {
+    if (isPlayerHidden || this.state === 'paused' || this.state === 'jumpscare') {
+      return false;
+    }
+
+    const eyeWorldPos = new THREE.Vector3(this.position.x, 2.2, this.position.z);
+    const targetPos = new THREE.Vector3(playerPos.x, 1.45, playerPos.z);
+    const toPlayer = targetPos.clone().sub(eyeWorldPos);
+    const dist = toPlayer.length();
+
+    // Mematikan senter mengurangi jarak pandang hantu hingga 55%
+    const effectiveRange = isFlashlightOn ? this.diff.sightRange : this.diff.sightRange * 0.45;
+    if (dist > effectiveRange) return false;
+
+    // Arah tatapan kepala hantu saat ini
+    const totalYaw = this.group.rotation.y + this.headGroup.rotation.y;
+    const lookDir = new THREE.Vector3(Math.sin(totalYaw), 0, Math.cos(totalYaw)).normalize();
+    const flatToPlayer = new THREE.Vector3(toPlayer.x, 0, toPlayer.z).normalize();
+
+    const angleDeg = THREE.MathUtils.radToDeg(lookDir.angleTo(flatToPlayer));
+    if (angleDeg > this.diff.sightConeDeg) return false;
+
+    // Raycast untuk memastikan pandangan mata tidak terhalang tembok
+    const raycaster = new THREE.Raycaster(eyeWorldPos, toPlayer.clone().normalize(), 0.2, dist);
+    const hits = raycaster.intersectObjects(wallMeshes, false);
+    return hits.length === 0;
+  }
+
+  _getNextWaypointToward(targetPos) {
+    const nearestNode = (pos) => {
+      let best = NAV_NODES[0];
+      let bestD = Infinity;
+      for (const n of NAV_NODES) {
+        const d = Math.hypot(n.x - pos.x, n.z - pos.z);
+        if (d < bestD) {
+          bestD = d;
+          best = n;
+        }
+      }
+      return best;
+    };
+
+    const start = nearestNode(this.position);
+    const goal = nearestNode(targetPos);
+    if (start.id === goal.id) {
+      return new THREE.Vector3(targetPos.x, 0, targetPos.z);
+    }
+
+    // BFS sederhana pada graf 9 ruangan
+    const queue = [[start.id]];
+    const visited = new Set([start.id]);
+    while (queue.length > 0) {
+      const path = queue.shift();
+      const curr = path[path.length - 1];
+      if (curr === goal.id) {
+        const nextId = path[1] || goal.id;
+        const node = NAV_NODES.find((n) => n.id === nextId);
+        return new THREE.Vector3(node.x, 0, node.z);
+      }
+      for (const nb of NAV_EDGES[curr] || []) {
+        if (!visited.has(nb)) {
+          visited.add(nb);
+          queue.push([...path, nb]);
+        }
+      }
+    }
+    return new THREE.Vector3(targetPos.x, 0, targetPos.z);
+  }
+
+  update(dt, context) {
+    const { playerPos, isFlashlightOn, isPlayerHidden, isQuizOpen, wallMeshes, audio, onSpotted, onCatch } = context;
+
+    // Jika modal kuis guru terbuka, bekukan entitas agar siswa bisa membaca soal
+    if (isQuizOpen) return;
+
+    // 1. Status PAUSED (Pemain di dalam lemari)
+    if (this.state === 'paused') {
+      this.pauseTimer -= dt;
+      this.seesPlayer = false;
+      if (this.pauseTimer <= 0) {
+        // Kembali ke posisi pengawasan utara dan diam memindai
+        this.position.copy(this.homePos);
+        this.group.position.copy(this.position);
+        this.state = 'dormant_scan';
+        this.targetLookYaw = null;
+      }
+      return;
+    }
+
+    // 2. Cek apakah mata hantu melihat pemain
+    const spottedNow = this._checkEyeLineOfSight(playerPos, isFlashlightOn, isPlayerHidden, wallMeshes);
+
+    if (spottedNow && !this.seesPlayer && this.state === 'dormant_scan') {
+      this.state = 'chasing';
+      if (onSpotted) onSpotted();
+    }
+    this.seesPlayer = spottedNow;
+
+    // Warna kerucut penglihatan mata berubah lebih terang saat melihat pemain
+    if (this.gazeCone) {
+      this.gazeCone.material.opacity = this.seesPlayer ? 0.22 : 0.075;
+    }
+
+    // 3. Perilaku DORMANT_SCAN: Diam 0 m/s, hanya menggerakkan kepala memindai
+    if (this.state === 'dormant_scan') {
+      this.scanTime += dt;
+      if (this.lookAlertTimer > 0 && this.targetLookYaw !== null) {
+        this.lookAlertTimer -= dt;
+        this.group.rotation.y = this._lerpAngle(this.group.rotation.y, this.targetLookYaw, dt * 4.5);
+        this.headGroup.rotation.y = Math.sin(this.scanTime * 3.2) * 0.22;
+      } else {
+        // Sapuan kepala lambat memindai lorong utara, barat, dan timur
+        this.group.rotation.y = this._lerpAngle(this.group.rotation.y, this.baseYaw, dt * 1.5);
+        this.headGroup.rotation.y = Math.sin(this.scanTime * 0.72) * 1.18;
+      }
+
+      // Ayunan lengan pelan saat diam
+      this.leftArm.rotation.x = Math.sin(this.scanTime * 1.4) * 0.08;
+      this.rightArm.rotation.x = -Math.sin(this.scanTime * 1.4) * 0.08;
+      return;
+    }
+
+    // 4. Perilaku CHASING: Mengejar pemain aktif
+    if (this.state === 'chasing') {
+      // Jika pemain bersembunyi di lemari saat dikejar, hantu terjeda
+      if (isPlayerHidden) {
+        this.pauseFromCloset();
+        return;
+      }
+
+      const waypoint = this.seesPlayer
+        ? new THREE.Vector3(playerPos.x, 0, playerPos.z)
+        : this._getNextWaypointToward(playerPos);
+
+      const moveVec = waypoint.clone().sub(this.position);
+      moveVec.y = 0;
+      const distToWp = moveVec.length();
+
+      if (distToWp > 0.05) {
+        moveVec.normalize();
+        const speed = this.seesPlayer ? this.diff.ghostSpeed : this.diff.ghostSpeed * 0.85;
+        this.position.addScaledVector(moveVec, speed * dt);
+        this.group.position.copy(this.position);
+
+        const desiredYaw = Math.atan2(moveVec.x, moveVec.z);
+        this.group.rotation.y = this._lerpAngle(this.group.rotation.y, desiredYaw, dt * 7.5);
+        this.headGroup.rotation.y = this._lerpAngle(this.headGroup.rotation.y, 0, dt * 8.0);
+
+        // Langkah kaki berat & ayunan tubuh
+        this.stepAccum += speed * dt;
+        this.group.position.y = Math.abs(Math.sin(this.stepAccum * 2.4)) * 0.09;
+        this.leftArm.rotation.x = Math.sin(this.stepAccum * 2.4) * 0.42 - 0.35;
+        this.rightArm.rotation.x = -Math.sin(this.stepAccum * 2.4) * 0.42 - 0.35;
+
+        if (this.stepAccum >= 1.45) {
+          this.stepAccum = 0;
+          if (audio) audio.playFootstep(true);
+        }
+      }
+
+      // Cek tertangkap
+      const distPlayer = Math.hypot(playerPos.x - this.position.x, playerPos.z - this.position.z);
+      if (distPlayer < 1.18) {
+        this.state = 'jumpscare';
+        if (onCatch) onCatch();
+      }
+    }
+  }
+
+  _lerpAngle(a, b, t) {
+    const diff = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+    return a + diff * Math.min(1, t);
+  }
+}
+
+
+function buildMansionWorld(scene) {
+  const wallColliders = []; // { minX, maxX, minZ, maxZ }
+  const wallMeshes = [];    // Untuk raycast garis pandang mata hantu
+  const interactiveMeshes = [];
+  const drawerObjects = [];
+  const closetObjects = [];
+  const animatedProps = {
+    pendulum: null,
+    gramophoneDisc: null,
+    flickerLights: [],
+    dustParticles: null
+  };
+
+  // Tekstur Kanvas Prosedural
+  const floorTex = createWoodFloorTexture();
+  floorTex.wrapS = THREE.RepeatWrapping;
+  floorTex.wrapT = THREE.RepeatWrapping;
+  floorTex.repeat.set(12, 11);
+
+  const wallTex = createAgedWallTexture();
+  wallTex.wrapS = THREE.RepeatWrapping;
+  wallTex.wrapT = THREE.RepeatWrapping;
+  wallTex.repeat.set(4, 1);
+
+  const woodDarkMat = new THREE.MeshStandardMaterial({
+    color: 0x2b1e15,
+    roughness: 0.78,
+    metalness: 0.08
+  });
+
+  const brassMat = new THREE.MeshStandardMaterial({
+    color: 0xd4a246,
+    roughness: 0.32,
+    metalness: 0.82
+  });
+
+  // Lantai & Langit-Langit
+  const floorMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(36, 32),
+    new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.85, metalness: 0.05 })
+  );
+  floorMesh.rotation.x = -Math.PI / 2;
+  scene.add(floorMesh);
+
+  const ceilingMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(36, 32),
+    new THREE.MeshStandardMaterial({ color: 0x14100d, roughness: 0.95 })
+  );
+  ceilingMesh.rotation.x = Math.PI / 2;
+  ceilingMesh.position.y = MANSION_BOUNDS.wallHeight;
+  scene.add(ceilingMesh);
+
+  // Balok kayu langit-langit
+  for (let z = -14; z <= 14; z += 4) {
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(36, 0.28, 0.32), woodDarkMat);
+    beam.position.set(0, MANSION_BOUNDS.wallHeight - 0.14, z);
+    scene.add(beam);
+  }
+
+  const wallMat = new THREE.MeshStandardMaterial({
+    map: wallTex,
+    roughness: 0.9,
+    metalness: 0.03
+  });
+
+  const addWallSegment = (x1, z1, x2, z2, thickness = 0.36) => {
+    const len = Math.hypot(x2 - x1, z2 - z1);
+    if (len < 0.05) return;
+    const cx = (x1 + x2) / 2;
+    const cz = (z1 + z2) / 2;
+    const isHorizontal = Math.abs(x2 - x1) >= Math.abs(z2 - z1);
+
+    const w = isHorizontal ? len : thickness;
+    const d = isHorizontal ? thickness : len;
+    const h = MANSION_BOUNDS.wallHeight;
+
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+    mesh.position.set(cx, h / 2, cz);
+    scene.add(mesh);
+    wallMeshes.push(mesh);
+
+    wallColliders.push({
+      minX: cx - w / 2,
+      maxX: cx + w / 2,
+      minZ: cz - d / 2,
+      maxZ: cz + d / 2
+    });
+  };
+
+  const addWallWithDoor = (x1, z1, x2, z2, doorCenter, doorWidth = 2.8) => {
+    const isHorizontal = Math.abs(x2 - x1) >= Math.abs(z2 - z1);
+    const halfDoor = doorWidth / 2;
+    if (isHorizontal) {
+      const minX = Math.min(x1, x2);
+      const maxX = Math.max(x1, x2);
+      addWallSegment(minX, z1, doorCenter - halfDoor, z2);
+      addWallSegment(doorCenter + halfDoor, z1, maxX, z2);
+      // Ambang atas pintu
+      const lintel = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, 1.3, 0.38), woodDarkMat);
+      lintel.position.set(doorCenter, MANSION_BOUNDS.wallHeight - 0.65, z1);
+      scene.add(lintel);
+    } else {
+      const minZ = Math.min(z1, z2);
+      const maxZ = Math.max(z1, z2);
+      addWallSegment(x1, minZ, x2, doorCenter - halfDoor);
+      addWallSegment(x1, doorCenter + halfDoor, x2, maxZ);
+      const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.38, 1.3, doorWidth), woodDarkMat);
+      lintel.position.set(x1, MANSION_BOUNDS.wallHeight - 0.65, doorCenter);
+      scene.add(lintel);
+    }
+  };
+
+  // Dinding Keliling Mansion (36m x 32m)
+  addWallSegment(-18, -16, 18, -16); // Utara
+  addWallSegment(-18, 16, 18, 16);   // Selatan (Pintu Keluar Utama berada di x=0, z=15.8)
+  addWallSegment(-18, -16, -18, 16); // Barat
+  addWallSegment(18, -16, 18, 16);   // Timur
+
+  // Dinding Sekat Vertikal (x = -6 dan x = 6) dengan pintu lebar 2.8m di tiap baris ruangan
+  [-6, 6].forEach((wx) => {
+    addWallWithDoor(wx, -16, wx, -5.33, -10.5, 2.8);
+    addWallWithDoor(wx, -5.33, wx, 5.33, 0.0, 2.8);
+    addWallWithDoor(wx, 5.33, wx, 16, 10.5, 2.8);
+  });
+
+  // Dinding Sekat Horizontal (z = -5.33 dan z = 5.33) dengan pintu lebar 2.8m di tiap kolom ruangan
+  [-5.33, 5.33].forEach((wz) => {
+    addWallWithDoor(-18, wz, -6, wz, -12.0, 2.8);
+    addWallWithDoor(-6, wz, 6, wz, 0.0, 2.8);
+    addWallWithDoor(6, wz, 18, wz, 12.0, 2.8);
+  });
+
+  // Pintu Keluar Utama (Selatan Serambi Utama: x = 0, z = 15.7)
+  const exitDoorGroup = new THREE.Group();
+  exitDoorGroup.position.set(0, 0, 15.65);
+
+  const doorLeaf = new THREE.Mesh(new THREE.BoxGeometry(2.1, 2.85, 0.16), woodDarkMat);
+  doorLeaf.position.set(0, 1.425, 0);
+  exitDoorGroup.add(doorLeaf);
+
+  const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(2.36, 3.0, 0.24), brassMat);
+  doorFrame.position.set(0, 1.5, 0.05);
+  exitDoorGroup.add(doorFrame);
+
+  // 3 Gembok Kuningan Visual pada Pintu Keluar
+  const padlockMeshes = [];
+  [-0.55, 0, 0.55].forEach((px) => {
+    const lock = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.24, 0.12), brassMat);
+    lock.position.set(px, 1.38, -0.12);
+    exitDoorGroup.add(lock);
+    padlockMeshes.push(lock);
+  });
+
+  doorLeaf.userData = { interactType: 'exit_door', label: 'Pintu Keluar Utama' };
+  interactiveMeshes.push(doorLeaf);
+  scene.add(exitDoorGroup);
+
+  // Bangun 12 Laci 2x Ketuk
+  DRAWER_SPOTS.forEach((spot, index) => {
+    const group = new THREE.Group();
+    group.position.set(spot.x, 0, spot.z);
+    group.rotation.y = spot.rotY;
+
+    const cabinet = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.92, 0.62), woodDarkMat);
+    cabinet.position.y = 0.46;
+    group.add(cabinet);
+
+    const drawerFront = new THREE.Mesh(
+      new THREE.BoxGeometry(1.02, 0.32, 0.12),
+      new THREE.MeshStandardMaterial({ color: 0x452d1d, roughness: 0.65 })
+    );
+    drawerFront.position.set(0, 0.64, 0.31);
+    group.add(drawerFront);
+
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), brassMat);
+    knob.position.set(0, 0.64, 0.39);
+    drawerFront.add(knob);
+
+    // Kilau kunci di dalam laci (terlihat saat laci dibuka)
+    const keyMesh = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.022, 6, 12), brassMat);
+    keyMesh.rotation.x = Math.PI / 2;
+    keyMesh.position.set(0, 0.62, 0.24);
+    keyMesh.visible = false;
+    group.add(keyMesh);
+
+    const drawerState = {
+      index,
+      spot,
+      group,
+      drawerFront,
+      keyMesh,
+      tapStage: 0,      // 0 = tertutup, 1 = terbuka celah, 2 = sudah digeledah
+      hasKey: false,
+      keyCollected: false
+    };
+
+    cabinet.userData = { interactType: 'drawer', ref: drawerState };
+    drawerFront.userData = { interactType: 'drawer', ref: drawerState };
+    interactiveMeshes.push(cabinet, drawerFront);
+
+    scene.add(group);
+    drawerObjects.push(drawerState);
+  });
+
+  // Bangun 9 Lemari Pakaian Berjalusi (Hiding Closets)
+  CLOSET_SPOTS.forEach((spot, index) => {
+    const group = new THREE.Group();
+    group.position.set(spot.x, 0, spot.z);
+    group.rotation.y = spot.rotY;
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.45, 2.35, 0.85), woodDarkMat);
+    body.position.y = 1.175;
+    group.add(body);
+
+    // Pintu berjalusi (louvered doors)
+    const doorPanel = new THREE.Mesh(
+      new THREE.BoxGeometry(1.32, 2.18, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0x382518, roughness: 0.72 })
+    );
+    doorPanel.position.set(0, 1.15, 0.43);
+    group.add(doorPanel);
+
+    const handleL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.24, 0.06), brassMat);
+    handleL.position.set(-0.08, 1.12, 0.49);
+    const handleR = handleL.clone();
+    handleR.position.x = 0.08;
+    group.add(handleL, handleR);
+
+    const closetState = {
+      index,
+      spot,
+      group
+    };
+
+    body.userData = { interactType: 'closet', ref: closetState };
+    doorPanel.userData = { interactType: 'closet', ref: closetState };
+    interactiveMeshes.push(body, doorPanel);
+
+    scene.add(group);
+    closetObjects.push(closetState);
+  });
+
+  // Properti Atmosferik: Jam Gadang Berbandul di Lorong Utara
+  const clockGroup = new THREE.Group();
+  clockGroup.position.set(-3.2, 0, -15.4);
+  const clockBody = new THREE.Mesh(new THREE.BoxGeometry(0.75, 2.6, 0.45), woodDarkMat);
+  clockBody.position.y = 1.3;
+  clockGroup.add(clockBody);
+
+  const clockFace = new THREE.Mesh(
+    new THREE.CircleGeometry(0.24, 16),
+    new THREE.MeshBasicMaterial({ color: 0xdfd6c5 })
+  );
+  clockFace.position.set(0, 2.15, 0.24);
+  clockGroup.add(clockFace);
+
+  const pendulum = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.08, 0.75, 8), brassMat);
+  pendulum.position.set(0, 1.25, 0.24);
+  clockGroup.add(pendulum);
+  animatedProps.pendulum = pendulum;
+  scene.add(clockGroup);
+
+  // Properti Atmosferik: Gramofon Antik di Ruang Keluarga Timur
+  const gramGroup = new THREE.Group();
+  gramGroup.position.set(12.0, 0, 10.5);
+  const gramTable = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.85, 1.1), woodDarkMat);
+  gramTable.position.y = 0.425;
+  gramGroup.add(gramTable);
+
+  const disc = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.26, 0.26, 0.03, 16),
+    new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3 })
+  );
+  disc.position.y = 0.88;
+  gramGroup.add(disc);
+  animatedProps.gramophoneDisc = disc;
+
+  const horn = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.55, 14, 1, true), brassMat);
+  horn.position.set(0.12, 1.18, -0.08);
+  horn.rotation.z = -0.55;
+  gramGroup.add(horn);
+  scene.add(gramGroup);
+
+  // Lampu Gantung Redup Berkedip di Beberapa Ruangan
+  const lampCoords = [
+    { x: 0, z: 10.5, color: 0xffb469, intensity: 1.5 },
+    { x: 0, z: 0, color: 0xffa654, intensity: 1.3 },
+    { x: -12, z: 0, color: 0xffb469, intensity: 1.2 },
+    { x: 12, z: 0, color: 0xffb469, intensity: 1.2 },
+    { x: 0, z: -10.5, color: 0xd45b4a, intensity: 1.0 }
+  ];
+
+  lampCoords.forEach((lc) => {
+    const light = new THREE.PointLight(lc.color, lc.intensity, 13.5, 1.7);
+    light.position.set(lc.x, 3.65, lc.z);
+    scene.add(light);
+    animatedProps.flickerLights.push({ light, baseIntensity: lc.intensity, phase: Math.random() * 10 });
+  });
+
+  // Partikel Debu Melayang
+  const dustCount = 260;
+  const dustGeo = new THREE.BufferGeometry();
+  const dustPositions = new Float32Array(dustCount * 3);
+  for (let i = 0; i < dustCount; i++) {
+    dustPositions[i * 3] = (Math.random() - 0.5) * 34;
+    dustPositions[i * 3 + 1] = 0.3 + Math.random() * 3.5;
+    dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+  }
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+  const dustMat = new THREE.PointsMaterial({
+    color: 0xdfd6c5,
+    size: 0.045,
+    transparent: true,
+    opacity: 0.38
+  });
+  const dustPoints = new THREE.Points(dustGeo, dustMat);
+  scene.add(dustPoints);
+  animatedProps.dustParticles = dustPoints;
+
+  return {
+    wallColliders,
+    wallMeshes,
+    interactiveMeshes,
+    drawerObjects,
+    closetObjects,
+    padlockMeshes,
+    animatedProps
+  };
+}
+
+function createWoodFloorTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#231810';
+  ctx.fillRect(0, 0, 256, 256);
+
+  const planks = 6;
+  const pw = 256 / planks;
+  for (let i = 0; i < planks; i++) {
+    const shade = 26 + ((i * 7) % 14);
+    ctx.fillStyle = `rgb(${shade + 12}, ${shade + 4}, ${Math.max(10, shade - 4)})`;
+    ctx.fillRect(i * pw + 1, 0, pw - 2, 256);
+
+    ctx.strokeStyle = 'rgba(8, 5, 3, 0.75)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(i * pw, 0, pw, 256);
+  }
+
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createAgedWallTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#2c251e';
+  ctx.fillRect(0, 0, 256, 256);
+
+  // Panel kayu bawah (wainscoting)
+  ctx.fillStyle = '#1d140e';
+  ctx.fillRect(0, 175, 256, 81);
+  ctx.fillStyle = '#4a3522';
+  ctx.fillRect(0, 172, 256, 5);
+
+  // Bercak usia dinding
+  for (let i = 0; i < 90; i++) {
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(15, 12, 9, 0.18)' : 'rgba(65, 54, 43, 0.12)';
+    ctx.fillRect(Math.random() * 256, Math.random() * 170, 6 + Math.random() * 18, 4 + Math.random() * 12);
+  }
+
+  return new THREE.CanvasTexture(canvas);
+}
+
+
+class HorrorGameEngine {
+  constructor(canvas, uiCallbacks) {
+    this.canvas = canvas;
+    this.ui = uiCallbacks;
+
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x090807);
+    this.scene.fog = new THREE.FogExp2(0x090807, 0.068);
+
+    this.camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.15, 45);
+    this.camera.rotation.order = 'YXZ';
+
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    this.audio = new HorrorAudioEngine();
+
+    // Cahaya ambient redup + Senter genggam pemain
+    const ambient = new THREE.AmbientLight(0x3a322a, 0.55);
+    this.scene.add(ambient);
+
+    this.flashlight = new THREE.SpotLight(0xfff1d6, 3.4, 22, THREE.MathUtils.degToRad(34), 0.45, 1.2);
+    this.flashlightTarget = new THREE.Object3D();
+    this.scene.add(this.flashlight);
+    this.scene.add(this.flashlightTarget);
+    this.flashlight.target = this.flashlightTarget;
+
+    this.world = buildMansionWorld(this.scene);
+    this.diffConfig = DIFFICULTY_CONFIG.normal;
+    this.ghost = new PaleShadowEntity(this.scene, this.diffConfig);
+
+    // Status permainan
+    this.isPlaying = false;
+    this.isPausedByQuiz = false;
+    this.isHiddenInCloset = false;
+    this.activeCloset = null;
+    this.flashlightOn = true;
+
+    this.elapsedTime = 0;
+    this.keysFound = 0;
+    this.quizData = null;
+    this.pendingKeyDrawer = null;
+
+    // Posisi & orientasi pemain
+    this.playerPos = new THREE.Vector3(0, 1.65, 13.5);
+    this.yaw = 0; // 0 menghadap Utara (-Z)
+    this.pitch = 0;
+    this.walkBob = 0;
+    this.stepAccum = 0;
+
+    // Input gerak (Keyboard + Multi-touch Joystick + Camera Swipe)
+    this.keysDown = new Set();
+    this.joyInput = { x: 0, y: 0 };
+    this.targetedObject = null;
+
+    this.ecgPhase = 0;
+    this.lastFrameTime = performance.now();
+
+    this._bindEvents();
+    this._animate = this._animate.bind(this);
+    requestAnimationFrame(this._animate);
+  }
+
+  _bindEvents() {
+    window.addEventListener('resize', () => {
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (!this.isPlaying || this.isPausedByQuiz) return;
+      const code = e.code;
+      this.keysDown.add(code);
+
+      if (code === 'KeyE' || code === 'Space') {
+        e.preventDefault();
+        this.triggerPrimaryAction();
+      } else if (code === 'KeyF') {
+        this.toggleFlashlight();
+      } else if (code === 'KeyQ') {
+        this.turnAround180();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      this.keysDown.delete(e.code);
+    });
+
+    // Geser layar sentuh / mouse pada kanvas untuk menengok bebas (multi-touch aman)
+    let lookPointerId = null;
+    let lastX = 0;
+    let lastY = 0;
+    let downX = 0;
+    let downY = 0;
+    let downTime = 0;
+
+    this.canvas.addEventListener('pointerdown', (e) => {
+      if (!this.isPlaying || this.isPausedByQuiz) return;
+      if (lookPointerId === null) {
+        lookPointerId = e.pointerId;
+        lastX = downX = e.clientX;
+        lastY = downY = e.clientY;
+        downTime = performance.now();
+      }
+    });
+
+    this.canvas.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== lookPointerId || !this.isPlaying || this.isPausedByQuiz) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+
+      this.yaw -= dx * 0.0042;
+      this.pitch = Math.max(-0.68, Math.min(0.68, this.pitch - dy * 0.0035));
+    });
+
+    const endLook = (e) => {
+      if (e.pointerId !== lookPointerId) return;
+      const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
+      const elapsed = performance.now() - downTime;
+      lookPointerId = null;
+
+      // Ketukan singkat pada kanvas PID langsung memicu interaksi objek di depan pemain
+      if (moved < 14 && elapsed < 280 && this.isPlaying && !this.isPausedByQuiz) {
+        this.triggerPrimaryAction();
+      }
+    };
+
+    this.canvas.addEventListener('pointerup', endLook);
+    this.canvas.addEventListener('pointercancel', endLook);
+  }
+
+  setJoystickInput(nx, ny) {
+    this.joyInput.x = nx;
+    this.joyInput.y = ny;
+  }
+
+  toggleFlashlight() {
+    if (this.isHiddenInCloset) return;
+    this.flashlightOn = !this.flashlightOn;
+    this.flashlight.visible = this.flashlightOn;
+    this.ui.showToast(
+      this.flashlightOn
+        ? 'Senter menyala — laci & ruangan terlihat jelas.'
+        : 'Senter dimatikan — jarak pandang mata hantu berkurang!'
+    );
+  }
+
+  turnAround180() {
+    this.yaw += Math.PI;
+  }
+
+  startSession(diffId, quizData) {
+    this.audio.init();
+    this.diffConfig = DIFFICULTY_CONFIG[diffId] || DIFFICULTY_CONFIG.normal;
+    this.quizData = JSON.parse(JSON.stringify(quizData));
+
+    // Reset posisi pemain di Serambi Utama
+    this.playerPos.set(0, 1.65, 13.4);
+    this.yaw = 0;
+    this.pitch = 0;
+    this.elapsedTime = 0;
+    this.keysFound = 0;
+    this.isHiddenInCloset = false;
+    this.activeCloset = null;
+    this.isPausedByQuiz = false;
+    this.flashlightOn = true;
+    this.flashlight.visible = true;
+
+    // Reset gembok pintu utama
+    this.world.padlockMeshes.forEach((m) => (m.visible = true));
+
+    // Reset 12 laci & acak 3 kunci (1 di Sayap Barat [0..3], 1 di Tengah [4..7], 1 di Timur [8..11])
+    this.world.drawerObjects.forEach((d) => {
+      d.tapStage = 0;
+      d.hasKey = false;
+      d.keyCollected = false;
+      d.drawerFront.position.z = 0.31;
+      d.keyMesh.visible = false;
+    });
+
+    const keyIndices = [
+      Math.floor(Math.random() * 4),
+      4 + Math.floor(Math.random() * 4),
+      8 + Math.floor(Math.random() * 4)
+    ];
+    keyIndices.forEach((idx) => {
+      this.world.drawerObjects[idx].hasKey = true;
+    });
+
+    // Reset hantu
+    this.ghost.diff = this.diffConfig;
+    this.ghost.reset();
+
+    this.isPlaying = true;
+    this.ui.onSessionStarted();
+  }
+
+  exitCloset() {
+    if (!this.isHiddenInCloset || !this.activeCloset) return;
+    const spot = this.activeCloset.spot;
+    // Keluar tepat 1.25m di depan pintu lemari
+    this.playerPos.x = spot.x + Math.sin(spot.rotY) * 1.25;
+    this.playerPos.z = spot.z + Math.cos(spot.rotY) * 1.25;
+    this.yaw = spot.rotY;
+    this.isHiddenInCloset = false;
+    this.activeCloset = null;
+    this.flashlightOn = true;
+    this.flashlight.visible = true;
+    this.audio.playClosetDoor(false);
+    this.ui.setClosetOverlay(false, 0);
+  }
+
+  triggerPrimaryAction() {
+    if (!this.isPlaying || this.isPausedByQuiz) return;
+
+    if (this.isHiddenInCloset) {
+      this.exitCloset();
+      return;
+    }
+
+    const target = this.targetedObject;
+    if (!target) {
+      this.ui.showToast('Dekati laci, lemari berjalusi, atau pintu utama untuk berinteraksi.');
+      return;
+    }
+
+    if (target.interactType === 'closet') {
+      this.isHiddenInCloset = true;
+      this.activeCloset = target.ref;
+      this.flashlightOn = false;
+      this.flashlight.visible = false;
+      this.audio.playClosetDoor(true);
+      this.ghost.pauseFromCloset();
+      this.ui.setClosetOverlay(true, this.diffConfig.hideDuration);
+      return;
+    }
+
+    if (target.interactType === 'drawer') {
+      const d = target.ref;
+      if (d.tapStage === 0) {
+        // Ketukan ke-1: Membuka celah laci + suara berisik sedang
+        d.tapStage = 1;
+        d.drawerFront.position.z = 0.48;
+        if (d.hasKey && !d.keyCollected) d.keyMesh.visible = true;
+        this.audio.playDrawerCreak(1);
+        this.ghost.hearNoiseAt(d.group.position, 14.5);
+        this.ui.showToast('Ketukan 1: Celah laci terbuka berderit! Ketuk sekali lagi untuk menggeledah.');
+      } else if (d.tapStage === 1) {
+        // Ketukan ke-2: Menggeledah isi laci + suara nyaring
+        d.tapStage = 2;
+        d.drawerFront.position.z = 0.64;
+        this.audio.playDrawerCreak(2);
+        this.ghost.hearNoiseAt(d.group.position, 19.5);
+
+        if (d.hasKey && !d.keyCollected) {
+          this.pendingKeyDrawer = d;
+          this.isPausedByQuiz = true;
+          const qObj = this.quizData.questions[this.keysFound] || this.quizData.questions[0];
+          this.ui.openQuizModal(this.quizData.subject, this.keysFound + 1, qObj);
+        } else {
+          this.ui.showToast('Laci ini hanya berisi berkas usang — kosong, tidak ada kunci.');
+        }
+      } else {
+        this.ui.showToast('Laci ini sudah selesai digeledah.');
+      }
+      return;
+    }
+
+    if (target.interactType === 'exit_door') {
+      if (this.keysFound >= 3) {
+        this._finishGame(true);
+      } else {
+        this.ui.showToast(`Pintu terkunci! Masih butuh ${3 - this.keysFound} Kunci Kuningan lagi.`);
+      }
+    }
+  }
+
+  resolveQuizAnswer(isCorrect) {
+    if (!this.pendingKeyDrawer) return;
+    if (isCorrect) {
+      const d = this.pendingKeyDrawer;
+      d.keyCollected = true;
+      d.keyMesh.visible = false;
+      this.keysFound += 1;
+      if (this.world.padlockMeshes[this.keysFound - 1]) {
+        this.world.padlockMeshes[this.keysFound - 1].visible = false;
+      }
+      this.audio.playKeyFound();
+      this.pendingKeyDrawer = null;
+      this.isPausedByQuiz = false;
+      this.ui.closeQuizModal();
+      this.ui.showToast(
+        this.keysFound >= 3
+          ? 'Semua 3 Kunci Kuningan terkumpul! Segera menuju Pintu Keluar Utama!'
+          : `Kunci Kuningan ke-${this.keysFound} berhasil diambil!`
+      );
+    } else {
+      // Jawaban salah membanting gembok hingga memancing perhatian hantu
+      this.audio.playWrongAnswerLock();
+      this.ghost.hearNoiseAt(this.playerPos, 24.0);
+    }
+  }
+
+  _finishGame(won) {
+    this.isPlaying = false;
+    this.isPausedByQuiz = false;
+    if (won) {
+      const rec = saveBestTime(this.diffConfig.id, this.elapsedTime);
+      this.ui.showEndScreen(true, this.elapsedTime, rec.best, rec.isNewRecord, this.keysFound);
+    } else {
+      this.audio.playJumpscare();
+      this.ui.showEndScreen(false, this.elapsedTime, null, false, this.keysFound);
+    }
+  }
+
+  _movePlayerWithCollision(dx, dz) {
+    const radius = 0.42;
+    const tryAxis = (nx, nz) => {
+      if (
+        nx < MANSION_BOUNDS.minX + radius ||
+        nx > MANSION_BOUNDS.maxX - radius ||
+        nz < MANSION_BOUNDS.minZ + radius ||
+        nz > MANSION_BOUNDS.maxZ - radius
+      ) {
+        return false;
+      }
+      for (const box of this.world.wallColliders) {
+        if (
+          nx + radius > box.minX &&
+          nx - radius < box.maxX &&
+          nz + radius > box.minZ &&
+          nz - radius < box.maxZ
+        ) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    if (tryAxis(this.playerPos.x + dx, this.playerPos.z)) {
+      this.playerPos.x += dx;
+    }
+    if (tryAxis(this.playerPos.x, this.playerPos.z + dz)) {
+      this.playerPos.z += dz;
+    }
+  }
+
+  _detectTargetObject() {
+    if (this.isHiddenInCloset) {
+      this.targetedObject = null;
+      return;
+    }
+
+    const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)).normalize();
+    let bestObj = null;
+    let bestScore = Infinity;
+
+    for (const mesh of this.world.interactiveMeshes) {
+      const ud = mesh.userData;
+      if (!ud || !ud.interactType) continue;
+      const worldPos = new THREE.Vector3();
+      mesh.getWorldPosition(worldPos);
+
+      const toObj = new THREE.Vector3(worldPos.x - this.playerPos.x, 0, worldPos.z - this.playerPos.z);
+      const dist = toObj.length();
+      if (dist > 2.55) continue;
+
+      const angle = forward.angleTo(toObj.normalize());
+      if (angle < 0.65) {
+        const score = dist + angle * 1.4;
+        if (score < bestScore) {
+          bestScore = score;
+          bestObj = ud;
+        }
+      }
+    }
+
+    this.targetedObject = bestObj;
+  }
+
+  _animate(now) {
+    requestAnimationFrame(this._animate);
+    const dt = Math.min(0.05, (now - this.lastFrameTime) / 1000);
+    this.lastFrameTime = now;
+
+    // Animasi properti mansion
+    if (this.world.animatedProps.pendulum) {
+      this.world.animatedProps.pendulum.rotation.z = Math.sin(now * 0.0025) * 0.24;
+    }
+    if (this.world.animatedProps.gramophoneDisc) {
+      this.world.animatedProps.gramophoneDisc.rotation.y += dt * 1.8;
+    }
+    this.world.animatedProps.flickerLights.forEach((fl) => {
+      fl.light.intensity = fl.baseIntensity + Math.sin(now * 0.011 + fl.phase) * 0.14;
+    });
+
+    if (this.isPlaying) {
+      if (!this.isPausedByQuiz) {
+        this.elapsedTime += dt;
+      }
+
+      // Gerak pemain jika tidak di dalam lemari & tidak sedang kuis
+      if (!this.isHiddenInCloset && !this.isPausedByQuiz) {
+        let forwardInput = -this.joyInput.y;
+        let strafeInput = this.joyInput.x;
+
+        if (this.keysDown.has('KeyW') || this.keysDown.has('ArrowUp')) forwardInput += 1;
+        if (this.keysDown.has('KeyS') || this.keysDown.has('ArrowDown')) forwardInput -= 1;
+        if (this.keysDown.has('KeyD') || this.keysDown.has('ArrowRight')) strafeInput += 1;
+        if (this.keysDown.has('KeyA') || this.keysDown.has('ArrowLeft')) strafeInput -= 1;
+
+        const mag = Math.hypot(forwardInput, strafeInput);
+        if (mag > 0.05) {
+          const normF = forwardInput / Math.max(1, mag);
+          const normS = strafeInput / Math.max(1, mag);
+          const speed = 4.6;
+
+          const sinY = Math.sin(this.yaw);
+          const cosY = Math.cos(this.yaw);
+          const vx = (-sinY * normF + cosY * normS) * speed * dt;
+          const vz = (-cosY * normF - sinY * normS) * speed * dt;
+
+          this._movePlayerWithCollision(vx, vz);
+
+          this.walkBob += dt * 10.5;
+          this.stepAccum += speed * dt;
+          if (this.stepAccum >= 1.75) {
+            this.stepAccum = 0;
+            this.audio.playFootstep(false);
+          }
+        } else {
+          this.walkBob = 0;
+        }
+      }
+
+      // Update kamera & senter
+      this.camera.position.set(
+        this.playerPos.x,
+        1.65 + Math.sin(this.walkBob) * 0.045,
+        this.playerPos.z
+      );
+      this.camera.rotation.y = this.yaw;
+      this.camera.rotation.x = this.pitch;
+
+      const lookDir = new THREE.Vector3(0, 0, -1).applyEuler(this.camera.rotation);
+      this.flashlight.position.copy(this.camera.position);
+      this.flashlightTarget.position.copy(this.camera.position).addScaledVector(lookDir, 6);
+
+      // Update entitas Sosok Bayangan Pucat
+      this.ghost.update(dt, {
+        playerPos: this.playerPos,
+        isFlashlightOn: this.flashlightOn,
+        isPlayerHidden: this.isHiddenInCloset,
+        isQuizOpen: this.isPausedByQuiz,
+        wallMeshes: this.world.wallMeshes,
+        audio: this.audio,
+        onSpotted: () => {
+          this.audio.playEyeSpotSting();
+          this.ui.showToast('MATA SOSOK MELIHATMU! Segera lari dan bersembunyi di dalam lemari!');
+        },
+        onCatch: () => {
+          this._finishGame(false);
+        }
+      });
+
+      const ghostDist = Math.hypot(
+        this.ghost.position.x - this.playerPos.x,
+        this.ghost.position.z - this.playerPos.z
+      );
+      const dangerLevel = this.ghost.state === 'chasing' ? Math.max(0.35, 1 - ghostDist / 18) : Math.max(0, 1 - ghostDist / 14) * 0.35;
+      this.audio.setTensionLevel(dangerLevel);
+
+      this._detectTargetObject();
+      this.ecgPhase += dt * (1.5 + dangerLevel * 4.5);
+
+      // Kirim telemetri ke UI HUD
+      this.ui.updateHud({
+        elapsedTime: this.elapsedTime,
+        keysFound: this.keysFound,
+        room: getRoomAt(this.playerPos.x, this.playerPos.z),
+        playerPos: this.playerPos,
+        yaw: this.yaw,
+        targetedObject: this.targetedObject,
+        isHiddenInCloset: this.isHiddenInCloset,
+        closetPauseRemaining: this.ghost.pauseTimer,
+        ghost: this.ghost,
+        drawers: this.world.drawerObjects,
+        closets: this.world.closetObjects,
+        dangerLevel,
+        ecgPhase: this.ecgPhase
+      });
+    }
+
+    this.renderer.render(this.scene, this.camera);
+  }
+}
+
+
+let selectedDiff = 'normal';
+let stickOnRight = false;
+let teacherQuiz = loadTeacherQuiz();
+let activeQuizQuestion = null;
+
+// Referensi Elemen UI
+const startScreen = document.getElementById('start-screen');
+const endScreen = document.getElementById('end-screen');
+const hud = document.getElementById('hud');
+const reticle = document.getElementById('reticle');
+const dangerPulse = document.getElementById('danger-pulse');
+const alertBanner = document.getElementById('alert-banner');
+const toastMsg = document.getElementById('toast-msg');
+const closetOverlay = document.getElementById('closet-overlay');
+const closetTimerText = document.getElementById('closet-timer-text');
+
+const minimapCanvas = document.getElementById('minimap-canvas');
+const minimapCtx = minimapCanvas.getContext('2d');
+const ecgCanvas = document.getElementById('ecg-canvas');
+const ecgCtx = ecgCanvas.getContext('2d');
+
+let toastTimeout = null;
+function showToast(text) {
+  toastMsg.textContent = text;
+  toastMsg.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => toastMsg.classList.remove('show'), 2800);
+}
+
+// Inisialisasi Mesin Gim 3D
+const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
+  showToast,
+  onSessionStarted: () => {
+    startScreen.classList.add('hidden');
+    endScreen.classList.add('hidden');
+    hud.classList.add('active');
+    closetOverlay.classList.remove('visible');
+    showToast('Gunakan kompas di atas untuk menemukan 3 laci berisi Kunci Kuningan!');
+  },
+  setClosetOverlay: (visible, remaining) => {
+    if (visible) {
+      closetOverlay.classList.add('visible');
+      closetTimerText.textContent = `${remaining.toFixed(1)} dtk`;
+    } else {
+      closetOverlay.classList.remove('visible');
+    }
+  },
+  openQuizModal: (subject, keyNumber, questionObj) => {
+    activeQuizQuestion = questionObj;
+    document.getElementById('quiz-modal-title').textContent = `UJI KUNCI KUNINGAN #${keyNumber} — ${subject.toUpperCase()}`;
+    document.getElementById('quiz-question-text').textContent = questionObj.q;
+    document.getElementById('quiz-feedback').textContent = '';
+
+    const optContainer = document.getElementById('quiz-options');
+    optContainer.innerHTML = '';
+
+    // Acak urutan tampilan opsi dengan tetap melacak jawaban benar
+    const indexedOpts = questionObj.options.map((text, idx) => ({
+      text,
+      isCorrect: idx === questionObj.answer
+    }));
+    indexedOpts.sort(() => Math.random() - 0.5);
+
+    const letters = ['A', 'B', 'C', 'D'];
+    indexedOpts.forEach((opt, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'quiz-opt-btn';
+      btn.textContent = `${letters[i]}. ${opt.text}`;
+      btn.onclick = () => {
+        if (opt.isCorrect) {
+          engine.resolveQuizAnswer(true);
+        } else {
+          document.getElementById('quiz-feedback').textContent =
+            'Gembok membanting keras! Jawaban belum tepat — urutan opsi diacak ulang, coba lagi!';
+          engine.resolveQuizAnswer(false);
+          // Re-render urutan baru saat salah
+          setTimeout(() => {
+            if (engine.isPausedByQuiz && activeQuizQuestion) {
+              engine.ui.openQuizModal(subject, keyNumber, activeQuizQuestion);
+            }
+          }, 420);
+        }
+      };
+      optContainer.appendChild(btn);
+    });
+
+    document.getElementById('quiz-modal').classList.add('open');
+  },
+  closeQuizModal: () => {
+    document.getElementById('quiz-modal').classList.remove('open');
+    activeQuizQuestion = null;
+  },
+  updateHud: (state) => {
+    document.getElementById('hud-timer').textContent = formatTime(state.elapsedTime);
+
+    for (let i = 1; i <= 3; i++) {
+      const slot = document.getElementById(`key-slot-${i}`);
+      if (state.keysFound >= i) {
+        slot.classList.add('found');
+        slot.textContent = `Kunci ${i} ✓`;
+      } else {
+        slot.classList.remove('found');
+        slot.textContent = `Kunci ${i}`;
+      }
+    }
+
+    document.getElementById('hud-room-name').textContent = `LOKASI: ${state.room.name} (${state.room.wing})`;
+
+    // Panduan Misi Kontekstual untuk Siswa
+    const guideEl = document.getElementById('hud-mission-guide');
+    if (state.ghost.state === 'chasing') {
+      guideEl.textContent = 'BAHAYA! Mata hantu melihatmu — segera masuk ke [LEMARI] terdekat!';
+    } else if (state.keysFound >= 3) {
+      guideEl.textContent = '3 Kunci lengkap! Ikuti penanda [PINTU KELUAR] di Serambi Utama!';
+    } else {
+      const remainingWings = [
+        ...new Set(
+          state.drawers
+            .filter((d) => d.hasKey && !d.keyCollected)
+            .map((d) => d.spot.wing)
+        )
+      ];
+      guideEl.textContent = `Cari ${3 - state.keysFound} kunci lagi (tersisa di: ${remainingWings.join(', ')}) • Ketuk laci 2×`;
+    }
+
+    // Peringatan Penglihatan Mata Hantu
+    if (state.ghost.state === 'chasing') {
+      alertBanner.classList.add('visible');
+      dangerPulse.classList.add('active');
+    } else {
+      alertBanner.classList.remove('visible');
+      dangerPulse.classList.remove('active');
+    }
+
+    if (state.isHiddenInCloset) {
+      closetTimerText.textContent = `${Math.max(0, state.closetPauseRemaining).toFixed(1)} dtk`;
+    }
+
+    // Reticle & Tombol Aksi Kontekstual PID
+    const actionBtn = document.getElementById('pid-action-btn');
+    if (state.targetedObject) {
+      reticle.classList.add('interactive');
+      actionBtn.classList.remove('disabled');
+      const t = state.targetedObject;
+      if (t.interactType === 'drawer') {
+        if (t.ref.tapStage === 0) actionBtn.textContent = '1× Ketuk: Buka Celah Laci';
+        else if (t.ref.tapStage === 1) actionBtn.textContent = '2× Ketuk: Geledah Isi Laci';
+        else actionBtn.textContent = 'Laci Sudah Digeledah';
+      } else if (t.interactType === 'closet') {
+        actionBtn.textContent = 'Masuk Sembunyi ke Lemari';
+      } else if (t.interactType === 'exit_door') {
+        actionBtn.textContent =
+          state.keysFound >= 3 ? 'Buka Pintu Keluar Utama!' : `Pintu Terkunci (${state.keysFound}/3)`;
+      }
+    } else {
+      reticle.classList.remove('interactive');
+      actionBtn.classList.add('disabled');
+      actionBtn.textContent = 'Dekati Objek Interaktif';
+    }
+
+    renderCompass(state);
+    renderMinimap(state);
+    renderEcg(state.ecgPhase, state.dangerLevel);
+  },
+  showEndScreen: (won, elapsed, best, isNewRecord, keysFound) => {
+    hud.classList.remove('active');
+    closetOverlay.classList.remove('visible');
+    alertBanner.classList.remove('visible');
+    dangerPulse.classList.remove('active');
+    endScreen.classList.remove('hidden');
+
+    const stamp = document.getElementById('end-stamp');
+    const title = document.getElementById('end-title');
+    const desc = document.getElementById('end-desc');
+
+    if (won) {
+      stamp.className = 'stamp-badge stamp-win';
+      stamp.textContent = 'MISI BERHASIL • SELAMAT KELUAR';
+      title.textContent = 'Pintu Utama Berhasil Dibuka!';
+      desc.textContent = isNewRecord
+        ? `Luar biasa! Kamu mencetak REKOR WAKTU TERCEPAT baru pada tingkat ${DIFFICULTY_CONFIG[selectedDiff].label}.`
+        : 'Ketiga Kunci Kuningan berhasil dikumpulkan dan dijawab dengan tepat.';
+    } else {
+      stamp.className = 'stamp-badge stamp-lose';
+      stamp.textContent = 'INVESTIGASI GAGAL • TERTANGKAP';
+      title.textContent = 'Sosok Bayangan Pucat Menangkapmu';
+      desc.textContent =
+        'Ingat: hantu baru bergerak jika matanya melihatmu. Matikan senter saat terdesak dan segera bersembunyi di lemari berjalusi.';
+    }
+
+    document.getElementById('stat-time').textContent = formatTime(elapsed);
+    document.getElementById('stat-keys').textContent = `${keysFound} / 3`;
+    document.getElementById('stat-best').textContent = best !== null ? formatTime(best) : formatTime(getBestTimes()[selectedDiff]);
+    refreshBestTimeBadges();
+  }
+});
+
+// Render Kompas Arah Dinamis
+function renderCompass(state) {
+  const bar = document.getElementById('compass-bar');
+  bar.querySelectorAll('.compass-marker').forEach((el) => el.remove());
+
+  const targets = [];
+
+  // 1. Kunci terdekat yang belum diambil
+  let nearestKey = null;
+  let nearestKeyDist = Infinity;
+  for (const d of state.drawers) {
+    if (d.hasKey && !d.keyCollected) {
+      const dist = Math.hypot(d.spot.x - state.playerPos.x, d.spot.z - state.playerPos.z);
+      if (dist < nearestKeyDist) {
+        nearestKeyDist = dist;
+        nearestKey = d.spot;
+      }
+    }
+  }
+  if (nearestKey) {
+    targets.push({
+      label: `[KUNCI ${Math.round(nearestKeyDist)}m]`,
+      x: nearestKey.x,
+      z: nearestKey.z,
+      cls: 'marker-key'
+    });
+  }
+
+  // 2. Lemari terdekat
+  let nearestCloset = null;
+  let nearestClosetDist = Infinity;
+  for (const c of state.closets) {
+    const dist = Math.hypot(c.spot.x - state.playerPos.x, c.spot.z - state.playerPos.z);
+    if (dist < nearestClosetDist) {
+      nearestClosetDist = dist;
+      nearestCloset = c.spot;
+    }
+  }
+  if (nearestCloset) {
+    targets.push({
+      label: `[LEMARI ${Math.round(nearestClosetDist)}m]`,
+      x: nearestCloset.x,
+      z: nearestCloset.z,
+      cls: 'marker-closet'
+    });
+  }
+
+  // 3. Pintu Keluar Utama (x: 0, z: 15.65)
+  const exitDist = Math.hypot(0 - state.playerPos.x, 15.65 - state.playerPos.z);
+  targets.push({
+    label: `[PINTU KELUAR ${Math.round(exitDist)}m]`,
+    x: 0,
+    z: 15.65,
+    cls: state.keysFound >= 3 ? 'marker-exit ready' : 'marker-exit'
+  });
+
+  targets.forEach((t) => {
+    const dx = t.x - state.playerPos.x;
+    const dz = t.z - state.playerPos.z;
+    const worldAngle = Math.atan2(-dx, -dz);
+    let relAngle = ((worldAngle - state.yaw + Math.PI) % (Math.PI * 2)) - Math.PI;
+    if (relAngle < -Math.PI) relAngle += Math.PI * 2;
+
+    const clamped = Math.max(-1.25, Math.min(1.25, relAngle));
+    const pct = 50 - (clamped / 1.25) * 44;
+
+    const el = document.createElement('div');
+    el.className = `compass-marker ${t.cls}`;
+    el.style.left = `${pct}%`;
+    el.textContent = t.label;
+    bar.appendChild(el);
+  });
+}
+
+// Render Denah Cetak Biru 9 Ruangan
+function renderMinimap(state) {
+  const w = minimapCanvas.width;
+  const h = minimapCanvas.height;
+  minimapCtx.clearRect(0, 0, w, h);
+
+  minimapCtx.fillStyle = '#120f0c';
+  minimapCtx.fillRect(0, 0, w, h);
+
+  const toMapX = (wx) => ((wx + 18) / 36) * (w - 16) + 8;
+  const toMapY = (wz) => ((wz + 16) / 32) * (h - 16) + 8;
+
+  // Grid 9 ruangan
+  minimapCtx.strokeStyle = 'rgba(201, 154, 69, 0.42)';
+  minimapCtx.lineWidth = 1;
+  minimapCtx.strokeRect(8, 8, w - 16, h - 16);
+
+  [toMapX(-6), toMapX(6)].forEach((gx) => {
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(gx, 8);
+    minimapCtx.lineTo(gx, h - 8);
+    minimapCtx.stroke();
+  });
+
+  [toMapY(-5.33), toMapY(5.33)].forEach((gy) => {
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(8, gy);
+    minimapCtx.lineTo(w - 8, gy);
+    minimapCtx.stroke();
+  });
+
+  // Pintu Keluar Utama
+  minimapCtx.fillStyle = state.keysFound >= 3 ? '#eab95c' : '#b52b21';
+  minimapCtx.fillRect(toMapX(0) - 8, h - 10, 16, 4);
+
+  // Lemari Persembunyian (titik hijau)
+  minimapCtx.fillStyle = '#4a8c5e';
+  state.closets.forEach((c) => {
+    minimapCtx.fillRect(toMapX(c.spot.x) - 2, toMapY(c.spot.z) - 2, 4, 4);
+  });
+
+  // Laci belum dibuka (titik kuning redup)
+  state.drawers.forEach((d) => {
+    if (d.tapStage < 2) {
+      minimapCtx.fillStyle = '#c99a45';
+      minimapCtx.beginPath();
+      minimapCtx.arc(toMapX(d.spot.x), toMapY(d.spot.z), 2.3, 0, Math.PI * 2);
+      minimapCtx.fill();
+    }
+  });
+
+  // Hantu hanya terlihat di denah jika matanya sedang melihat pemain
+  if (state.ghost.seesPlayer) {
+    minimapCtx.fillStyle = '#ff3b30';
+    minimapCtx.beginPath();
+    minimapCtx.arc(toMapX(state.ghost.position.x), toMapY(state.ghost.position.z), 4.2, 0, Math.PI * 2);
+    minimapCtx.fill();
+  }
+
+  // Posisi & Arah Hadap Pemain
+  const px = toMapX(state.playerPos.x);
+  const py = toMapY(state.playerPos.z);
+  minimapCtx.save();
+  minimapCtx.translate(px, py);
+  minimapCtx.rotate(-state.yaw);
+  minimapCtx.fillStyle = '#dfd6c5';
+  minimapCtx.beginPath();
+  minimapCtx.moveTo(0, -6);
+  minimapCtx.lineTo(4, 4);
+  minimapCtx.lineTo(-4, 4);
+  minimapCtx.closePath();
+  minimapCtx.fill();
+  minimapCtx.restore();
+}
+
+// Render Monitor Detak Jantung ECG
+function renderEcg(phase, dangerLevel) {
+  const w = ecgCanvas.width;
+  const h = ecgCanvas.height;
+  ecgCtx.clearRect(0, 0, w, h);
+
+  ecgCtx.strokeStyle = dangerLevel > 0.35 ? '#e03c30' : '#6bc485';
+  ecgCtx.lineWidth = 1.6;
+  ecgCtx.beginPath();
+
+  for (let x = 0; x < w; x++) {
+    const t = (x / w) * 6 + phase;
+    const beat = Math.sin(t * 3.1415);
+    const spike = beat > 0.92 ? (beat - 0.92) * 140 : 0;
+    const y = h / 2 - spike + Math.sin(t * 2) * 2;
+    if (x === 0) ecgCtx.moveTo(x, y);
+    else ecgCtx.lineTo(x, y);
+  }
+  ecgCtx.stroke();
+}
+
+// Virtual Joystick Analog Multi-Sentuh
+function setupVirtualJoystick() {
+  const zone = document.getElementById('joystick-zone');
+  const knob = document.getElementById('joystick-knob');
+  let joyPointerId = null;
+  const maxRadius = 42;
+
+  const updateStick = (clientX, clientY) => {
+    const rect = zone.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    let dx = clientX - cx;
+    let dy = clientY - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > maxRadius) {
+      dx = (dx / dist) * maxRadius;
+      dy = (dy / dist) * maxRadius;
+    }
+    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    engine.setJoystickInput(dx / maxRadius, dy / maxRadius);
+  };
+
+  zone.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    if (joyPointerId === null) {
+      joyPointerId = e.pointerId;
+      zone.setPointerCapture(e.pointerId);
+      updateStick(e.clientX, e.clientY);
+    }
+  });
+
+  zone.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== joyPointerId) return;
+    e.stopPropagation();
+    updateStick(e.clientX, e.clientY);
+  });
+
+  const resetStick = (e) => {
+    if (e.pointerId !== joyPointerId) return;
+    joyPointerId = null;
+    knob.style.transform = 'translate(-50%, -50%)';
+    engine.setJoystickInput(0, 0);
+  };
+
+  zone.addEventListener('pointerup', resetStick);
+  zone.addEventListener('pointercancel', resetStick);
+}
+
+// Pengelolaan UI Layar Awal & Editor Soal Guru
+function refreshBestTimeBadges() {
+  const bests = getBestTimes();
+  ['mudah', 'normal', 'sulit'].forEach((id) => {
+    const el = document.getElementById(`best-${id}`);
+    if (el) el.textContent = `Rekor: ${formatTime(bests[id])}`;
+  });
+}
+
+function renderQuizPreview() {
+  document.getElementById('active-subject-label').textContent = teacherQuiz.subject;
+  const list = document.getElementById('quiz-preview-list');
+  list.innerHTML = '';
+  teacherQuiz.questions.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'quiz-preview-item';
+    div.textContent = `Kunci ${idx + 1}: ${item.q}`;
+    list.appendChild(div);
+  });
+}
+
+function populateQuizEditor() {
+  document.getElementById('edit-subject').value = teacherQuiz.subject;
+  const grid = document.getElementById('editor-questions-grid');
+  grid.innerHTML = '';
+
+  teacherQuiz.questions.forEach((item, idx) => {
+    const card = document.createElement('div');
+    card.className = 'q-edit-card';
+    card.innerHTML = `
+      <label>PERTANYAAN KUNCI #${idx + 1}</label>
+      <textarea rows="2" id="eq-q-${idx}">${item.q}</textarea>
+      <label>PILIHAN A</label>
+      <input type="text" id="eq-opt-${idx}-0" value="${item.options[0]}" />
+      <label>PILIHAN B</label>
+      <input type="text" id="eq-opt-${idx}-1" value="${item.options[1]}" />
+      <label>PILIHAN C</label>
+      <input type="text" id="eq-opt-${idx}-2" value="${item.options[2]}" />
+      <label>PILIHAN D</label>
+      <input type="text" id="eq-opt-${idx}-3" value="${item.options[3]}" />
+      <label>KUNCI JAWABAN BENAR</label>
+      <select id="eq-ans-${idx}">
+        <option value="0" ${item.answer === 0 ? 'selected' : ''}>Pilihan A</option>
+        <option value="1" ${item.answer === 1 ? 'selected' : ''}>Pilihan B</option>
+        <option value="2" ${item.answer === 2 ? 'selected' : ''}>Pilihan C</option>
+        <option value="3" ${item.answer === 3 ? 'selected' : ''}>Pilihan D</option>
+      </select>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function initUiBindings() {
+  refreshBestTimeBadges();
+  renderQuizPreview();
+  populateQuizEditor();
+  setupVirtualJoystick();
+
+  // Pilih Tingkat Kesulitan
+  document.querySelectorAll('.diff-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.diff-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedDiff = btn.dataset.diff;
+    });
+  });
+
+  // Preset Mata Pelajaran Guru
+  document.querySelectorAll('.preset-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.preset-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const key = btn.dataset.preset;
+      if (QUIZ_PRESETS[key]) {
+        teacherQuiz = JSON.parse(JSON.stringify(QUIZ_PRESETS[key]));
+        saveTeacherQuiz(teacherQuiz);
+        renderQuizPreview();
+        populateQuizEditor();
+      }
+    });
+  });
+
+  // Buka / Tutup Editor Soal Guru
+  const editorPanel = document.getElementById('teacher-editor-panel');
+  document.getElementById('toggle-editor-btn').addEventListener('click', () => {
+    editorPanel.classList.toggle('open');
+  });
+
+  document.getElementById('save-quiz-btn').addEventListener('click', () => {
+    const subject = document.getElementById('edit-subject').value.trim() || 'Mata Pelajaran';
+    const updatedQuestions = [];
+    for (let idx = 0; idx < 3; idx++) {
+      const q = document.getElementById(`eq-q-${idx}`).value.trim() || `Pertanyaan Kunci #${idx + 1}`;
+      const options = [0, 1, 2, 3].map(
+        (o) => document.getElementById(`eq-opt-${idx}-${o}`).value.trim() || `Opsi ${o + 1}`
+      );
+      const answer = parseInt(document.getElementById(`eq-ans-${idx}`).value, 10) || 0;
+      updatedQuestions.push({ q, options, answer });
+    }
+    teacherQuiz = { subject, questions: updatedQuestions };
+    saveTeacherQuiz(teacherQuiz);
+    renderQuizPreview();
+    editorPanel.classList.remove('open');
+  });
+
+  // Tukar Posisi Stik Kiri / Kanan
+  const touchControls = document.getElementById('touch-controls');
+  const swapStickStartBtn = document.getElementById('swap-stick-start-btn');
+  const swapStickHudBtn = document.getElementById('swap-stick-hud-btn');
+
+  const toggleStickSide = () => {
+    stickOnRight = !stickOnRight;
+    touchControls.classList.toggle('stick-right', stickOnRight);
+    const label = stickOnRight ? '⇄ Stik Kanan' : '⇄ Stik Kiri';
+    swapStickStartBtn.textContent = label;
+    swapStickHudBtn.textContent = label;
+  };
+  swapStickStartBtn.addEventListener('click', toggleStickSide);
+  swapStickHudBtn.addEventListener('click', toggleStickSide);
+
+  // Tombol Mulai & Ulangi
+  document.getElementById('start-game-btn').addEventListener('click', () => {
+    engine.startSession(selectedDiff, teacherQuiz);
+  });
+
+  document.getElementById('retry-btn').addEventListener('click', () => {
+    engine.startSession(selectedDiff, teacherQuiz);
+  });
+
+  document.getElementById('back-menu-btn').addEventListener('click', () => {
+    endScreen.classList.add('hidden');
+    startScreen.classList.remove('hidden');
+  });
+
+  // Tombol Kontrol PID dalam Permainan
+  document.getElementById('pid-action-btn').addEventListener('click', () => engine.triggerPrimaryAction());
+  document.getElementById('pid-turn-btn').addEventListener('click', () => engine.turnAround180());
+  document.getElementById('pid-flash-btn').addEventListener('click', () => engine.toggleFlashlight());
+  document.getElementById('exit-closet-btn').addEventListener('click', () => engine.exitCloset());
+
+  // Tombol Audio BGM & SFX
+  const bgmBtn = document.getElementById('toggle-bgm-btn');
+  const sfxBtn = document.getElementById('toggle-sfx-btn');
+  bgmBtn.addEventListener('click', () => {
+    const on = engine.audio.toggleBgm();
+    bgmBtn.classList.toggle('off', !on);
+  });
+  sfxBtn.addEventListener('click', () => {
+    const on = engine.audio.toggleSfx();
+    sfxBtn.classList.toggle('off', !on);
+  });
+}
+
+initUiBindings();
+  </script>
+</body>
+</html>

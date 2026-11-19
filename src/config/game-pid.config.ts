@@ -11,6 +11,9 @@ export const STORAGE_KEY_GAME_PID_URL = 'smart_absensi_game_pid_url';
 export const DEFAULT_SCHOOL_SLICE_3D_URL = '/games/school-slice-3d/index.html';
 export const STORAGE_KEY_SCHOOL_SLICE_3D_URL = 'smart_absensi_school_slice_3d_url';
 
+export const DEFAULT_RUMAH_SUNYI_URL = '/games/rumah-sunyi/index.html';
+export const STORAGE_KEY_RUMAH_SUNYI_URL = 'smart_absensi_rumah_sunyi_url';
+
 /**
  * Mengambil tautan langsung platform Game PID dari storage lokal atau default resmi sekolah
  */
@@ -83,6 +86,46 @@ export function setSchoolSlice3dUrl(url: string): void {
         localStorage.removeItem(STORAGE_KEY_SCHOOL_SLICE_3D_URL);
       }
       window.dispatchEvent(new CustomEvent('smart_absensi_school_slice_3d_url_updated', { detail: trimmed || DEFAULT_SCHOOL_SLICE_3D_URL }));
+    } catch {
+      // ignore
+    }
+  }
+}
+
+/**
+ * Mengambil tautan langsung Gim 3D Rumah Sunyi: Tiga Kunci dari storage lokal atau default bundle
+ */
+export function getRumahSunyiUrl(): string {
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_RUMAH_SUNYI_URL);
+      if (stored && stored.trim().length > 0) {
+        return stored.trim();
+      }
+    } catch {
+      // fallback to default
+    }
+  }
+  return DEFAULT_RUMAH_SUNYI_URL;
+}
+
+/**
+ * Menyimpan tautan kustom Gim 3D Rumah Sunyi (misal: localhost atau URL staging)
+ */
+export function setRumahSunyiUrl(url: string): void {
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const trimmed = url.trim();
+      if (trimmed.length > 0 && trimmed !== DEFAULT_RUMAH_SUNYI_URL) {
+        localStorage.setItem(STORAGE_KEY_RUMAH_SUNYI_URL, trimmed);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_RUMAH_SUNYI_URL);
+      }
+      window.dispatchEvent(
+        new CustomEvent('smart_absensi_rumah_sunyi_url_updated', {
+          detail: trimmed || DEFAULT_RUMAH_SUNYI_URL,
+        })
+      );
     } catch {
       // ignore
     }

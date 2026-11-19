@@ -6,12 +6,16 @@
 import {
   DEFAULT_GAME_PID_URL,
   DEFAULT_SCHOOL_SLICE_3D_URL,
+  DEFAULT_RUMAH_SUNYI_URL,
   STORAGE_KEY_GAME_PID_URL,
   STORAGE_KEY_SCHOOL_SLICE_3D_URL,
+  STORAGE_KEY_RUMAH_SUNYI_URL,
   getGamePidPlatformUrl,
   setGamePidPlatformUrl,
   getSchoolSlice3dUrl,
   setSchoolSlice3dUrl,
+  getRumahSunyiUrl,
+  setRumahSunyiUrl,
 } from '../../config/game-pid.config';
 import type { TestSuiteResult, TestResultItem } from '../test-runner.service';
 
@@ -260,6 +264,56 @@ Siti (Ketua Kelas),Teman Sebangku,Hai kawan!,Perangkat masukan komputer?,Monitor
     failed++;
     results.push({
       testName: 'CSV Question Bank Schema: Validasi format 10 kolom bank soal School Slice 3D',
+      status: 'FAIL',
+      details: (err as Error)?.message || String(err),
+    });
+  }
+
+  // Test 5: Rumah Sunyi: Tiga Kunci 3D Getter & Setter
+  try {
+    setupMockBrowser();
+    const initial = getRumahSunyiUrl();
+    if (initial !== DEFAULT_RUMAH_SUNYI_URL) {
+      throw new Error(`Getter default Rumah Sunyi gagal: diharapkan ${DEFAULT_RUMAH_SUNYI_URL}, didapat ${initial}`);
+    }
+
+    let eventDispatched = false;
+    let eventDetail = '';
+    const listener = (e: unknown) => {
+      eventDispatched = true;
+      eventDetail = (e as { detail: string }).detail;
+    };
+    globalThis.window.addEventListener('smart_absensi_rumah_sunyi_url_updated', listener);
+
+    const customUrl = '/games/rumah-sunyi/index.html?diff=normal';
+    setRumahSunyiUrl(customUrl);
+    if (getRumahSunyiUrl() !== customUrl || mockStorage[STORAGE_KEY_RUMAH_SUNYI_URL] !== customUrl) {
+      throw new Error(`Getter tidak mengembalikan URL kustom: didapat ${getRumahSunyiUrl()}`);
+    }
+    if (!eventDispatched || eventDetail !== customUrl) {
+      throw new Error('CustomEvent smart_absensi_rumah_sunyi_url_updated tidak ter-dispatch');
+    }
+
+    // Reset URL ke default
+    setRumahSunyiUrl('');
+    if (getRumahSunyiUrl() !== DEFAULT_RUMAH_SUNYI_URL) {
+      throw new Error('Reset URL Rumah Sunyi gagal kembali ke default');
+    }
+
+    globalThis.window.removeEventListener('smart_absensi_rumah_sunyi_url_updated', listener);
+    cleanupMockBrowser();
+
+    passed++;
+    results.push({
+      testName: 'Rumah Sunyi 3D Getter & Setter: Tersimpan di localStorage & trigger event',
+      status: 'PASS',
+      details: 'URL kustom tersimpan, CustomEvent ter-dispatch, reset default sukses',
+    });
+  } catch (err: unknown) {
+    cleanupMockBrowser();
+    failed++;
+    results.push({
+      testName: 'Rumah Sunyi 3D Getter & Setter: Tersimpan di localStorage & trigger event',
       status: 'FAIL',
       details: (err as Error)?.message || String(err),
     });

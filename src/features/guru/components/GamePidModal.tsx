@@ -10,9 +10,14 @@ import {
   ExternalLink,
   Box,
   Play,
+  Key,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
-import { getGamePidPlatformUrl, getSchoolSlice3dUrl } from '../../../config/game-pid.config';
+import {
+  getGamePidPlatformUrl,
+  getSchoolSlice3dUrl,
+  getRumahSunyiUrl,
+} from '../../../config/game-pid.config';
 
 export interface GamePidModalProps {
   isOpen: boolean;
@@ -72,6 +77,22 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
       accentColor: 'from-[#8C5A3C] via-[#C85A32] to-[#2F5D50]',
       actionUrl: getSchoolSlice3dUrl(),
       thumbnailUrl: '/games/school-slice-3d/thumbnail.jpg',
+      is3d: true,
+    },
+    {
+      id: 'pid_rumah_sunyi',
+      title: 'Rumah Sunyi: Tiga Kunci',
+      category: 'QUIZ',
+      badgeCategory: 'Gim Horor Edukasi 3D POV',
+      description:
+        'Investigasi POV 3D mansion 9 ruangan: temukan 3 kunci kuningan di antara 12 laci, selesaikan uji materi kuis guru, bersembunyi di lemari dari Sosok Bayangan Pucat, dan buka pintu keluar.',
+      status: 'AVAILABLE',
+      statusLabel: 'Siap Dimainkan',
+      rewardPoints: 40,
+      icon: Key,
+      accentColor: 'from-[#171310] via-[#c99a45] to-[#b52b21]',
+      actionUrl: getRumahSunyiUrl(),
+      thumbnailUrl: '/games/rumah-sunyi/thumbnail.jpg',
       is3d: true,
     },
   ];
@@ -211,7 +232,7 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Gim Terintegrasi Resmi (1)
+                Gim Terintegrasi Resmi ({gamePlans.length})
               </h3>
               <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                 Siap Dimainkan

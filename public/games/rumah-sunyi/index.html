@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Rumah Sunyi: Tiga Kunci — Gim Horor Edukasi 3D POV</title>
+  <link rel="stylesheet" href="./src/styles/dossier.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.160.0"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div class="film-vignette"></div>
+  <div id="danger-pulse" class="danger-pulse"></div>
+  <div id="reticle" class="reticle"></div>
+
+  <!-- Overlay Bersembunyi di Dalam Lemari Berjalusi -->
+  <div id="closet-overlay" class="closet-overlay">
+    <div class="closet-banner">
+      <div class="dossier-tag">PERSEMBUNYIAN LEMARI BERJALUSI</div>
+      <div id="closet-timer-text" class="closet-timer-ring">5.0 dtk</div>
+      <p style="font-size: 0.88rem; color: var(--paper-muted);">
+        Sosok Bayangan Pucat terhenti sejenak. Tunggu hingga hitungan selesai sebelum keluar.
+      </p>
+    </div>
+    <button id="exit-closet-btn" class="pid-action-btn" style="pointer-events: auto;">
+      Keluar dari Lemari Sekarang
+    </button>
+  </div>
+
+  <!-- HUD Dalam Permainan -->
+  <div id="hud">
+    <div class="hud-top">
+      <div class="hud-box">
+        <div class="hud-keys">
+          <span id="key-slot-1" class="key-slot">Kunci 1</span>
+          <span id="key-slot-2" class="key-slot">Kunci 2</span>
+          <span id="key-slot-3" class="key-slot">Kunci 3</span>
+        </div>
+        <div id="hud-timer" class="hud-timer">00:00.00</div>
+      </div>
+
+      <div class="compass-wrap">
+        <div id="compass-bar" class="compass-bar">
+          <div class="compass-center-tick"></div>
+        </div>
+        <div class="mission-guide">
+          <div id="hud-room-name" class="room-badge">LOKASI: SERAMBI UTAMA</div>
+          <div id="hud-mission-guide">Cari 3 Kunci Kuningan dengan mengetuk laci 2×</div>
+        </div>
+      </div>
+
+      <div class="hud-right-col">
+        <canvas id="minimap-canvas" width="156" height="140"></canvas>
+        <canvas id="ecg-canvas" width="156" height="34"></canvas>
+        <div class="audio-controls">
+          <button id="toggle-bgm-btn" class="mini-btn">BGM</button>
+          <button id="toggle-sfx-btn" class="mini-btn">SFX</button>
+          <button id="swap-stick-hud-btn" class="mini-btn">⇄ Stik Kiri</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="alert-banner" class="alert-banner">MATA SOSOK MELIHATMU! SEGERA SEMBUNYI DI LEMARI!</div>
+    <div id="toast-msg" class="toast-msg"></div>
+
+    <!-- Kontrol Multi-Sentuh Papan Interaktif Digital (PID) -->
+    <div id="touch-controls" class="touch-controls">
+      <div id="joystick-zone" class="joystick-zone">
+        <div id="joystick-knob" class="joystick-knob"></div>
+      </div>
+      <div class="action-cluster">
+        <div class="utility-row">
+          <button id="pid-flash-btn" class="pid-btn">Senter (F)</button>
+          <button id="pid-turn-btn" class="pid-btn">Balik 180° (Q)</button>
+        </div>
+        <button id="pid-action-btn" class="pid-action-btn disabled">Dekati Objek Interaktif</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Pertanyaan Mata Pelajaran Guru Saat Menemukan Kunci -->
+  <div id="quiz-modal" class="quiz-modal">
+    <div class="quiz-card">
+      <div class="dossier-tag">GEMBOK KOMBINASI KUNCI KUNINGAN</div>
+      <h2 id="quiz-modal-title" style="margin-top: 4px; color: var(--brass-bright); font-size: 1.25rem;">
+        UJI KUNCI KUNINGAN #1
+      </h2>
+      <div id="quiz-question-text" class="quiz-question-text"></div>
+      <div id="quiz-options" class="quiz-options"></div>
+      <div id="quiz-feedback" class="quiz-feedback"></div>
+    </div>
+  </div>
+
+  <!-- Layar Awal (Dossier Investigasi & Pengaturan Soal Guru) -->
+  <div id="start-screen" class="screen-overlay">
+    <div class="dossier-card">
+      <div class="corner-mark corner-tl"></div>
+      <div class="corner-mark corner-tr"></div>
+      <div class="corner-mark corner-bl"></div>
+      <div class="corner-mark corner-br"></div>
+
+      <div class="dossier-header">
+        <div>
+          <div class="dossier-tag">BERKAS INVESTIGASI #09 • PAPAN INTERAKTIF DIGITAL (PID)</div>
+          <h1 class="dossier-title">RUMAH SUNYI: TIGA KUNCI</h1>
+          <p class="dossier-subtitle">
+            Eksplorasi 9 ruangan mansion, pecahkan 3 soal mata pelajaran dari laci berkunci, dan buka Pintu Keluar Utama.
+          </p>
+        </div>
+        <button id="swap-stick-start-btn" class="btn-secondary">⇄ Stik Kiri</button>
+      </div>
+
+      <div class="grid-two">
+        <!-- Kolom Kiri: Tingkat Kesulitan & Aturan Main -->
+        <div class="panel-box">
+          <div class="panel-heading">
+            <span>1. TINGKAT KESULITAN & REKOR</span>
+          </div>
+          <div class="diff-group">
+            <button class="diff-btn" data-diff="mudah">
+              <strong>Mudah</strong>
+              <span id="best-mudah">Rekor: --:--.--</span>
+            </button>
+            <button class="diff-btn active" data-diff="normal">
+              <strong>Normal</strong>
+              <span id="best-normal">Rekor: --:--.--</span>
+            </button>
+            <button class="diff-btn" data-diff="sulit">
+              <strong>Sulit</strong>
+              <span id="best-sulit">Rekor: --:--.--</span>
+            </button>
+          </div>
+
+          <div class="panel-heading" style="margin-top: 12px;">
+            <span>PANDUAN SINGKAT SISWA</span>
+          </div>
+          <ul class="brief-list">
+            <li><strong>Laci 2× Ketuk:</strong> Ketuk 1× membuka celah laci (berisik), ketuk 2× menggeledah isi & menjawab soal kunci.</li>
+            <li><strong>Sosok Bayangan Pucat:</strong> Diam di lorong utara sampai <em>matanya melihatmu</em>. Matikan senter agar sulit terlihat.</li>
+            <li><strong>Lemari Berjalusi:</strong> Masuk ke lemari menjeda pergerakan hantu selama beberapa detik.</li>
+            <li><strong>Kendali PID:</strong> Gunakan stik analog untuk berjalan, geser layar untuk menengok, dan ikuti kompas arah di atas.</li>
+          </ul>
+        </div>
+
+        <!-- Kolom Kanan: Pengaturan Soal Mata Pelajaran Guru -->
+        <div class="panel-box">
+          <div class="panel-heading">
+            <span>2. SOAL MATA PELAJARAN GURU</span>
+            <span id="active-subject-label" style="color: var(--paper-aged);">Informatika</span>
+          </div>
+          <div class="preset-row">
+            <button class="chip-btn preset-btn active" data-preset="informatika">Informatika</button>
+            <button class="chip-btn preset-btn" data-preset="matematika">Matematika</button>
+            <button class="chip-btn preset-btn" data-preset="ipa">IPA Terpadu</button>
+            <button class="chip-btn preset-btn" data-preset="ips">IPS</button>
+            <button class="chip-btn preset-btn" data-preset="bahasa">B. Indonesia</button>
+          </div>
+
+          <div id="quiz-preview-list" class="quiz-preview-list"></div>
+
+          <button id="toggle-editor-btn" class="btn-secondary">✎ Edit 3 Soal Guru (Kustom)</button>
+        </div>
+      </div>
+
+      <!-- Panel Editor 3 Soal Guru (Dapat Dibuka/Tutup) -->
+      <div id="teacher-editor-panel" class="editor-panel">
+        <div class="panel-heading">
+          <span>EDITOR 3 SOAL UJI KUNCI (TERSIMPAN OTOMATIS DI PERAMBAN)</span>
+        </div>
+        <div style="max-width: 340px;">
+          <label style="font-family: var(--font-mono); font-size: 0.76rem; color: var(--brass-gold);">NAMA MATA PELAJARAN</label>
+          <input id="edit-subject" class="subject-input" type="text" value="Informatika" />
+        </div>
+        <div id="editor-questions-grid" class="editor-grid"></div>
+        <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+          <button id="save-quiz-btn" class="btn-primary" style="padding: 10px 20px; font-size: 0.92rem;">
+            Simpan Perubahan Soal
+          </button>
+        </div>
+      </div>
+
+      <div class="start-bar">
+        <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--paper-muted);">
+          Dukungan Penuh: Layar Sentuh PID Multi-Touch & Keyboard (WASD / E / F / Q)
+        </div>
+        <button id="start-game-btn" class="btn-primary">MULAI INVESTIGASI (MASUK RUMAH)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layar Laporan Akhir -->
+  <div id="end-screen" class="screen-overlay hidden">
+    <div class="dossier-card" style="max-width: 640px; text-align: center;">
+      <div class="corner-mark corner-tl"></div>
+      <div class="corner-mark corner-tr"></div>
+      <div class="corner-mark corner-bl"></div>
+      <div class="corner-mark corner-br"></div>
+
+      <div class="dossier-tag">LAPORAN AKHIR INVESTIGASI</div>
+      <div id="end-stamp" class="stamp-badge stamp-win">MISI BERHASIL</div>
+      <h2 id="end-title" class="dossier-title" style="font-size: 1.7rem;">Pintu Utama Berhasil Dibuka!</h2>
+      <p id="end-desc" class="dossier-subtitle" style="margin-top: 8px;"></p>
+
+      <div class="stats-grid">
+        <div class="stat-cell">
+          <span>WAKTU SELESAI</span>
+          <strong id="stat-time">00:00.00</strong>
+        </div>
+        <div class="stat-cell">
+          <span>KUNCI TERKUMPUL</span>
+          <strong id="stat-keys">3 / 3</strong>
+        </div>
+        <div class="stat-cell">
+          <span>REKOR TERCEPAT</span>
+          <strong id="stat-best">--:--.--</strong>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: center; gap: 12px; margin-top: 18px;">
+        <button id="back-menu-btn" class="btn-secondary">Pengaturan & Soal Guru</button>
+        <button id="retry-btn" class="btn-primary">Main Lagi</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
