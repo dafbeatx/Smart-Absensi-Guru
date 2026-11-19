@@ -162,7 +162,8 @@ import { TopDisciplineCelebrationModal } from '../../guru/components/TopDiscipli
 import { TeacherDailyChallengeWidget } from '../../guru/components/TeacherDailyChallengeWidget';
 import { TeacherChallengeModal } from '../../guru/components/TeacherChallengeModal';
 import { GamePidView } from '../../guru/components/GamePidView';
-import { getGamePidPlatformUrl } from '../../../config/game-pid.config';
+import { GamePidPromoModal } from '../../guru/components/GamePidPromoModal';
+import { getGamePidPlatformUrl, shouldShowPidPromoToday } from '../../../config/game-pid.config';
 import { TeacherChallengeService } from '../../../services/teacher-challenge.service';
 import { CheckoutReminderBanner } from '../components/CheckoutReminderBanner';
 import { AttendancePolicyAgreementModal } from '../../guru/components/AttendancePolicyAgreementModal';
@@ -536,6 +537,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [permissionBlockedRequiresCamera, setPermissionBlockedRequiresCamera] = useState(false);
   const [isDisciplineBadgeModalOpen, setIsDisciplineBadgeModalOpen] = useState(false);
   const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false);
+  const [isGamePidPromoOpen, setIsGamePidPromoOpen] = useState(false);
   const [pointHistory, setPointHistory] = useState<TeacherPointLog[]>([]);
   const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
     return getSafeInitialTeacherPointLogs();
@@ -845,6 +847,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     { id: 'guru_exam_period', isOpen: isExamPeriodModalOpen, onClose: () => setIsExamPeriodModalOpen(false), title: 'Periode Ujian' },
     { id: 'guru_sarpras', isOpen: isSarprasModalOpen, onClose: () => setIsSarprasModalOpen(false), title: 'Inventaris Sarpras' },
     { id: 'guru_customize_icons', isOpen: isCustomizeIconsModalOpen, onClose: () => setIsCustomizeIconsModalOpen(false), title: 'Kustomisasi Menu Utama' },
+    { id: 'guru_game_pid_promo', isOpen: isGamePidPromoOpen, onClose: () => setIsGamePidPromoOpen(false), title: 'Promosi Game PID' },
   ]);
 
   // 🛡️ Sub-Layer Back Navigation (berandaLayer -> returnTarget / HOME)
@@ -2152,6 +2155,32 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, [attendanceHistory, pointHistory]);
 
   const todayDateStr = useMemo(() => getTodayDateInJakarta(), []);
+
+  // 🎮 Promosi Pop-up Game PID & Deep Link Handler saat Guru Masuk ke Web
+  useEffect(() => {
+    if (!effectiveUser?.id) return;
+
+    // 1. Periksa Tautan Deep Link (?portal=game-pid / ?open=game-pid / ?tab=game_pid)
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const searchParams = new URLSearchParams(window.location.search);
+      const portalParam = searchParams.get('portal') || searchParams.get('open') || searchParams.get('tab');
+      if (portalParam === 'game-pid' || portalParam === 'game_pid') {
+        setActiveTab('BERANDA');
+        setGamePidReturnTarget('HOME');
+        setBerandaLayer('GAME_PID');
+        return; // Deep-link langsung membuka portal game tanpa memunculkan popup promo
+      }
+    }
+
+    // 2. Automated Pop-up Promosi Game PID saat Guru Masuk ke Web
+    if (shouldShowPidPromoToday(todayDateStr)) {
+      const promoTimer = setTimeout(() => {
+        setIsGamePidPromoOpen(true);
+        SoundService.play('SUCCESS');
+      }, 1200);
+      return () => clearTimeout(promoTimer);
+    }
+  }, [effectiveUser?.id, todayDateStr]);
 
   const hasFilledMoodToday = useMemo(() => {
     if (todayMood) return true;
@@ -7191,6 +7220,19 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         teacherData={disciplineLeaderboard?.leaderboard?.find((t) => t.isCurrentUser)}
         topTeachers={disciplineLeaderboard?.leaderboard?.slice(0, 3)}
         periodMonthYear={`${disciplineLeaderboard.monthName} ${disciplineLeaderboard.year}`}
+      />
+
+      {/* 15c. Modal Pop-up Promosi Pekan Inovasi Digital (Game PID) */}
+      <GamePidPromoModal
+        isOpen={isGamePidPromoOpen}
+        onClose={() => setIsGamePidPromoOpen(false)}
+        onOpenPortal={() => {
+          setIsGamePidPromoOpen(false);
+          setActiveTab('BERANDA');
+          setGamePidReturnTarget('HOME');
+          setBerandaLayer('GAME_PID');
+        }}
+        todayDateStr={todayDateStr}
       />
 
       {/* 15b. Modal Syarat & Ketentuan Kebijakan Presensi Wajib Datang & Pulang */}

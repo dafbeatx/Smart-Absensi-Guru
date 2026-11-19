@@ -17,6 +17,9 @@ export const STORAGE_KEY_RUMAH_SUNYI_URL = 'smart_absensi_rumah_sunyi_url';
 export const DEFAULT_G7KAIH_URL = '/games/g7kaih-al-ittihadiyah/index.html';
 export const STORAGE_KEY_G7KAIH_URL = 'smart_absensi_g7kaih_url';
 
+export const STORAGE_KEY_PID_PROMO_DISMISSED_DATE = 'smart_absensi_pid_promo_dismissed_date';
+export const SESSION_KEY_PID_PROMO_SHOWN = 'smart_absensi_pid_promo_shown';
+
 /**
  * Mengambil tautan langsung platform Game PID dari storage lokal atau default resmi sekolah
  */
@@ -172,5 +175,54 @@ export function setG7kaihUrl(url: string): void {
     } catch {
       // ignore
     }
+  }
+}
+
+/**
+ * Mendapatkan tautan deep-link khusus yang langsung membuka portal Game PID saat diakses
+ */
+export function getDirectGamePidShareUrl(): string {
+  if (typeof window !== 'undefined' && window.location) {
+    return `${window.location.origin}${window.location.pathname}?portal=game-pid`;
+  }
+  return DEFAULT_GAME_PID_URL;
+}
+
+/**
+ * Mengecek apakah promosi pop-up Game PID harus dimunculkan ke guru hari ini
+ */
+export function shouldShowPidPromoToday(todayDateStr: string): boolean {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined' || typeof sessionStorage === 'undefined') {
+    return false;
+  }
+  try {
+    const dismissedDate = localStorage.getItem(STORAGE_KEY_PID_PROMO_DISMISSED_DATE);
+    if (dismissedDate === todayDateStr) {
+      return false;
+    }
+    const shownInSession = sessionStorage.getItem(SESSION_KEY_PID_PROMO_SHOWN);
+    if (shownInSession === 'true') {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Menandai pop-up promosi Game PID telah dilihat pada sesi saat ini atau ditutup permanen untuk hari ini
+ */
+export function markPidPromoShown(dontShowAgainToday = false, todayDateStr = ''): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(SESSION_KEY_PID_PROMO_SHOWN, 'true');
+    }
+    if (dontShowAgainToday && todayDateStr && typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_PID_PROMO_DISMISSED_DATE, todayDateStr);
+    }
+  } catch {
+    // ignore
   }
 }

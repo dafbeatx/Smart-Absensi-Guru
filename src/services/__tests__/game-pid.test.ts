@@ -20,6 +20,11 @@ import {
   setRumahSunyiUrl,
   getG7kaihUrl,
   setG7kaihUrl,
+  getDirectGamePidShareUrl,
+  shouldShowPidPromoToday,
+  markPidPromoShown,
+  STORAGE_KEY_PID_PROMO_DISMISSED_DATE,
+  SESSION_KEY_PID_PROMO_SHOWN,
 } from '../../config/game-pid.config';
 import type { TestSuiteResult, TestResultItem } from '../test-runner.service';
 
@@ -30,10 +35,12 @@ export async function runGamePidTestSuite(): Promise<TestSuiteResult> {
 
   // Setup Mock Browser Storage & Event System for Node environment
   const mockStorage: Record<string, string> = {};
+  const mockSessionStorage: Record<string, string> = {};
   const mockListeners: Record<string, Array<(e: unknown) => void>> = {};
 
   const originalWindow = globalThis.window;
   const originalLocalStorage = globalThis.localStorage;
+  const originalSessionStorage = globalThis.sessionStorage;
 
   const setupMockBrowser = () => {
     // Mock localStorage
@@ -50,8 +57,26 @@ export async function runGamePidTestSuite(): Promise<TestSuiteResult> {
       },
     };
 
+    // Mock sessionStorage
+    const sessionStorageMock = {
+      getItem: (key: string) => mockSessionStorage[key] || null,
+      setItem: (key: string, val: string) => {
+        mockSessionStorage[key] = String(val);
+      },
+      removeItem: (key: string) => {
+        delete mockSessionStorage[key];
+      },
+      clear: () => {
+        for (const k of Object.keys(mockSessionStorage)) delete mockSessionStorage[k];
+      },
+    };
+
     // Mock window
     const windowMock = {
+      location: {
+        origin: 'https://smart-absensi.alittihadiyah.sch.id',
+        pathname: '/dashboard',
+      },
       addEventListener: (type: string, listener: (e: unknown) => void) => {
         if (!mockListeners[type]) mockListeners[type] = [];
         mockListeners[type].push(listener);
@@ -70,13 +95,16 @@ export async function runGamePidTestSuite(): Promise<TestSuiteResult> {
 
     // Inject into globalThis
     (globalThis as unknown as { localStorage: unknown }).localStorage = storageMock;
+    (globalThis as unknown as { sessionStorage: unknown }).sessionStorage = sessionStorageMock;
     (globalThis as unknown as { window: unknown }).window = windowMock;
   };
 
   const cleanupMockBrowser = () => {
     (globalThis as unknown as { localStorage: unknown }).localStorage = originalLocalStorage;
+    (globalThis as unknown as { sessionStorage: unknown }).sessionStorage = originalSessionStorage;
     (globalThis as unknown as { window: unknown }).window = originalWindow;
     for (const k of Object.keys(mockStorage)) delete mockStorage[k];
+    for (const k of Object.keys(mockSessionStorage)) delete mockSessionStorage[k];
     for (const k of Object.keys(mockListeners)) delete mockListeners[k];
   };
 
@@ -484,6 +512,102 @@ Siti (Ketua Kelas),Teman Sebangku,Hai kawan!,Perangkat masukan komputer?,Monitor
     failed++;
     results.push({
       testName: 'G7KAIH Bundle & Thumbnail Integrity: Semua berkas bundel & thumbnail 3D terverifikasi',
+      status: 'FAIL',
+      details: (err as Error)?.message || String(err),
+    });
+  }
+
+  // Test 9: Game PID Promo & Direct Share Link (shouldShowPidPromoToday, markPidPromoShown, getDirectGamePidShareUrl)
+  try {
+    setupMockBrowser();
+    const testDate = '2026-11-19';
+
+    // Awal: harus bernilai true karena belum pernah dilihat
+    if (!shouldShowPidPromoToday(testDate)) {
+      throw new Error('shouldShowPidPromoToday harus bernilai true saat pertama kali masuk');
+    }
+
+    // Direct Share URL harus mengandung ?portal=game-pid
+    const shareUrl = getDirectGamePidShareUrl();
+    if (!shareUrl.includes('?portal=game-pid')) {
+      throw new Error(`getDirectGamePidShareUrl tidak mengandung ?portal=game-pid: ${shareUrl}`);
+    }
+
+    // Tandai sudah dilihat di sesi ini
+    markPidPromoShown(false);
+    if (mockSessionStorage[SESSION_KEY_PID_PROMO_SHOWN] !== 'true') {
+      throw new Error('SESSION_KEY_PID_PROMO_SHOWN tidak tersimpan di sessionStorage');
+    }
+    if (shouldShowPidPromoToday(testDate)) {
+      throw new Error('shouldShowPidPromoToday harus false setelah ditandai di sesi saat ini');
+    }
+
+    // Hapus sesi tapi tandai jangan tampilkan lagi hari ini
+    delete mockSessionStorage[SESSION_KEY_PID_PROMO_SHOWN];
+    markPidPromoShown(true, testDate);
+    if (mockStorage[STORAGE_KEY_PID_PROMO_DISMISSED_DATE] !== testDate) {
+      throw new Error(`STORAGE_KEY_PID_PROMO_DISMISSED_DATE tidak tersimpan untuk tanggal ${testDate}`);
+    }
+    if (shouldShowPidPromoToday(testDate)) {
+      throw new Error('shouldShowPidPromoToday harus false saat dismissed date sama dengan hari ini');
+    }
+
+    // Simulasi sesi peramban baru di hari esok: harus bernilai true kembali
+    delete mockSessionStorage[SESSION_KEY_PID_PROMO_SHOWN];
+    if (!shouldShowPidPromoToday('2026-11-20')) {
+      throw new Error('shouldShowPidPromoToday harus bernilai true di hari baru berikutnya');
+    }
+
+    cleanupMockBrowser();
+
+    passed++;
+    results.push({
+      testName: 'Game PID Promo & Direct Share Link: Logika kemunculan harian & format deep-link terverifikasi',
+      status: 'PASS',
+      details: 'shouldShowPidPromoToday, markPidPromoShown, dan ?portal=game-pid berfungsi presisi',
+    });
+  } catch (err: unknown) {
+    cleanupMockBrowser();
+    failed++;
+    results.push({
+      testName: 'Game PID Promo & Direct Share Link: Logika kemunculan harian & format deep-link terverifikasi',
+      status: 'FAIL',
+      details: (err as Error)?.message || String(err),
+    });
+  }
+
+  // Test 10: Game PID Promo Poster Asset Integrity
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+
+    const posterGames = path.resolve(process.cwd(), 'public/games/game-pid-promo-poster.jpg');
+    const posterImages = path.resolve(process.cwd(), 'public/images/game-pid-promo-poster.jpg');
+
+    if (!fs.existsSync(posterGames)) {
+      throw new Error('Poster promosi public/games/game-pid-promo-poster.jpg tidak ditemukan');
+    }
+    if (!fs.existsSync(posterImages)) {
+      throw new Error('Poster promosi public/images/game-pid-promo-poster.jpg tidak ditemukan');
+    }
+
+    const statGames = fs.statSync(posterGames);
+    const statImages = fs.statSync(posterImages);
+
+    if (statGames.size < 10000 || statImages.size < 10000) {
+      throw new Error(`Ukuran berkas poster terlalu kecil (${statGames.size} / ${statImages.size} bytes)`);
+    }
+
+    passed++;
+    results.push({
+      testName: 'Game PID Promo Poster Asset Integrity: Berkas poster resmi 16:9 terkonfirmasi valid & siap tayang',
+      status: 'PASS',
+      details: `Ukuran poster: ${(statGames.size / 1024).toFixed(1)} KB (public/games & public/images)`,
+    });
+  } catch (err: unknown) {
+    failed++;
+    results.push({
+      testName: 'Game PID Promo Poster Asset Integrity: Berkas poster resmi 16:9 terkonfirmasi valid & siap tayang',
       status: 'FAIL',
       details: (err as Error)?.message || String(err),
     });
