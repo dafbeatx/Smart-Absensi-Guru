@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Gamepad2,
   Sparkles,
@@ -19,6 +19,7 @@ import {
   getSchoolSlice3dUrl,
   getRumahSunyiUrl,
   getG7kaihUrl,
+  getSuuqAlMadinahUrl,
 } from '../../../config/game-pid.config';
 
 export interface GamePidModalProps {
@@ -42,6 +43,12 @@ interface GamePlanItem {
   actionUrl?: string;
   is3d?: boolean;
   thumbnailUrl?: string;
+  subject: string;
+  subjectCategory: 'ALL' | 'BAHASA_ARAB' | 'PAI' | 'UMUM' | 'LITERASI';
+  subjectIcon: string;
+  subjectBadgeColor: string;
+  gradeLevel: string;
+  curriculumTopic: string;
 }
 
 export const GamePidModal: React.FC<GamePidModalProps> = ({
@@ -64,12 +71,50 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
 
   if (!isOpen) return null;
 
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<'ALL' | 'BAHASA_ARAB' | 'PAI' | 'UMUM' | 'LITERASI'>('ALL');
+
+  const subjectFilterOptions = [
+    { id: 'ALL', label: 'Semua Mapel', icon: '🎯' },
+    { id: 'BAHASA_ARAB', label: 'Bahasa Arab', icon: '📖' },
+    { id: 'PAI', label: 'Karakter & PAI', icon: '🕌' },
+    { id: 'UMUM', label: 'Umum & Bank Soal', icon: '📚' },
+    { id: 'LITERASI', label: 'Literasi & Kuis', icon: '🔍' },
+  ];
+
   const gamePlans: GamePlanItem[] = [
+    {
+      id: 'pid_suuq_al_madinah',
+      title: 'Suuq Al-Madinah 3D: Petualangan Pasar Arab',
+      category: 'CHALLENGE',
+      badgeCategory: 'Gim 3D Bahasa Arab PID',
+      subject: 'Bahasa Arab',
+      subjectCategory: 'BAHASA_ARAB',
+      subjectIcon: '📖',
+      subjectBadgeColor: 'bg-amber-100 text-amber-900 border-amber-300',
+      gradeLevel: 'Kelas 7, 8, 9 SMP',
+      curriculumTopic: 'Mufradat Buah, Peralatan Sekolah, Angka Arab & Dinar',
+      description:
+        'Simulasi pasar tradisional 3D Timur Tengah: layani pembeli NPC dalam bahasa Arab, cari buah dan alat tulis di rak lapak, timbang belanjaan, dan terima pembayaran koin Arab untuk mengumpulkan poin berkah.',
+      status: 'AVAILABLE',
+      statusLabel: 'Siap Dimainkan',
+      rewardPoints: 50,
+      icon: Sparkles,
+      accentColor: 'from-[#C84B31] via-[#D4A373] to-[#1B4D3E]',
+      actionUrl: getSuuqAlMadinahUrl(),
+      thumbnailUrl: '/games/suuq-al-madinah/thumbnail.jpg',
+      is3d: true,
+    },
     {
       id: 'pid_school_slice_3d',
       title: 'School Slice 3D: Kehidupan Sekolah',
       category: 'QUIZ',
       badgeCategory: 'Gim 3D Cel-Shaded PID',
+      subject: 'Umum & Multi-Mapel',
+      subjectCategory: 'UMUM',
+      subjectIcon: '📚',
+      subjectBadgeColor: 'bg-blue-100 text-blue-900 border-blue-300',
+      gradeLevel: 'Semua Tingkat',
+      curriculumTopic: 'Bank Soal Multi-Mata Pelajaran Guru & Simulasi Sekolah',
       description:
         'Jelajahi kelas dan lingkungan 3D cel-shaded SMP Terpadu Al-Ittihadiyah, interaksi tap-to-move dengan karakter siswa dan guru, nikmati mode split-screen 2 pemain, dan selesaikan tantangan bank soal terintegrasi.',
       status: 'AVAILABLE',
@@ -82,26 +127,16 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
       is3d: true,
     },
     {
-      id: 'pid_rumah_sunyi',
-      title: 'Rumah Sunyi: Tiga Kunci',
-      category: 'QUIZ',
-      badgeCategory: 'Gim Horor Edukasi 3D POV',
-      description:
-        'Investigasi POV 3D mansion 9 ruangan: temukan 3 kunci kuningan di antara 12 laci, selesaikan uji materi kuis guru, bersembunyi di lemari dari Sosok Bayangan Pucat, dan buka pintu keluar.',
-      status: 'AVAILABLE',
-      statusLabel: 'Siap Dimainkan',
-      rewardPoints: 40,
-      icon: Key,
-      accentColor: 'from-[#171310] via-[#c99a45] to-[#b52b21]',
-      actionUrl: getRumahSunyiUrl(),
-      thumbnailUrl: '/games/rumah-sunyi/thumbnail.jpg',
-      is3d: true,
-    },
-    {
       id: 'pid_g7kaih',
       title: 'G7KAIH: Perjalanan ke SMP Terpadu Al-Ittihadiyah',
       category: 'CHALLENGE',
       badgeCategory: 'Gim 3D Simulasi Karakter PID',
+      subject: 'Karakter & PAI',
+      subjectCategory: 'PAI',
+      subjectIcon: '🕌',
+      subjectBadgeColor: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+      gradeLevel: 'Kelas 7, 8, 9 SMP',
+      curriculumTopic: '7 Kebiasaan Anak Indonesia Hebat, Sholat Subuh & Disiplin',
       description:
         'Simulasi POV 3D 7 Kebiasaan Anak Indonesia Hebat: bangun Subuh di rumah 4 kamar, sholat berjamaah di Masjid Al-Ikhlas, perjalanan desa, dan tiba tepat waktu di SMP Terpadu Al-Ittihadiyah.',
       status: 'AVAILABLE',
@@ -113,7 +148,34 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
       thumbnailUrl: '/games/g7kaih-al-ittihadiyah/thumbnail.jpg',
       is3d: true,
     },
+    {
+      id: 'pid_rumah_sunyi',
+      title: 'Rumah Sunyi: Tiga Kunci',
+      category: 'QUIZ',
+      badgeCategory: 'Gim Horor Edukasi 3D POV',
+      subject: 'Literasi & Kuis',
+      subjectCategory: 'LITERASI',
+      subjectIcon: '🔍',
+      subjectBadgeColor: 'bg-purple-100 text-purple-900 border-purple-300',
+      gradeLevel: 'Kelas 7, 8, 9 SMP',
+      curriculumTopic: 'Investigasi Ruang 3D POV, Laci Misteri, & Uji Kuis Guru',
+      description:
+        'Investigasi POV 3D mansion 9 ruangan: temukan 3 kunci kuningan di antara 12 laci, selesaikan uji materi kuis guru, bersembunyi di lemari dari Sosok Bayangan Pucat, dan buka pintu keluar.',
+      status: 'AVAILABLE',
+      statusLabel: 'Siap Dimainkan',
+      rewardPoints: 40,
+      icon: Key,
+      accentColor: 'from-[#171310] via-[#c99a45] to-[#b52b21]',
+      actionUrl: getRumahSunyiUrl(),
+      thumbnailUrl: '/games/rumah-sunyi/thumbnail.jpg',
+      is3d: true,
+    },
   ];
+
+  const filteredGamePlans = gamePlans.filter((g) => {
+    if (selectedSubjectFilter === 'ALL') return true;
+    return g.subjectCategory === selectedSubjectFilter;
+  });
 
   return (
     // BACKDROP: Full-screen di mobile, blur backdrop di Desktop
@@ -246,18 +308,50 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
             </div>
           </div>
 
+          {/* Filter Mata Pelajaran untuk Guru */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                <span>🏷️</span> Filter Mata Pelajaran:
+              </span>
+              <span className="text-[10px] text-slate-500 font-semibold">
+                Menampilkan {filteredGamePlans.length} dari {gamePlans.length} game
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+              {subjectFilterOptions.map((f) => {
+                const isActive = selectedSubjectFilter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setSelectedSubjectFilter(f.id as any)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                      isActive
+                        ? 'bg-[#023246] text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                    }`}
+                  >
+                    <span>{f.icon}</span>
+                    <span>{f.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Game Pilihan Utama: School Slice 3D */}
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Gim Terintegrasi Resmi ({gamePlans.length})
+                Gim Terintegrasi Resmi ({filteredGamePlans.length})
               </h3>
               <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                 Siap Dimainkan
               </span>
             </div>
 
-            {gamePlans.map((item) => {
+            {filteredGamePlans.map((item) => {
               const IconComp = item.icon;
               return (
                 <div
@@ -297,7 +391,7 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
                           {item.title}
                         </h4>
                         <p className="text-[10px] text-amber-200 font-medium drop-shadow-sm mt-0.5">
-                          Mode Split-Screen 2 Pemain • Kejar-kejaran KBM
+                          {item.subject} • {item.gradeLevel}
                         </p>
                       </div>
                       <div className="px-2 py-0.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-black shadow-md shrink-0">
@@ -307,6 +401,21 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
                   </div>
 
                   <div className="p-3.5 sm:p-4 space-y-3">
+                    {/* Subject & Grade Level Badge */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${item.subjectBadgeColor}`}>
+                        <span>{item.subjectIcon}</span>
+                        <span>Mata Pelajaran: {item.subject}</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[9.5px] font-extrabold bg-slate-100 text-slate-700 border border-slate-200">
+                        🎯 {item.gradeLevel}
+                      </span>
+                    </div>
+
+                    <p className="text-[10.5px] text-slate-600 font-medium bg-slate-50 p-2 rounded-xl border border-slate-200">
+                      <b className="text-slate-800">Topik Materi:</b> {item.curriculumTopic}
+                    </p>
+
                     <p className="text-[11.5px] text-slate-600 leading-relaxed">
                       {item.description}
                     </p>

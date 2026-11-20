@@ -8,10 +8,12 @@ import {
   DEFAULT_SCHOOL_SLICE_3D_URL,
   DEFAULT_RUMAH_SUNYI_URL,
   DEFAULT_G7KAIH_URL,
+  DEFAULT_SUUQ_AL_MADINAH_URL,
   STORAGE_KEY_GAME_PID_URL,
   STORAGE_KEY_SCHOOL_SLICE_3D_URL,
   STORAGE_KEY_RUMAH_SUNYI_URL,
   STORAGE_KEY_G7KAIH_URL,
+  STORAGE_KEY_SUUQ_AL_MADINAH_URL,
   getGamePidPlatformUrl,
   setGamePidPlatformUrl,
   getSchoolSlice3dUrl,
@@ -20,6 +22,8 @@ import {
   setRumahSunyiUrl,
   getG7kaihUrl,
   setG7kaihUrl,
+  getSuuqAlMadinahUrl,
+  setSuuqAlMadinahUrl,
   getDirectGamePidShareUrl,
   shouldShowPidPromoToday,
   markPidPromoShown,
@@ -621,6 +625,105 @@ Siti (Ketua Kelas),Teman Sebangku,Hai kawan!,Perangkat masukan komputer?,Monitor
     failed++;
     results.push({
       testName: 'Game PID Promo Poster Asset Integrity: Berkas poster resmi 16:9 terkonfirmasi valid & siap tayang',
+      status: 'FAIL',
+      details: (err as Error)?.message || String(err),
+    });
+  }
+
+  // Test 11: Suuq Al-Madinah 3D Getter & Setter
+  try {
+    setupMockBrowser();
+    const initial = getSuuqAlMadinahUrl();
+    if (initial !== DEFAULT_SUUQ_AL_MADINAH_URL) {
+      throw new Error(`Getter default gagal: diharapkan ${DEFAULT_SUUQ_AL_MADINAH_URL}, didapat ${initial}`);
+    }
+
+    let eventDispatched = false;
+    let eventDetail = '';
+    const listener = (e: unknown) => {
+      eventDispatched = true;
+      eventDetail = (e as { detail: string }).detail;
+    };
+    globalThis.window.addEventListener('smart_absensi_suuq_al_madinah_url_updated', listener);
+
+    // Simpan URL kustom
+    const customUrl = 'http://localhost:5175/suuq-al-madinah';
+    setSuuqAlMadinahUrl(customUrl);
+
+    if (getSuuqAlMadinahUrl() !== customUrl) {
+      throw new Error(`URL kustom tidak tersimpan: ${getSuuqAlMadinahUrl()}`);
+    }
+    if (mockStorage[STORAGE_KEY_SUUQ_AL_MADINAH_URL] !== customUrl) {
+      throw new Error(`Storage key ${STORAGE_KEY_SUUQ_AL_MADINAH_URL} tidak berisi URL kustom`);
+    }
+    if (!eventDispatched || eventDetail !== customUrl) {
+      throw new Error('Event smart_absensi_suuq_al_madinah_url_updated tidak ter-dispatch dengan benar');
+    }
+
+    // Reset default
+    setSuuqAlMadinahUrl('');
+    if (getSuuqAlMadinahUrl() !== DEFAULT_SUUQ_AL_MADINAH_URL) {
+      throw new Error('Reset URL Suuq Al-Madinah gagal kembali ke default');
+    }
+
+    globalThis.window.removeEventListener('smart_absensi_suuq_al_madinah_url_updated', listener);
+    cleanupMockBrowser();
+
+    passed++;
+    results.push({
+      testName: 'Suuq Al-Madinah 3D Getter & Setter: Tersimpan di localStorage & trigger event',
+      status: 'PASS',
+      details: 'URL kustom tersimpan, CustomEvent ter-dispatch, reset default sukses',
+    });
+  } catch (err: unknown) {
+    cleanupMockBrowser();
+    failed++;
+    results.push({
+      testName: 'Suuq Al-Madinah 3D Getter & Setter: Tersimpan di localStorage & trigger event',
+      status: 'FAIL',
+      details: (err as Error)?.message || String(err),
+    });
+  }
+
+  // Test 12: Suuq Al-Madinah 3D File & Thumbnail Integrity
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+
+    const htmlPath = path.resolve(process.cwd(), 'public/games/suuq-al-madinah/index.html');
+    const thumbDir = path.resolve(process.cwd(), 'public/games/suuq-al-madinah/thumbnail.jpg');
+    const thumbRoot = path.resolve(process.cwd(), 'public/games/suuq-al-madinah-thumbnail.jpg');
+
+    if (!fs.existsSync(htmlPath)) {
+      throw new Error('Berkas game public/games/suuq-al-madinah/index.html tidak ditemukan');
+    }
+    if (!fs.existsSync(thumbDir)) {
+      throw new Error('Thumbnail public/games/suuq-al-madinah/thumbnail.jpg tidak ditemukan');
+    }
+    if (!fs.existsSync(thumbRoot)) {
+      throw new Error('Thumbnail fallback public/games/suuq-al-madinah-thumbnail.jpg tidak ditemukan');
+    }
+
+    const statHtml = fs.statSync(htmlPath);
+    const statThumb = fs.statSync(thumbDir);
+
+    if (statHtml.size < 50000) {
+      throw new Error(`Ukuran berkas HTML Suuq Al-Madinah terlalu kecil (${statHtml.size} bytes)`);
+    }
+    if (statThumb.size < 10000) {
+      throw new Error(`Ukuran thumbnail Suuq Al-Madinah terlalu kecil (${statThumb.size} bytes)`);
+    }
+
+    passed++;
+    results.push({
+      testName: 'Suuq Al-Madinah 3D File & Thumbnail Integrity: Berkas HTML Three.js & cover 3D terverifikasi utuh',
+      status: 'PASS',
+      details: `HTML: ${(statHtml.size / 1024).toFixed(1)} KB, Thumbnail: ${(statThumb.size / 1024).toFixed(1)} KB`,
+    });
+  } catch (err: unknown) {
+    failed++;
+    results.push({
+      testName: 'Suuq Al-Madinah 3D File & Thumbnail Integrity: Berkas HTML Three.js & cover 3D terverifikasi utuh',
       status: 'FAIL',
       details: (err as Error)?.message || String(err),
     });

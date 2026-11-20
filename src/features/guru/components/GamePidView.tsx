@@ -32,6 +32,7 @@ import {
   DEFAULT_SCHOOL_SLICE_3D_URL,
   getRumahSunyiUrl,
   getG7kaihUrl,
+  getSuuqAlMadinahUrl,
 } from '../../../config/game-pid.config';
 import { useBackHandler, BACK_PRIORITIES } from '../../../hooks/useBackNavigation';
 
@@ -56,6 +57,12 @@ interface GamePlanItem {
   actionUrl?: string;
   is3d?: boolean;
   thumbnailUrl?: string;
+  subject: string;
+  subjectCategory: 'ALL' | 'BAHASA_ARAB' | 'PAI' | 'UMUM' | 'LITERASI';
+  subjectIcon: string;
+  subjectBadgeColor: string;
+  gradeLevel: string;
+  curriculumTopic: string;
 }
 
 const SAMPLE_CSV_CONTENT = `npcName,npcRole,storyIntro,question,optionA,optionB,optionC,optionD,correctIndex,explanation
@@ -87,7 +94,13 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
   // State khusus G7KAIH 3D
   const [g7kaihUrl, setG7kaihUrlState] = useState<string>(() => getG7kaihUrl());
 
-  // Embedded Player Aktif (School Slice 3D, Rumah Sunyi 3D, atau G7KAIH 3D)
+  // State khusus Suuq Al-Madinah 3D (Bahasa Arab)
+  const [suuqAlMadinahUrl, setSuuqAlMadinahUrlState] = useState<string>(() => getSuuqAlMadinahUrl());
+
+  // State Filter Mata Pelajaran PID
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<'ALL' | 'BAHASA_ARAB' | 'PAI' | 'UMUM' | 'LITERASI'>('ALL');
+
+  // Embedded Player Aktif (School Slice 3D, Rumah Sunyi 3D, G7KAIH 3D, atau Suuq Al-Madinah 3D)
   const [embeddedGame, setEmbeddedGame] = useState<{
     id: string;
     title: string;
@@ -118,17 +131,23 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
       const current = getG7kaihUrl();
       setG7kaihUrlState(current);
     };
+    const handleSuuqAlMadinahUrlUpdated = () => {
+      const current = getSuuqAlMadinahUrl();
+      setSuuqAlMadinahUrlState(current);
+    };
 
     window.addEventListener('smart_absensi_game_pid_url_updated', handleUrlUpdated);
     window.addEventListener('smart_absensi_school_slice_3d_url_updated', handleSchoolUrlUpdated);
     window.addEventListener('smart_absensi_rumah_sunyi_url_updated', handleRumahSunyiUrlUpdated);
     window.addEventListener('smart_absensi_g7kaih_url_updated', handleG7kaihUrlUpdated);
+    window.addEventListener('smart_absensi_suuq_al_madinah_url_updated', handleSuuqAlMadinahUrlUpdated);
 
     return () => {
       window.removeEventListener('smart_absensi_game_pid_url_updated', handleUrlUpdated);
       window.removeEventListener('smart_absensi_school_slice_3d_url_updated', handleSchoolUrlUpdated);
       window.removeEventListener('smart_absensi_rumah_sunyi_url_updated', handleRumahSunyiUrlUpdated);
       window.removeEventListener('smart_absensi_g7kaih_url_updated', handleG7kaihUrlUpdated);
+      window.removeEventListener('smart_absensi_suuq_al_madinah_url_updated', handleSuuqAlMadinahUrlUpdated);
     };
   }, []);
 
@@ -256,12 +275,48 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
     }
   };
 
+  const subjectFilterOptions = [
+    { id: 'ALL', label: 'Semua Mapel', icon: '🎯' },
+    { id: 'BAHASA_ARAB', label: 'Bahasa Arab', icon: '📖' },
+    { id: 'PAI', label: 'Karakter & PAI', icon: '🕌' },
+    { id: 'UMUM', label: 'Umum & Bank Soal', icon: '📚' },
+    { id: 'LITERASI', label: 'Literasi & Kuis', icon: '🔍' },
+  ];
+
   const gamePlans: GamePlanItem[] = [
+    {
+      id: 'pid_suuq_al_madinah',
+      title: 'Suuq Al-Madinah 3D: Petualangan Pasar Arab',
+      category: 'CHALLENGE',
+      badgeCategory: 'Gim 3D Bahasa Arab PID',
+      subject: 'Bahasa Arab',
+      subjectCategory: 'BAHASA_ARAB',
+      subjectIcon: '📖',
+      subjectBadgeColor: 'bg-amber-100 text-amber-900 border-amber-300',
+      gradeLevel: 'Kelas 7, 8, 9 SMP',
+      curriculumTopic: 'Mufradat Buah, Peralatan Sekolah, Angka Arab & Dinar',
+      description:
+        'Simulasi pasar tradisional 3D Timur Tengah: layani pembeli NPC dalam bahasa Arab, cari buah dan alat tulis di rak lapak, timbang belanjaan, dan terima pembayaran koin Arab untuk mengumpulkan poin berkah.',
+      status: 'AVAILABLE',
+      statusLabel: 'Siap Dimainkan',
+      rewardPoints: 50,
+      icon: Sparkles,
+      accentColor: 'from-[#C84B31] via-[#D4A373] to-[#1B4D3E]',
+      actionUrl: suuqAlMadinahUrl,
+      thumbnailUrl: '/games/suuq-al-madinah/thumbnail.jpg',
+      is3d: true,
+    },
     {
       id: 'pid_school_slice_3d',
       title: 'School Slice 3D: Kehidupan Sekolah',
       category: 'QUIZ',
       badgeCategory: 'Gim 3D Cel-Shaded PID',
+      subject: 'Umum & Multi-Mapel',
+      subjectCategory: 'UMUM',
+      subjectIcon: '📚',
+      subjectBadgeColor: 'bg-blue-100 text-blue-900 border-blue-300',
+      gradeLevel: 'Semua Tingkat',
+      curriculumTopic: 'Bank Soal Multi-Mata Pelajaran Guru & Simulasi Sekolah',
       description:
         'Jelajahi kelas dan lingkungan 3D cel-shaded SMP Terpadu Al-Ittihadiyah, interaksi tap-to-move dengan karakter siswa dan guru resmi, nikmati mode split-screen 2 pemain kejar-kejaran, dan selesaikan tantangan bank soal terintegrasi.',
       status: 'AVAILABLE',
@@ -274,26 +329,16 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
       is3d: true,
     },
     {
-      id: 'pid_rumah_sunyi',
-      title: 'Rumah Sunyi: Tiga Kunci',
-      category: 'QUIZ',
-      badgeCategory: 'Gim Horor Edukasi 3D POV',
-      description:
-        'Investigasi first-person 3D di mansion 9 ruangan: cari 3 kunci kuningan di antara 12 laci, selesaikan uji materi kuis guru, hindari tatapan Sosok Bayangan Pucat dengan sembunyi di lemari, dan buka pintu keluar.',
-      status: 'AVAILABLE',
-      statusLabel: 'Siap Dimainkan',
-      rewardPoints: 40,
-      icon: Key,
-      accentColor: 'from-[#171310] via-[#c99a45] to-[#b52b21]',
-      actionUrl: rumahSunyiUrl,
-      thumbnailUrl: '/games/rumah-sunyi/thumbnail.jpg',
-      is3d: true,
-    },
-    {
       id: 'pid_g7kaih',
       title: 'G7KAIH: Perjalanan ke SMP Terpadu Al-Ittihadiyah',
       category: 'CHALLENGE',
       badgeCategory: 'Gim 3D Simulasi Karakter PID',
+      subject: 'Karakter & PAI',
+      subjectCategory: 'PAI',
+      subjectIcon: '🕌',
+      subjectBadgeColor: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+      gradeLevel: 'Kelas 7, 8, 9 SMP',
+      curriculumTopic: '7 Kebiasaan Anak Indonesia Hebat, Sholat Subuh & Disiplin',
       description:
         'Simulasi POV 3D 7 Kebiasaan Anak Indonesia Hebat: bangun Subuh di rumah 4 kamar, sholat berjamaah di Masjid Al-Ikhlas, perjalanan desa, dan tiba tepat waktu di SMP Terpadu Al-Ittihadiyah.',
       status: 'AVAILABLE',
@@ -305,7 +350,34 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
       thumbnailUrl: '/games/g7kaih-al-ittihadiyah/thumbnail.jpg',
       is3d: true,
     },
+    {
+      id: 'pid_rumah_sunyi',
+      title: 'Rumah Sunyi: Tiga Kunci',
+      category: 'QUIZ',
+      badgeCategory: 'Gim Horor Edukasi 3D POV',
+      subject: 'Literasi & Kuis',
+      subjectCategory: 'LITERASI',
+      subjectIcon: '🔍',
+      subjectBadgeColor: 'bg-purple-100 text-purple-900 border-purple-300',
+      gradeLevel: 'Kelas 7, 8, 9 SMP',
+      curriculumTopic: 'Literasi Digital, Problem Solving & Investigasi',
+      description:
+        'Investigasi first-person 3D di mansion 9 ruangan: cari 3 kunci kuningan di antara 12 laci, selesaikan uji materi kuis guru, hindari tatapan Sosok Bayangan Pucat dengan sembunyi di lemari, dan buka pintu keluar.',
+      status: 'AVAILABLE',
+      statusLabel: 'Siap Dimainkan',
+      rewardPoints: 40,
+      icon: Key,
+      accentColor: 'from-[#171310] via-[#c99a45] to-[#b52b21]',
+      actionUrl: rumahSunyiUrl,
+      thumbnailUrl: '/games/rumah-sunyi/thumbnail.jpg',
+      is3d: true,
+    },
   ];
+
+  const filteredGames =
+    selectedSubjectFilter === 'ALL'
+      ? gamePlans
+      : gamePlans.filter((g) => g.subjectCategory === selectedSubjectFilter);
 
   return (
     <div className="w-full space-y-4 animate-in fade-in duration-200">
@@ -615,161 +687,282 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
         </div>
       </div>
 
-      {/* 5. GIM UTAMA: SCHOOL SLICE 3D (FEATURED ARENA DENGAN THUMBNAIL) */}
-      <div className="space-y-3">
+      {/* 5. FILTER MATA PELAJARAN UNTUK GURU */}
+      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🏷️</span>
+            <h2 className="text-xs sm:text-sm font-black text-slate-900">
+              Filter Mata Pelajaran PID
+            </h2>
+          </div>
+          <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-xl">
+            Menampilkan {filteredGames.length} dari {gamePlans.length} gim
+          </span>
+        </div>
+
+        {/* Tab Buttons Filter - Touch friendly for Infinix Note 8 */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {subjectFilterOptions.map((f) => {
+            const isActive = selectedSubjectFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setSelectedSubjectFilter(f.id as typeof selectedSubjectFilter)}
+                className={`px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-2 active:scale-95 min-h-11 ${
+                  isActive
+                    ? 'bg-[#023246] text-white shadow-md'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
+                }`}
+              >
+                <span className="text-sm">{f.icon}</span>
+                <span>{f.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 6. DAFTAR GIM EDUKASI SESUAI MAPEL */}
+      <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-2">
             <Gamepad2 className="w-4 h-4 text-[#023246]" />
-            <span>Daftar Gim Edukasi Resmi PID ({gamePlans.length})</span>
+            <span>Katalog Gim Edukasi ({filteredGames.length})</span>
           </h2>
           <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
             Aktif &amp; Terintegrasi
           </span>
         </div>
 
-        {gamePlans.map((item) => {
-          const IconComp = item.icon;
-          return (
-            <div
-              key={item.id}
-              className="bg-white rounded-3xl border-2 border-amber-300 ring-4 ring-amber-400/10 shadow-md overflow-hidden transition-all group"
+        {filteredGames.length === 0 ? (
+          <div className="bg-white rounded-3xl p-8 border border-slate-200 text-center space-y-2">
+            <p className="text-2xl">🔍</p>
+            <p className="text-sm font-bold text-slate-800">Tidak ada gim untuk filter ini</p>
+            <button
+              type="button"
+              onClick={() => setSelectedSubjectFilter('ALL')}
+              className="text-xs text-indigo-600 font-bold hover:underline"
             >
-              {/* THUMBNAIL BANNER HERO */}
-              <div className="relative w-full aspect-video sm:aspect-21/9 bg-slate-950 overflow-hidden">
-                <img
-                  src={item.thumbnailUrl || '/games/school-slice-3d/thumbnail.jpg'}
-                  alt={item.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    if (!target.src.endsWith('/games/school-slice-3d-thumbnail.jpg')) {
-                      target.src = '/games/school-slice-3d-thumbnail.jpg';
-                    }
-                  }}
-                />
-                {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/25 to-black/10" />
-
-                {/* Badges on top of thumbnail */}
-                <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
-                  <span className="text-[10px] sm:text-xs font-black px-2.5 py-1 rounded-xl bg-black/60 backdrop-blur-md text-amber-300 border border-amber-300/40 shadow-xs flex items-center gap-1.5">
-                    <IconComp className="w-3.5 h-3.5" />
-                    <span>{item.badgeCategory}</span>
-                  </span>
-                  <span className="text-[9.5px] sm:text-xs font-bold px-2.5 py-1 rounded-xl bg-emerald-500/90 text-white shadow-xs backdrop-blur-md flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                    <span>{item.statusLabel}</span>
-                  </span>
-                </div>
-
-                {/* Floating Bottom Info on thumbnail */}
-                <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2 pointer-events-none">
-                  <div className="text-white drop-shadow-md">
-                    <h3 className="text-sm sm:text-lg font-black leading-tight drop-shadow-sm">
-                      {item.title}
-                    </h3>
-                    <p className="text-[10.5px] sm:text-xs text-amber-200 font-semibold drop-shadow-sm flex items-center gap-1 mt-0.5">
-                      <Sparkles className="w-3 h-3 text-amber-300" />
-                      <span>
-                        {item.id === 'pid_school_slice_3d'
-                          ? 'Mode Split-Screen 2 Pemain • Kejar-kejaran KBM'
-                          : 'Eksplorasi Mansion 9 Ruangan • 3 Kunci & Lemari Sembunyi'}
-                      </span>
-                    </p>
-                  </div>
-                  <div className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow-md shrink-0">
-                    ⭐ +{item.rewardPoints} PTS
-                  </div>
-                </div>
-              </div>
-
-              {/* CARD CONTENT & ACTIONS */}
-              <div className="p-4 sm:p-5 space-y-4">
-                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  {item.description}
-                </p>
-
-                {/* Action Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEmbeddedGame({
-                        id: item.id,
-                        title: item.title,
-                        url: item.actionUrl || '',
-                        badgeCategory: item.badgeCategory,
-                      })
-                    }
-                    className="py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer min-h-11"
-                  >
-                    <Play className="w-4 h-4 fill-white stroke-none" />
-                    <span>Main di Aplikasi (In-App)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (typeof window !== 'undefined' && item.actionUrl) {
-                        window.open(item.actionUrl, '_blank', 'noopener,noreferrer');
+              Reset ke Semua Mapel
+            </button>
+          </div>
+        ) : (
+          filteredGames.map((item) => {
+            const IconComp = item.icon;
+            return (
+              <div
+                key={item.id}
+                className="bg-white rounded-3xl border-2 border-amber-300 ring-4 ring-amber-400/10 shadow-md overflow-hidden transition-all group"
+              >
+                {/* THUMBNAIL BANNER HERO */}
+                <div className="relative w-full aspect-video sm:aspect-21/9 bg-slate-950 overflow-hidden">
+                  <img
+                    src={item.thumbnailUrl || '/games/school-slice-3d/thumbnail.jpg'}
+                    alt={item.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.endsWith('/games/school-slice-3d-thumbnail.jpg')) {
+                        target.src = '/games/school-slice-3d-thumbnail.jpg';
                       }
                     }}
-                    className="py-3 px-4 rounded-2xl bg-amber-400 hover:bg-amber-500 active:scale-[0.99] text-slate-950 font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer min-h-11"
-                  >
-                    <span>Buka Tab Baru Penuh</span>
-                    <ExternalLink className="w-4 h-4 stroke-[2.5]" />
-                  </button>
+                  />
+                  {/* Gradient overlay */}
+                  <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/25 to-black/10" />
+
+                  {/* Badges on top of thumbnail */}
+                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
+                    <span className="text-[10px] sm:text-xs font-black px-2.5 py-1 rounded-xl bg-black/60 backdrop-blur-md text-amber-300 border border-amber-300/40 shadow-xs flex items-center gap-1.5">
+                      <IconComp className="w-3.5 h-3.5" />
+                      <span>{item.badgeCategory}</span>
+                    </span>
+                    <span className="text-[9.5px] sm:text-xs font-bold px-2.5 py-1 rounded-xl bg-emerald-500/90 text-white shadow-xs backdrop-blur-md flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                      <span>{item.statusLabel}</span>
+                    </span>
+                  </div>
+
+                  {/* Floating Bottom Info on thumbnail */}
+                  <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2 pointer-events-none">
+                    <div className="text-white drop-shadow-md">
+                      <h3 className="text-sm sm:text-lg font-black leading-tight drop-shadow-sm">
+                        {item.title}
+                      </h3>
+                      <p className="text-[10.5px] sm:text-xs text-amber-200 font-semibold drop-shadow-sm flex items-center gap-1 mt-0.5">
+                        <Sparkles className="w-3 h-3 text-amber-300" />
+                        <span>
+                          {item.id === 'pid_suuq_al_madinah'
+                            ? 'Pasar 3D Arab • Belanja Koin Dinar & Mufradat'
+                            : item.id === 'pid_school_slice_3d'
+                            ? 'Mode Split-Screen 2 Pemain • Kejar-kejaran KBM'
+                            : item.id === 'pid_g7kaih'
+                            ? 'POV 3D Rumah & Desa • Sholat Subuh & 7 Karakter'
+                            : 'Eksplorasi Mansion 9 Ruangan • 3 Kunci & Lemari Sembunyi'}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow-md shrink-0">
+                      ⭐ +{item.rewardPoints} PTS
+                    </div>
+                  </div>
                 </div>
 
-                {item.id === 'pid_school_slice_3d' ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                {/* CARD CONTENT & ACTIONS */}
+                <div className="p-4 sm:p-5 space-y-3.5">
+                  {/* Subject & Grade Level Badge */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border ${item.subjectBadgeColor}`}
+                    >
+                      <span>{item.subjectIcon}</span>
+                      <span>Mata Pelajaran: {item.subject}</span>
+                    </span>
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-slate-100 text-slate-700 border border-slate-200">
+                      🎯 {item.gradeLevel}
+                    </span>
+                  </div>
+
+                  {/* Curriculum Topic Box */}
+                  <div className="p-2.5 sm:p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed">
+                    <span className="font-black text-slate-900">Topik Kurikulum: </span>
+                    <span className="font-medium text-slate-600">{item.curriculumTopic}</span>
+                  </div>
+
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    {item.description}
+                  </p>
+
+                  {/* Action Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-100">
                     <button
                       type="button"
-                      onClick={handleDownloadCsvTemplate}
-                      className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      onClick={() =>
+                        setEmbeddedGame({
+                          id: item.id,
+                          title: item.title,
+                          url: item.actionUrl || '',
+                          badgeCategory: item.badgeCategory,
+                        })
+                      }
+                      className="py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer min-h-11"
                     >
-                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Unduh Format CSV Soal</span>
+                      <Play className="w-4 h-4 fill-white stroke-none" />
+                      <span>Main di Aplikasi (In-App)</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setShowGuideModal(true)}
-                      className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Panduan Integrasi Soal Guru</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                     <button
                       type="button"
                       onClick={() => {
-                        if (typeof window !== 'undefined') {
-                          window.open(
-                            '/games/rumah-sunyi/standalone/rumah_sunyi_tiga_kunci_standalone.html',
-                            '_blank',
-                            'noopener,noreferrer'
-                          );
+                        if (typeof window !== 'undefined' && item.actionUrl) {
+                          window.open(item.actionUrl, '_blank', 'noopener,noreferrer');
                         }
                       }}
-                      className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      className="py-3 px-4 rounded-2xl bg-amber-400 hover:bg-amber-500 active:scale-[0.99] text-slate-950 font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer min-h-11"
                     >
-                      <ExternalLink className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Mode Mandiri (1 Berkas HTML)</span>
+                      <span>Buka Tab Baru Penuh</span>
+                      <ExternalLink className="w-4 h-4 stroke-[2.5]" />
                     </button>
-
-                    <div className="py-2 px-3 rounded-xl bg-amber-50/70 border border-amber-200/60 text-[11px] font-semibold text-amber-900 flex items-center gap-1.5 justify-center">
-                      <Key className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                      <span>5 Paket Kuis Mapel &amp; Editor Guru</span>
-                    </div>
                   </div>
-                )}
+
+                  {/* Secondary Context Actions per Game */}
+                  {item.id === 'pid_school_slice_3d' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleDownloadCsvTemplate}
+                        className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-11"
+                      >
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Unduh Format CSV Soal</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowGuideModal(true)}
+                        className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-11"
+                      >
+                        <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Panduan Integrasi Soal Guru</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {item.id === 'pid_suuq_al_madinah' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            window.open('/games/suuq-al-madinah/index.html', '_blank', 'noopener,noreferrer');
+                          }
+                        }}
+                        className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-11"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Mode Mandiri (1 Berkas HTML)</span>
+                      </button>
+
+                      <div className="py-2 px-3 rounded-xl bg-amber-50/80 border border-amber-200 text-[11px] font-semibold text-amber-900 flex items-center gap-1.5 justify-center min-h-11">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                        <span>Mufradat Arab, Koin Dinar &amp; Buah 3D</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.id === 'pid_rumah_sunyi' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            window.open(
+                              '/games/rumah-sunyi/standalone/rumah_sunyi_tiga_kunci_standalone.html',
+                              '_blank',
+                              'noopener,noreferrer'
+                            );
+                          }
+                        }}
+                        className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-11"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Mode Mandiri (1 Berkas HTML)</span>
+                      </button>
+
+                      <div className="py-2 px-3 rounded-xl bg-purple-50/70 border border-purple-200/60 text-[11px] font-semibold text-purple-900 flex items-center gap-1.5 justify-center min-h-11">
+                        <Key className="w-3.5 h-3.5 text-purple-700 shrink-0" />
+                        <span>5 Paket Kuis Mapel &amp; Editor Guru</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.id === 'pid_g7kaih' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            window.open('/games/g7kaih-al-ittihadiyah/index.html', '_blank', 'noopener,noreferrer');
+                          }
+                        }}
+                        className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-11"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Mode Mandiri (1 Berkas HTML)</span>
+                      </button>
+
+                      <div className="py-2 px-3 rounded-xl bg-emerald-50/80 border border-emerald-200 text-[11px] font-semibold text-emerald-900 flex items-center gap-1.5 justify-center min-h-11">
+                        <Compass className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                        <span>7 Kebiasaan Hebat &amp; Sholat Subuh 3D</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* 7. STATUS KESIAPAN ARSITEKTUR & PANDUAN */}
