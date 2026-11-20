@@ -10,6 +10,7 @@ export interface TopDashboardNavbarProps {
   onNavigateTab?: (tabId: string) => void;
   onOpenPreferences?: () => void;
   onLogout: () => void;
+  onSwitchToGuruView?: () => void;
 }
 
 export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
@@ -20,6 +21,7 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
   onNavigateTab,
   onOpenPreferences,
   onLogout,
+  onSwitchToGuruView,
 }) => {
   const dynamicAppName = useSettingsStore((s) => s.settings.app_name) || 'Smart Absensi Guru';
   const dynamicInstitution = useSettingsStore((s) => s.settings.institution_name) || 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam';
@@ -93,6 +95,19 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
               className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-[#023246] text-xs font-bold rounded-xl border border-slate-200 transition-all cursor-pointer active:scale-95"
             >
               <span>🖨️</span> Poster QR
+            </button>
+          )}
+
+          {/* Quick Dual-Role Switch Button for Admin / Kepsek to Guru View */}
+          {onSwitchToGuruView && (
+            <button
+              type="button"
+              onClick={onSwitchToGuruView}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-900 text-xs font-bold rounded-xl border border-cyan-300 shadow-2xs transition-all cursor-pointer active:scale-95"
+              title="Pilih Mode Akun (Guru / Admin)"
+            >
+              <span className="text-sm">🔄</span>
+              <span className="hidden min-[420px]:inline">Mode Guru</span>
             </button>
           )}
 

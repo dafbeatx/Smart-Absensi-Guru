@@ -697,6 +697,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           onNavigateTab={(tab) => setActiveTab(tab as any)}
           onOpenPreferences={() => setIsPreferencesModalOpen(true)}
           onLogout={logout}
+          onSwitchToGuruView={onSwitchToGuruView}
         />
 
         {/* Main Content Viewport */}

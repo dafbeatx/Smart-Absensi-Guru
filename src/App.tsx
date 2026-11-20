@@ -112,13 +112,31 @@ import {
   hasCompletedActiveSurvey,
 } from './services/research-survey.service';
 import { NotificationService } from './services/notification-permission.service';
+import { SwitchRoleModeModal } from './components/dashboard/SwitchRoleModeModal';
+
+const isDualRoleEligible = (u?: { role?: string; full_name?: string; id?: string } | null) => {
+  if (!u) return false;
+  if (u.role === 'ADMIN' || u.role === 'OPERATOR' || u.role === 'KEPSEK') return true;
+  const lowerName = (u.full_name || '').toLowerCase();
+  if (lowerName.includes('mira') || lowerName.includes('qodi') || lowerName.includes('dafa')) return true;
+  if (u.id === 'usr_guru_004' || u.id === 'usr_op_002' || u.id === 'usr_admin_001') return true;
+  return false;
+};
 
 export const App: React.FC = () => {
   const { isAuthenticated, user, token } = useAuthStore();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [isPreviewGuruMode, setIsPreviewGuruMode] = useState(false);
+  const [isSwitchRoleModalOpen, setIsSwitchRoleModalOpen] = useState(false);
+  const [activeRoleMode, setActiveRoleMode] = useState<'GURU' | 'ADMIN' | 'OPERATOR' | 'KEPSEK'>(() => {
+    if (typeof window !== 'undefined' && user?.id) {
+      const saved = localStorage.getItem(`smart_absensi_active_role_mode_${user.id}`);
+      if (saved === 'GURU' || saved === 'ADMIN' || saved === 'OPERATOR' || saved === 'KEPSEK') {
+        return saved as 'GURU' | 'ADMIN' | 'OPERATOR' | 'KEPSEK';
+      }
+    }
+    return (user?.role as 'GURU' | 'ADMIN' | 'OPERATOR' | 'KEPSEK') || 'GURU';
+  });
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
-  const [isPreviewScannerBlocked, setIsPreviewScannerBlocked] = useState(false);
   const [isFridaySurveyOpen, setIsFridaySurveyOpen] = useState(false);
   const [isSurveyAnalyticsOpen, setIsSurveyAnalyticsOpen] = useState(false);
   const [verificationDocInfo, setVerificationDocInfo] = useState<{
@@ -160,11 +178,11 @@ export const App: React.FC = () => {
       title: 'Celebration Award Overlay',
     },
     {
-      id: 'app_preview_guru',
-      isOpen: isPreviewGuruMode,
-      onClose: () => setIsPreviewGuruMode(false),
-      priority: BACK_PRIORITIES.PREVIEW_MODE,
-      title: 'Mode Preview Guru',
+      id: 'app_switch_role_modal',
+      isOpen: isSwitchRoleModalOpen,
+      onClose: () => setIsSwitchRoleModalOpen(false),
+      priority: BACK_PRIORITIES.MODAL,
+      title: 'Pilih Mode Akun',
     },
     {
       id: 'app_test_runner',
@@ -172,13 +190,6 @@ export const App: React.FC = () => {
       onClose: () => setIsTestRunnerOpen(false),
       priority: BACK_PRIORITIES.MODAL,
       title: 'Unit Test Runner',
-    },
-    {
-      id: 'app_preview_scanner_blocked',
-      isOpen: isPreviewScannerBlocked,
-      onClose: () => setIsPreviewScannerBlocked(false),
-      priority: BACK_PRIORITIES.MODAL,
-      title: 'Preview Scanner Blocked Dialog',
     },
     {
       id: 'app_friday_survey',
@@ -453,53 +464,46 @@ export const App: React.FC = () => {
     );
   }
 
-  // Multi-Role Dashboard Router with Lazy Suspense & Admin/Kepsek Preview Switcher
+  useEffect(() => {
+    if (user?.id) {
+      const saved = localStorage.getItem(`smart_absensi_active_role_mode_${user.id}`);
+      if (saved === 'GURU' || saved === 'ADMIN' || saved === 'OPERATOR' || saved === 'KEPSEK') {
+        setActiveRoleMode(saved as any);
+      } else {
+        setActiveRoleMode((user.role as any) || 'GURU');
+      }
+    }
+  }, [user?.id, user?.role]);
+
+  const handleSelectRoleMode = (mode: 'GURU' | 'ADMIN' | 'OPERATOR' | 'KEPSEK') => {
+    if (user?.id) {
+      localStorage.setItem(`smart_absensi_active_role_mode_${user.id}`, mode);
+    }
+    setActiveRoleMode(mode);
+    setIsSwitchRoleModalOpen(false);
+    useToastStore.getState().showToast(
+      'success',
+      'Mode Tampilan Berhasil Diubah',
+      mode === 'GURU'
+        ? 'Anda kini berada dalam Mode Guru Pendidik. Fitur presensi QR dan aktivitas mengajar aktif.'
+        : `Anda kini berada dalam Mode ${mode === 'KEPSEK' ? 'Kepala Sekolah' : 'Admin & Operator'}.`
+    );
+  };
+
+  // Multi-Role Dashboard Router with Dynamic Dual-Role Switcher (Guru vs Admin/Operator/Kepsek)
   const renderRoleDashboard = () => {
-    // Mode Preview Tampilan Guru untuk Admin/Kepsek
-    if (isPreviewGuruMode && (user.role === 'ADMIN' || user.role === 'OPERATOR' || user.role === 'KEPSEK')) {
+    const isDual = isDualRoleEligible(user);
+
+    // Jika pengguna memiliki wewenang peran ganda (Admin, Operator, Kepsek, Bu Mira, Pak Qodi, dll.) dan memilih Mode Guru:
+    if (isDual && activeRoleMode === 'GURU') {
       return (
-        <div>
-          {/* Sticky Floating Switch Bar */}
-          <div className="bg-slate-900 text-white text-xs font-bold px-4 py-2.5 flex items-center justify-between shadow-lg sticky top-0 z-50 border-b border-slate-700">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>📱 Mode Tampilan Guru (Tersinkronisasi Real-time: {user.full_name})</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsTestRunnerOpen(true)}
-                className="px-3.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-[11px] transition-all flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
-              >
-                <span>🧪</span> Run Unit Tests
-              </button>
-              <button
-                onClick={() => setIsPreviewGuruMode(false)}
-                className="px-3.5 py-1 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-lg text-[11px] transition-all flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
-              >
-                <span>🔄</span> Kembali ke Dashboard {user.role === 'ADMIN' ? 'Admin' : 'Kepsek'}
-              </button>
-            </div>
-          </div>
-
-          {/* Banner Peringatan Mode Preview */}
-          <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-amber-900 text-xs font-bold flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span>⚠️</span>
-              <span>Mode Preview Aktif — Pemindaian QR absensi dinonaktifkan untuk simulasi tampilan {user.role === 'ADMIN' ? 'Admin' : 'Kepsek'}.</span>
-            </div>
-          </div>
-
-          <GuruDashboardPage
-            onOpenScanner={() => setIsPreviewScannerBlocked(true)}
-            isPreviewMode={true}
-            previewUser={{
-              ...user,
-              avatar_url: user.avatar_url || null,
-              role: 'GURU',
-              position: user.position || 'Pendidik / Tenaga Kependidikan',
-            }}
-          />
-        </div>
+        <GuruDashboardPage
+          onOpenScanner={() => setIsScannerOpen(true)}
+          isPreviewMode={false}
+          isDualRoleUser={true}
+          currentRoleMode="GURU"
+          onSwitchRoleMode={() => setIsSwitchRoleModalOpen(true)}
+        />
       );
     }
 
@@ -508,7 +512,7 @@ export const App: React.FC = () => {
         return (
           <KepsekDashboardPage
             onOpenScanner={() => setIsScannerOpen(true)}
-            onSwitchToGuruView={() => setIsPreviewGuruMode(true)}
+            onSwitchToGuruView={() => setIsSwitchRoleModalOpen(true)}
           />
         );
       case 'ADMIN':
@@ -516,12 +520,20 @@ export const App: React.FC = () => {
         return (
           <AdminDashboardPage
             onOpenScanner={() => setIsScannerOpen(true)}
-            onSwitchToGuruView={() => setIsPreviewGuruMode(true)}
+            onSwitchToGuruView={() => setIsSwitchRoleModalOpen(true)}
           />
         );
       case 'GURU':
       default:
-        return <GuruDashboardPage onOpenScanner={() => setIsScannerOpen(true)} />;
+        return (
+          <GuruDashboardPage
+            onOpenScanner={() => setIsScannerOpen(true)}
+            isPreviewMode={false}
+            isDualRoleUser={isDual}
+            currentRoleMode="GURU"
+            onSwitchRoleMode={isDual ? () => setIsSwitchRoleModalOpen(true) : undefined}
+          />
+        );
     }
   };
 
@@ -570,36 +582,15 @@ export const App: React.FC = () => {
         </Suspense>
       )}
 
-      {/* Preview Mode QR Scanner Blocked Modal */}
-      {isPreviewScannerBlocked && (
-        <div
-          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6"
-          onClick={() => setIsPreviewScannerBlocked(false)}
-        >
-          <div
-            className="bg-white rounded-3xl shadow-2xl p-6 max-w-xs w-full text-center space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center text-3xl mx-auto">
-              📱
-            </div>
-            <div>
-              <h3 className="font-extrabold text-slate-800 text-lg">Mode Preview Aktif</h3>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Fitur scan QR absensi tidak dapat digunakan dalam Mode Preview Tampilan Guru.
-                <br /><br />
-                Ini adalah tampilan simulasi untuk Admin/Kepsek. Untuk scan absensi nyata, login menggunakan akun Guru aktif.
-              </p>
-            </div>
-            <button
-              onClick={() => setIsPreviewScannerBlocked(false)}
-              className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-2xl text-sm transition-all active:scale-95 cursor-pointer"
-            >
-              🔙 Kembali ke Preview
-            </button>
-          </div>
-        </div>
-      )}
+      {/* 🔄 Modal Pilihan Mode Tampilan (Guru vs Admin/Operator/Kepsek) untuk Pengguna Dual-Role */}
+      <SwitchRoleModeModal
+        isOpen={isSwitchRoleModalOpen}
+        onClose={() => setIsSwitchRoleModalOpen(false)}
+        currentMode={activeRoleMode}
+        userRole={user.role}
+        userName={user.full_name}
+        onSelectMode={handleSelectRoleMode}
+      />
 
       <QueueMonitor />
       <AIAssistantDrawer />

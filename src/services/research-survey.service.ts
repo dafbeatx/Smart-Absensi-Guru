@@ -290,6 +290,7 @@ export interface ShouldTriggerSurveyParams {
   userId: string;
   action?: 'CHECK_IN' | 'CHECK_OUT';
   hasCheckedInToday?: boolean;
+  dateStr?: string;
 }
 
 /**
@@ -299,11 +300,11 @@ export interface ShouldTriggerSurveyParams {
  * 3. Trigger condition: User just checked in (action === 'CHECK_IN') OR already checked in earlier today.
  */
 export function shouldTriggerFridaySurvey(params: ShouldTriggerSurveyParams): boolean {
-  if (!isFridayToday()) {
+  if (!isFridayToday(params.dateStr)) {
     return false;
   }
   // PENTING: Jika guru sudah mengisi survey perminggu, JANGAN DITAGIH LAGI!
-  if (hasCompletedActiveSurvey(params.userId) || hasCompletedFridaySurvey(params.userId)) {
+  if (hasCompletedActiveSurvey(params.userId, params.dateStr) || hasCompletedFridaySurvey(params.userId, params.dateStr)) {
     return false;
   }
   // Only trigger after check-in, never on check-out

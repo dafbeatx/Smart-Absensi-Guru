@@ -310,7 +310,7 @@ export async function runResearchSurveyTestSuite(): Promise<TestSuiteResult> {
     );
     assert(
       'No-Nag Guarantee - Friday survey popup is suppressed for teacher who already filled it this week',
-      shouldTriggerFridaySurvey({ userId: guruWedUser, hasCheckedInToday: true }) === false
+      shouldTriggerFridaySurvey({ userId: guruWedUser, hasCheckedInToday: true, dateStr: fridayDate }) === false
     );
 
     // C: Cross-Device Sync from Cloud Point History Logs

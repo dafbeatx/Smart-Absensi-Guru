@@ -228,6 +228,9 @@ export interface GuruDashboardPageProps {
   onOpenCorrectionForm?: () => void;
   previewUser?: UserProfile;
   isPreviewMode?: boolean;
+  isDualRoleUser?: boolean;
+  currentRoleMode?: 'GURU' | 'ADMIN' | 'OPERATOR' | 'KEPSEK';
+  onSwitchRoleMode?: () => void;
 }
 
 // Robust Avatar Component with graceful image onError fallback for mobile devices
@@ -343,6 +346,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   onOpenCorrectionForm,
   previewUser,
   isPreviewMode = false,
+  isDualRoleUser = false,
+  currentRoleMode: _currentRoleMode = 'GURU',
+  onSwitchRoleMode,
 }) => {
   const { user: authUser, token, logout, deviceUUID } = useAuthStore();
   const { showToast } = useToastStore();
@@ -2694,7 +2700,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   return (
     <div className="min-h-screen bg-slate-50 pb-28 text-[#023246]">
       {/* ── PREVIEW MODE WARNING BANNER ───────────────────────────────────── */}
-      {isPreviewMode && (
+      {isPreviewMode && !isDualRoleUser && (
         <div className="bg-purple-900 text-purple-100 px-4 py-2 text-xs font-bold text-center border-b border-purple-700 flex items-center justify-center gap-2">
           <span>⚠️</span> MODE PREVIEW GURU (ADMIN/KEPSEK ACCESS) — Menggunakan data simulasi guru.
         </div>
@@ -2734,6 +2740,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Dual-Role Switcher Pill for Admin/Operator working in Guru Mode */}
+            {isDualRoleUser && onSwitchRoleMode && (
+              <button
+                type="button"
+                onClick={onSwitchRoleMode}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-400/40 rounded-2xl transition-all cursor-pointer text-xs font-bold shrink-0 min-h-11 active:scale-95"
+                title="Beralih Peran (Mode Guru / Admin)"
+                aria-label="Beralih Mode Tampilan"
+              >
+                <span className="text-sm">🔄</span>
+                <span className="text-[11px] font-extrabold hidden min-[360px]:inline">Mode Guru</span>
+                <span className="text-[9px] opacity-75">▾</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('smart_absensi_open_app_install'))}
@@ -6331,6 +6352,36 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* Dual-Role Account Switcher Card */}
+              {isDualRoleUser && onSwitchRoleMode && (
+                <div className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-cyan-50/80 border border-cyan-200/90 space-y-2.5 shadow-2xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🔄</span>
+                      <div>
+                        <h3 className="font-extrabold text-xs text-[#023246]">Akses Peran Ganda</h3>
+                        <p className="text-[10px] text-slate-500 font-medium">
+                          Sedang aktif: <strong className="text-cyan-800">Mode Guru Pendidik</strong>
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 border border-cyan-300 shrink-0">
+                      Dual-Role
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Akun Anda memiliki hak akses administratif sekolah. Anda dapat beralih ke panel pengelolaan kapan saja.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onSwitchRoleMode}
+                    className="w-full py-2.5 px-3 bg-[#023246] hover:bg-[#023246]/90 text-white font-extrabold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95 cursor-pointer min-h-[44px]"
+                  >
+                    <span>⚙️</span> Beralih ke Mode Admin / Operator
+                  </button>
+                </div>
+              )}
 
               {/* Teacher Education & Guidance Card */}
               <div className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-[#0D7A5F]/5 border border-[#0D7A5F]/20 space-y-3 shadow-2xs">
