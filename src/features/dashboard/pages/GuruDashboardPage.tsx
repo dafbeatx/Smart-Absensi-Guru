@@ -6376,7 +6376,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <button
                     type="button"
                     onClick={onSwitchRoleMode}
-                    className="w-full py-2.5 px-3 bg-[#023246] hover:bg-[#023246]/90 text-white font-extrabold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95 cursor-pointer min-h-[44px]"
+                    className="w-full py-2.5 px-3 bg-[#023246] hover:bg-[#023246]/90 text-white font-extrabold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95 cursor-pointer min-h-11"
                   >
                     <span>⚙️</span> Beralih ke Mode Admin / Operator
                   </button>

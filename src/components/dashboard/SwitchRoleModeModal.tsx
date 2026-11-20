@@ -136,7 +136,7 @@ export const SwitchRoleModeModal: React.FC<SwitchRoleModeModalProps> = ({
                     e.stopPropagation();
                     onSelectMode('GURU');
                   }}
-                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer min-h-[44px] flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer min-h-11 flex items-center justify-center gap-1.5"
                 >
                   <span>📱</span> Beralih ke Mode Guru
                 </button>
@@ -208,7 +208,7 @@ export const SwitchRoleModeModal: React.FC<SwitchRoleModeModalProps> = ({
                     e.stopPropagation();
                     onSelectMode(managementTargetMode);
                   }}
-                  className="w-full py-2.5 px-4 bg-[#023246] hover:bg-[#023246]/90 text-white font-black rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer min-h-[44px] flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 px-4 bg-[#023246] hover:bg-[#023246]/90 text-white font-black rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer min-h-11 flex items-center justify-center gap-1.5"
                 >
                   <span>🛡️</span> Beralih ke Mode {managementRoleLabel}
                 </button>
@@ -230,7 +230,7 @@ export const SwitchRoleModeModal: React.FC<SwitchRoleModeModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl text-xs transition-all cursor-pointer active:scale-95 min-h-[44px]"
+            className="w-full sm:w-auto px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold rounded-xl text-xs transition-all cursor-pointer active:scale-95 min-h-11"
           >
             Tutup
           </button>
