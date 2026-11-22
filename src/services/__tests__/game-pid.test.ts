@@ -9,11 +9,13 @@ import {
   DEFAULT_RUMAH_SUNYI_URL,
   DEFAULT_G7KAIH_URL,
   DEFAULT_SUUQ_AL_MADINAH_URL,
+  DEFAULT_LOKA_NUSANTARA_3D_URL,
   STORAGE_KEY_GAME_PID_URL,
   STORAGE_KEY_SCHOOL_SLICE_3D_URL,
   STORAGE_KEY_RUMAH_SUNYI_URL,
   STORAGE_KEY_G7KAIH_URL,
   STORAGE_KEY_SUUQ_AL_MADINAH_URL,
+  STORAGE_KEY_LOKA_NUSANTARA_3D_URL,
   getGamePidPlatformUrl,
   setGamePidPlatformUrl,
   getSchoolSlice3dUrl,
@@ -24,6 +26,8 @@ import {
   setG7kaihUrl,
   getSuuqAlMadinahUrl,
   setSuuqAlMadinahUrl,
+  getLokaNusantara3dUrl,
+  setLokaNusantara3dUrl,
   getDirectGamePidShareUrl,
   shouldShowPidPromoToday,
   markPidPromoShown,
@@ -724,6 +728,99 @@ Siti (Ketua Kelas),Teman Sebangku,Hai kawan!,Perangkat masukan komputer?,Monitor
     failed++;
     results.push({
       testName: 'Suuq Al-Madinah 3D File & Thumbnail Integrity: Berkas HTML Three.js & cover 3D terverifikasi utuh',
+      status: 'FAIL',
+      details: (err as Error)?.message || String(err),
+    });
+  }
+
+  // Test 13: Loka Nusantara 3D Getter & Setter
+  try {
+    setupMockBrowser();
+
+    if (STORAGE_KEY_LOKA_NUSANTARA_3D_URL !== 'smart_absensi_loka_nusantara_3d_url') {
+      throw new Error(`Storage key harus smart_absensi_loka_nusantara_3d_url, didapat ${STORAGE_KEY_LOKA_NUSANTARA_3D_URL}`);
+    }
+
+    // Default bundle
+    const defaultUrl = getLokaNusantara3dUrl();
+    if (defaultUrl !== DEFAULT_LOKA_NUSANTARA_3D_URL) {
+      throw new Error(`Default URL harus ${DEFAULT_LOKA_NUSANTARA_3D_URL}, didapat ${defaultUrl}`);
+    }
+
+    // Custom URL & event trigger
+    let eventReceived: string | null = null;
+    window.addEventListener('smart_absensi_loka_nusantara_3d_url_updated', ((e: CustomEvent) => {
+      eventReceived = e.detail;
+    }) as EventListener);
+
+    setLokaNusantara3dUrl('https://loka-nusantara-staging.example.com');
+    if (getLokaNusantara3dUrl() !== 'https://loka-nusantara-staging.example.com') {
+      throw new Error('Custom URL Loka Nusantara 3D gagal disimpan di localStorage');
+    }
+    if (eventReceived !== 'https://loka-nusantara-staging.example.com') {
+      throw new Error('Event smart_absensi_loka_nusantara_3d_url_updated tidak tertembak dengan benar');
+    }
+
+    // Reset ke default saat string kosong
+    setLokaNusantara3dUrl('');
+    if (getLokaNusantara3dUrl() !== DEFAULT_LOKA_NUSANTARA_3D_URL) {
+      throw new Error('Reset URL Loka Nusantara 3D gagal kembali ke default');
+    }
+
+    passed++;
+    results.push({
+      testName: 'Loka Nusantara 3D Getter & Setter: Tersimpan di localStorage & trigger event',
+      status: 'PASS',
+      details: 'URL default, kustomisasi link staging, dan custom event terverifikasi sukses',
+    });
+  } catch (err: unknown) {
+    failed++;
+    results.push({
+      testName: 'Loka Nusantara 3D Getter & Setter: Tersimpan di localStorage & trigger event',
+      status: 'FAIL',
+      details: (err as Error)?.message || String(err),
+    });
+  }
+
+  // Test 14: Loka Nusantara 3D File & Roblox Thumbnail Integrity
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+
+    const htmlPath = path.resolve(process.cwd(), 'public/games/loka-nusantara-3d/index.html');
+    const thumbDir = path.resolve(process.cwd(), 'public/games/loka-nusantara-3d/thumbnail.jpg');
+    const thumbRoot = path.resolve(process.cwd(), 'public/games/loka-nusantara-thumbnail.jpg');
+
+    if (!fs.existsSync(htmlPath)) {
+      throw new Error('Berkas game public/games/loka-nusantara-3d/index.html tidak ditemukan');
+    }
+    if (!fs.existsSync(thumbDir)) {
+      throw new Error('Thumbnail public/games/loka-nusantara-3d/thumbnail.jpg tidak ditemukan');
+    }
+    if (!fs.existsSync(thumbRoot)) {
+      throw new Error('Thumbnail fallback public/games/loka-nusantara-thumbnail.jpg tidak ditemukan');
+    }
+
+    const statHtml = fs.statSync(htmlPath);
+    const statThumb = fs.statSync(thumbDir);
+
+    if (statHtml.size < 50000) {
+      throw new Error(`Ukuran berkas HTML Loka Nusantara terlalu kecil (${statHtml.size} bytes)`);
+    }
+    if (statThumb.size < 10000) {
+      throw new Error(`Ukuran thumbnail Loka Nusantara terlalu kecil (${statThumb.size} bytes)`);
+    }
+
+    passed++;
+    results.push({
+      testName: 'Loka Nusantara 3D File & Roblox Thumbnail Integrity: Berkas HTML & cover Roblox terverifikasi utuh',
+      status: 'PASS',
+      details: `HTML: ${(statHtml.size / 1024).toFixed(1)} KB, Thumbnail Roblox: ${(statThumb.size / 1024).toFixed(1)} KB`,
+    });
+  } catch (err: unknown) {
+    failed++;
+    results.push({
+      testName: 'Loka Nusantara 3D File & Roblox Thumbnail Integrity: Berkas HTML & cover Roblox terverifikasi utuh',
       status: 'FAIL',
       details: (err as Error)?.message || String(err),
     });
