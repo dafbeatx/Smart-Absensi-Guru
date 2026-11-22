@@ -20,9 +20,6 @@ export const STORAGE_KEY_G7KAIH_URL = 'smart_absensi_g7kaih_url';
 export const DEFAULT_SUUQ_AL_MADINAH_URL = '/games/suuq-al-madinah/index.html';
 export const STORAGE_KEY_SUUQ_AL_MADINAH_URL = 'smart_absensi_suuq_al_madinah_url';
 
-export const DEFAULT_LOKA_NUSANTARA_3D_URL = '/games/loka-nusantara-3d/index.html';
-export const STORAGE_KEY_LOKA_NUSANTARA_3D_URL = 'smart_absensi_loka_nusantara_3d_url';
-
 export const STORAGE_KEY_PID_PROMO_DISMISSED_DATE = 'smart_absensi_pid_promo_dismissed_date';
 export const SESSION_KEY_PID_PROMO_SHOWN = 'smart_absensi_pid_promo_shown';
 
@@ -221,46 +218,6 @@ export function setSuuqAlMadinahUrl(url: string): void {
       window.dispatchEvent(
         new CustomEvent('smart_absensi_suuq_al_madinah_url_updated', {
           detail: trimmed || DEFAULT_SUUQ_AL_MADINAH_URL,
-        })
-      );
-    } catch {
-      // ignore
-    }
-  }
-}
-
-/**
- * Mengambil tautan langsung Gim 3D Loka Nusantara (Pendidikan Pancasila) dari storage lokal atau default bundle
- */
-export function getLokaNusantara3dUrl(): string {
-  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_LOKA_NUSANTARA_3D_URL);
-      if (stored && stored.trim().length > 0) {
-        return stored.trim();
-      }
-    } catch {
-      // fallback to default
-    }
-  }
-  return DEFAULT_LOKA_NUSANTARA_3D_URL;
-}
-
-/**
- * Menyimpan tautan kustom Gim 3D Loka Nusantara
- */
-export function setLokaNusantara3dUrl(url: string): void {
-  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-    try {
-      const trimmed = url.trim();
-      if (trimmed.length > 0 && trimmed !== DEFAULT_LOKA_NUSANTARA_3D_URL) {
-        localStorage.setItem(STORAGE_KEY_LOKA_NUSANTARA_3D_URL, trimmed);
-      } else {
-        localStorage.removeItem(STORAGE_KEY_LOKA_NUSANTARA_3D_URL);
-      }
-      window.dispatchEvent(
-        new CustomEvent('smart_absensi_loka_nusantara_3d_url_updated', {
-          detail: trimmed || DEFAULT_LOKA_NUSANTARA_3D_URL,
         })
       );
     } catch {

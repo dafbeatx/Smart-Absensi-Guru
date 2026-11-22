@@ -18,7 +18,6 @@ import {
   BookOpen,
   Key,
   Compass,
-  Landmark,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import {
@@ -26,7 +25,6 @@ import {
   getRumahSunyiUrl,
   getG7kaihUrl,
   getSuuqAlMadinahUrl,
-  getLokaNusantara3dUrl,
 } from '../../../config/game-pid.config';
 import { useBackHandler, BACK_PRIORITIES } from '../../../hooks/useBackNavigation';
 
@@ -52,7 +50,7 @@ interface GamePlanItem {
   is3d?: boolean;
   thumbnailUrl?: string;
   subject: string;
-  subjectCategory: 'ALL' | 'PANCASILA' | 'BAHASA_ARAB' | 'PAI' | 'UMUM' | 'LITERASI';
+  subjectCategory: 'ALL' | 'BAHASA_ARAB' | 'PAI' | 'UMUM' | 'LITERASI';
   subjectIcon: string;
   subjectBadgeColor: string;
   gradeLevel: string;
@@ -83,13 +81,10 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
   // State khusus Suuq Al-Madinah 3D (Bahasa Arab)
   const [suuqAlMadinahUrl, setSuuqAlMadinahUrlState] = useState<string>(() => getSuuqAlMadinahUrl());
 
-  // State khusus Loka Nusantara 3D (Pendidikan Pancasila)
-  const [lokaNusantaraUrl, setLokaNusantaraUrlState] = useState<string>(() => getLokaNusantara3dUrl());
-
   // State Filter Mata Pelajaran PID
-  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<'ALL' | 'PANCASILA' | 'BAHASA_ARAB' | 'PAI' | 'UMUM' | 'LITERASI'>('ALL');
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<'ALL' | 'BAHASA_ARAB' | 'PAI' | 'UMUM' | 'LITERASI'>('ALL');
 
-  // Embedded Player Aktif (School Slice 3D, Rumah Sunyi 3D, G7KAIH 3D, Suuq Al-Madinah 3D, atau Loka Nusantara 3D)
+  // Embedded Player Aktif (School Slice 3D, Rumah Sunyi 3D, G7KAIH 3D, atau Suuq Al-Madinah 3D)
   const [embeddedGame, setEmbeddedGame] = useState<{
     id: string;
     title: string;
@@ -118,23 +113,17 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
       const current = getSuuqAlMadinahUrl();
       setSuuqAlMadinahUrlState(current);
     };
-    const handleLokaNusantaraUrlUpdated = () => {
-      const current = getLokaNusantara3dUrl();
-      setLokaNusantaraUrlState(current);
-    };
 
     window.addEventListener('smart_absensi_school_slice_3d_url_updated', handleSchoolUrlUpdated);
     window.addEventListener('smart_absensi_rumah_sunyi_url_updated', handleRumahSunyiUrlUpdated);
     window.addEventListener('smart_absensi_g7kaih_url_updated', handleG7kaihUrlUpdated);
     window.addEventListener('smart_absensi_suuq_al_madinah_url_updated', handleSuuqAlMadinahUrlUpdated);
-    window.addEventListener('smart_absensi_loka_nusantara_3d_url_updated', handleLokaNusantaraUrlUpdated);
 
     return () => {
       window.removeEventListener('smart_absensi_school_slice_3d_url_updated', handleSchoolUrlUpdated);
       window.removeEventListener('smart_absensi_rumah_sunyi_url_updated', handleRumahSunyiUrlUpdated);
       window.removeEventListener('smart_absensi_g7kaih_url_updated', handleG7kaihUrlUpdated);
       window.removeEventListener('smart_absensi_suuq_al_madinah_url_updated', handleSuuqAlMadinahUrlUpdated);
-      window.removeEventListener('smart_absensi_loka_nusantara_3d_url_updated', handleLokaNusantaraUrlUpdated);
     };
   }, []);
 
@@ -183,7 +172,6 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
 
   const subjectFilterOptions = [
     { id: 'ALL', label: 'Semua Mapel', icon: '🎯' },
-    { id: 'PANCASILA', label: 'Pendidikan Pancasila', icon: '🇮🇩' },
     { id: 'BAHASA_ARAB', label: 'Bahasa Arab', icon: '📖' },
     { id: 'PAI', label: 'Karakter & PAI', icon: '🕌' },
     { id: 'UMUM', label: 'Umum & Bank Soal', icon: '📚' },
@@ -191,28 +179,6 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
   ];
 
   const gamePlans: GamePlanItem[] = [
-    {
-      id: 'pid_loka_nusantara_3d',
-      title: 'Loka Nusantara 3D: Pendidikan Pancasila',
-      category: 'CHALLENGE',
-      badgeCategory: 'Gim 3D Pendidikan Pancasila PID',
-      subject: 'Pendidikan Pancasila',
-      subjectCategory: 'PANCASILA',
-      subjectIcon: '🇮🇩',
-      subjectBadgeColor: 'bg-rose-100 text-rose-900 border-rose-300',
-      gradeLevel: 'Kelas 7, 8, 9 SMP (Fase D)',
-      curriculumTopic: 'Kearifan Lokal, Gotong Royong, Balai Desa & 10 Kasus Pancasila',
-      description:
-        'Jelajahi desa 3D Nusantara gaya visual Roblox: kelola energi warga, seberangi jembatan lengkung, ikuti musyawarah mufakat di Balai Desa, dan selesaikan 10 studi kasus Kuis Pancasila Kurikulum Merdeka Fase D.',
-      status: 'AVAILABLE',
-      statusLabel: 'Siap Dimainkan',
-      rewardPoints: 50,
-      icon: Landmark,
-      accentColor: 'from-[#A63D2F] via-[#B87D32] to-[#2F6146]',
-      actionUrl: lokaNusantaraUrl,
-      thumbnailUrl: '/games/loka-nusantara-3d/thumbnail.jpg',
-      is3d: true,
-    },
     {
       id: 'pid_suuq_al_madinah',
       title: 'Suuq Al-Madinah 3D: Petualangan Pasar Arab',
@@ -561,28 +527,6 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
                         <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
                         <span>Panduan Integrasi Soal Guru</span>
                       </button>
-                    </div>
-                  )}
-
-                  {item.id === 'pid_loka_nusantara_3d' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (typeof window !== 'undefined') {
-                            window.open('/games/loka-nusantara-3d/index.html', '_blank', 'noopener,noreferrer');
-                          }
-                        }}
-                        className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 text-xs font-bold border border-slate-200/90 flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-11"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5 text-rose-600" />
-                        <span>Mode Mandiri (1 Berkas HTML)</span>
-                      </button>
-
-                      <div className="py-2 px-3 rounded-xl bg-rose-50/80 border border-rose-200 text-[11px] font-semibold text-rose-900 flex items-center gap-1.5 justify-center min-h-11">
-                        <Sparkles className="w-3.5 h-3.5 text-rose-700 shrink-0" />
-                        <span>Kurikulum Merdeka Fase D • 10 Studi Kasus</span>
-                      </div>
                     </div>
                   )}
 
