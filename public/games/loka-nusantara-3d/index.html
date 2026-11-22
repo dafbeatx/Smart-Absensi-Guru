@@ -1,0 +1,4561 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Loka Nusantara 3D — Pendidikan Pancasila SMP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --paper: #f4efe6;
+      --paper-card: #fbf8f2;
+      --paper-muted: #e8dfd1;
+      --paper-border: #d5c7b2;
+      --ink: #221c16;
+      --ink-soft: #5c5145;
+      --terracotta: #a63d2f;
+      --terracotta-dark: #842d21;
+      --forest: #2f6146;
+      --forest-dark: #224a34;
+      --indigo: #2e5266;
+      --ochre: #b87d32;
+      --ochre-soft: #efe2c6;
+      --shadow-soft: 0 10px 28px rgba(34, 28, 22, 0.14);
+      --shadow-card: 0 4px 14px rgba(34, 28, 22, 0.08);
+      --radius: 14px;
+      --radius-sm: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #d8cdb8;
+      color: var(--ink);
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+
+    /* Woven Nusantara top accent stripe */
+    .tenun-bar {
+      height: 5px;
+      width: 100%;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--terracotta) 0 28px,
+        var(--ochre) 28px 46px,
+        var(--forest) 46px 74px,
+        var(--indigo) 74px 96px
+      );
+      flex-shrink: 0;
+    }
+
+    /* 3D World Canvas & Floating Labels */
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      touch-action: none;
+    }
+
+    #labels-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .world-label {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      background: rgba(251, 248, 242, 0.92);
+      color: var(--ink);
+      border: 1.5px solid var(--paper-border);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 3px 10px rgba(34, 28, 22, 0.14);
+      transition: opacity 0.2s;
+    }
+
+    .world-label.npc-bubble {
+      background: #221c16;
+      color: #fbf8f2;
+      border-color: #4a3f34;
+    }
+
+    .world-label.energy {
+      background: var(--forest);
+      color: #fbf8f2;
+      border-color: #1e422e;
+    }
+
+    /* =========================================================
+       MAIN MENU OVERLAY (EDITORIAL NUSANTARA — NO AI SLOP)
+    ========================================================= */
+    #menu-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    #menu-overlay.hidden {
+      opacity: 0;
+      pointer-events: none !important;
+      visibility: hidden;
+    }
+
+    #menu-overlay.mode-full {
+      background: var(--paper);
+      pointer-events: auto;
+    }
+
+    #menu-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 22px;
+      background: rgba(244, 239, 230, 0.96);
+      border-bottom: 1.5px solid var(--paper-border);
+      pointer-events: auto;
+      flex-shrink: 0;
+    }
+
+    .brand-block {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-seal {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--terracotta);
+      color: #fbf8f2;
+      display: grid;
+      place-items: center;
+      font-family: 'Fraunces', Georgia, serif;
+      font-weight: 700;
+      font-size: 20px;
+      box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+    }
+
+    .brand-title {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 19px;
+      font-weight: 700;
+      line-height: 1.1;
+      color: var(--ink);
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: var(--ink-soft);
+      font-weight: 600;
+    }
+
+    .nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .nav-tab-btn {
+      border: 1.5px solid var(--paper-border);
+      background: var(--paper-card);
+      color: var(--ink);
+      padding: 9px 18px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    .nav-tab-btn:hover {
+      background: var(--paper-muted);
+    }
+
+    .nav-tab-btn.active {
+      background: var(--ink);
+      color: var(--paper-card);
+      border-color: var(--ink);
+    }
+
+    .nav-tab-btn.resume-btn {
+      background: var(--forest);
+      color: #fbf8f2;
+      border-color: var(--forest-dark);
+      display: none;
+    }
+
+    .nav-tab-btn.resume-btn.visible {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #menu-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .menu-panel {
+      display: none;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .menu-panel.active {
+      display: flex;
+    }
+
+    /* --- 1. HOME PANEL (Asymmetric Editorial Rail over Live 3D World) --- */
+    #panel-beranda {
+      align-items: stretch;
+      justify-content: flex-start;
+      padding: 20px 24px;
+      pointer-events: none;
+    }
+
+    .home-rail {
+      width: min(460px, 100%);
+      background: rgba(244, 239, 230, 0.95);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 18px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: var(--shadow-soft);
+      pointer-events: auto;
+    }
+
+    .kicker {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--terracotta);
+      background: #efe0d6;
+      padding: 4px 10px;
+      border-radius: 6px;
+      width: fit-content;
+    }
+
+    .home-heading {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: clamp(26px, 3vw, 34px);
+      line-height: 1.14;
+      color: var(--ink);
+      margin-top: 8px;
+    }
+
+    .home-desc {
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--ink-soft);
+      margin-top: 8px;
+    }
+
+    .home-menu-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .home-card-btn {
+      text-align: left;
+      background: var(--paper-card);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 12px;
+      padding: 14px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+    }
+
+    .home-card-btn:hover {
+      border-color: var(--ink);
+      transform: translateY(-2px);
+    }
+
+    .home-card-btn.primary {
+      grid-column: 1 / -1;
+      background: var(--terracotta);
+      border-color: var(--terracotta-dark);
+      color: #fbf8f2;
+      padding: 16px 18px;
+    }
+
+    .home-card-btn.primary .hc-sub {
+      color: rgba(251, 248, 242, 0.85);
+    }
+
+    .hc-num {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.72;
+    }
+
+    .hc-title {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .hc-sub {
+      font-size: 12px;
+      color: var(--ink-soft);
+      line-height: 1.35;
+    }
+
+    .home-footnote {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--ink-soft);
+      border-top: 1px solid var(--paper-border);
+      padding-top: 12px;
+    }
+
+    /* --- 2. ADVENTURE & 3D CUSTOMIZER PANEL (FULL SCREEN, NO CLUTTER) --- */
+    #panel-adventure {
+      padding: 16px 22px;
+      gap: 18px;
+      background: var(--paper);
+      pointer-events: auto;
+    }
+
+    .cust-stage-col {
+      flex: 0 0 40%;
+      min-width: 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .cust-canvas-box {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      background: linear-gradient(180deg, #e9e0d0 0%, #d8cbb6 100%);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 16px;
+      overflow: hidden;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .cust-canvas-box:active {
+      cursor: grabbing;
+    }
+
+    .cust-stage-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .badge-chip {
+      background: rgba(251, 248, 242, 0.92);
+      border: 1px solid var(--paper-border);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 11px;
+      border-radius: 999px;
+    }
+
+    .badge-chip.hijab-note {
+      background: var(--forest);
+      color: #fbf8f2;
+      border-color: var(--forest-dark);
+    }
+
+    .cust-stage-controls {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .mini-ctrl-btn {
+      background: rgba(251, 248, 242, 0.94);
+      border: 1.5px solid var(--paper-border);
+      color: var(--ink);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .mini-ctrl-btn:hover {
+      background: var(--paper-muted);
+    }
+
+    .hero-switch-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .hero-pick-btn {
+      background: var(--paper-card);
+      border: 2px solid var(--paper-border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .hero-pick-btn.active {
+      border-color: var(--terracotta);
+      background: #f9efe9;
+    }
+
+    .hero-pick-name {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .hero-pick-meta {
+      font-size: 12px;
+      color: var(--ink-soft);
+      font-weight: 600;
+    }
+
+    .cust-options-col {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--paper-card);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      gap: 12px;
+    }
+
+    .cust-head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      border-bottom: 1.5px solid var(--paper-muted);
+      padding-bottom: 10px;
+    }
+
+    .cust-section-title {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .cust-tabs {
+      display: flex;
+      gap: 6px;
+    }
+
+    .cust-tab {
+      border: 1.5px solid var(--paper-border);
+      background: var(--paper);
+      color: var(--ink);
+      padding: 8px 16px;
+      border-radius: 9px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .cust-tab.active {
+      background: var(--ink);
+      color: var(--paper-card);
+      border-color: var(--ink);
+    }
+
+    .cust-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .region-filters {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .region-btn {
+      border: 1.5px solid var(--paper-border);
+      background: var(--paper);
+      color: var(--ink-soft);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .region-btn.active {
+      background: var(--indigo);
+      border-color: var(--indigo);
+      color: #fbf8f2;
+    }
+
+    /* Clean 2-column outfit grid: zero overlapping text, consistent height */
+    .outfit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .outfit-card {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 10px 12px;
+      border-radius: 11px;
+      border: 1.5px solid var(--paper-border);
+      background: var(--paper);
+      text-align: left;
+      cursor: pointer;
+      min-height: 58px;
+      transition: border-color 0.14s, background 0.14s;
+    }
+
+    .outfit-card:hover {
+      border-color: var(--ink-soft);
+    }
+
+    .outfit-card.active {
+      border-color: var(--terracotta);
+      background: #f8ece5;
+      box-shadow: inset 0 0 0 1px var(--terracotta);
+    }
+
+    .cloth-swatch {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      flex-shrink: 0;
+      border: 1.5px solid rgba(34, 28, 22, 0.22);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cloth-swatch-accent {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 11px;
+    }
+
+    .outfit-info {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .outfit-name {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.25;
+    }
+
+    .outfit-region {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--ink-soft);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+
+    .outfit-summary-bar {
+      background: var(--paper);
+      border: 1.5px solid var(--paper-border);
+      border-left: 4px solid var(--terracotta);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 12.5px;
+      line-height: 1.4;
+      color: var(--ink-soft);
+      flex-shrink: 0;
+    }
+
+    .outfit-summary-bar strong {
+      color: var(--ink);
+    }
+
+    .opt-group-label {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      margin-bottom: 6px;
+    }
+
+    .swatch-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .color-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1.5px solid var(--paper-border);
+      background: var(--paper);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .color-pill.active {
+      border-color: var(--terracotta);
+      background: #f8ece5;
+    }
+
+    .color-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(34, 28, 22, 0.28);
+    }
+
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .choice-btn {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1.5px solid var(--paper-border);
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .choice-btn.active {
+      border-color: var(--terracotta);
+      background: #f8ece5;
+      color: var(--terracotta-dark);
+    }
+
+    .cust-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-top: 10px;
+      border-top: 1.5px solid var(--paper-muted);
+      flex-shrink: 0;
+    }
+
+    .btn-primary-large {
+      background: var(--terracotta);
+      color: #fbf8f2;
+      border: 2px solid var(--terracotta-dark);
+      padding: 13px 26px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 0 var(--terracotta-dark);
+      transition: transform 0.1s;
+    }
+
+    .btn-primary-large:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 var(--terracotta-dark);
+    }
+
+    .btn-secondary-large {
+      background: var(--forest);
+      color: #fbf8f2;
+      border: 2px solid var(--forest-dark);
+      padding: 11px 20px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    /* --- 3. MATERI PANEL (FULL-SCREEN, NO SCROLL, 3D DIORAMA) --- */
+    #panel-materi {
+      flex-direction: column;
+      padding: 12px 20px 16px;
+      gap: 12px;
+      background: var(--paper);
+      pointer-events: auto;
+    }
+
+    .materi-topic-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .topic-tab {
+      background: var(--paper-card);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 11px;
+      padding: 9px 12px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .topic-tab.active {
+      background: var(--ink);
+      color: var(--paper-card);
+      border-color: var(--ink);
+    }
+
+    .topic-tab-num {
+      font-size: 10.5px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.72;
+    }
+
+    .topic-tab-name {
+      font-size: 13.5px;
+      font-weight: 800;
+      margin-top: 2px;
+    }
+
+    .materi-workspace {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1.12fr 0.88fr;
+      gap: 16px;
+    }
+
+    .materi-stage-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    #materi-canvas-wrap {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      border-radius: 16px;
+      border: 1.5px solid var(--paper-border);
+      background: #d8cdb8;
+      overflow: hidden;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #materi-canvas-wrap:active {
+      cursor: grabbing;
+    }
+
+    .materi-stage-top {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .materi-dialogue-card {
+      background: var(--paper-card);
+      border: 1.5px solid var(--paper-border);
+      border-left: 4px solid var(--indigo);
+      border-radius: 12px;
+      padding: 11px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .materi-speaker {
+      font-size: 11.5px;
+      font-weight: 800;
+      color: var(--indigo);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .materi-speech {
+      font-size: 13.5px;
+      line-height: 1.4;
+      color: var(--ink);
+      margin-top: 2px;
+    }
+
+    .materi-stage-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .materi-info-col {
+      background: var(--paper-card);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .materi-scene-title {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: clamp(18px, 1.8vw, 23px);
+      line-height: 1.2;
+      color: var(--ink);
+      margin-top: 4px;
+    }
+
+    .materi-points {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .materi-point-item {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      background: var(--paper);
+      border: 1px solid var(--paper-border);
+      border-radius: 10px;
+      padding: 9px 12px;
+    }
+
+    .mp-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 7px;
+      background: var(--ink);
+      color: #fbf8f2;
+      font-size: 12px;
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .mp-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .mp-desc {
+      font-size: 12px;
+      color: var(--ink-soft);
+      line-height: 1.35;
+      margin-top: 1px;
+    }
+
+    .materi-footer-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-top: 1.5px solid var(--paper-muted);
+      padding-top: 10px;
+    }
+
+    /* --- 4. KUIS PANEL (FULL-SCREEN, NO SCROLL, 2x2 GRID) --- */
+    #panel-kuis {
+      flex-direction: column;
+      padding: 16px 26px 18px;
+      gap: 14px;
+      background: var(--paper);
+      pointer-events: auto;
+    }
+
+    .quiz-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      background: var(--paper-card);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 12px;
+      padding: 10px 16px;
+      flex-shrink: 0;
+    }
+
+    .quiz-progress-track {
+      flex: 1;
+      max-width: 340px;
+      height: 10px;
+      background: var(--paper-muted);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .quiz-progress-fill {
+      height: 100%;
+      background: var(--forest);
+      transition: width 0.25s ease;
+    }
+
+    .quiz-main-card {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+      background: var(--paper-card);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 16px;
+      padding: 20px 24px;
+    }
+
+    .quiz-question-text {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: clamp(19px, 2.1vw, 25px);
+      line-height: 1.32;
+      color: var(--ink);
+    }
+
+    .quiz-options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      flex: 1;
+      align-content: center;
+    }
+
+    .quiz-opt-btn {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 2px solid var(--paper-border);
+      background: var(--paper);
+      color: var(--ink);
+      text-align: left;
+      font-size: clamp(14px, 1.3vw, 16px);
+      font-weight: 700;
+      line-height: 1.35;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+
+    .quiz-opt-btn:hover:not(:disabled) {
+      border-color: var(--ink);
+      background: #efe7da;
+    }
+
+    .quiz-opt-letter {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: var(--paper-card);
+      border: 1.5px solid var(--paper-border);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .quiz-opt-btn.correct {
+      background: #e2f0e6;
+      border-color: var(--forest);
+      color: var(--forest-dark);
+    }
+
+    .quiz-opt-btn.correct .quiz-opt-letter {
+      background: var(--forest);
+      color: #fbf8f2;
+      border-color: var(--forest);
+    }
+
+    .quiz-opt-btn.wrong {
+      background: #f5e2df;
+      border-color: var(--terracotta);
+      color: var(--terracotta-dark);
+    }
+
+    .quiz-opt-btn.wrong .quiz-opt-letter {
+      background: var(--terracotta);
+      color: #fbf8f2;
+      border-color: var(--terracotta);
+    }
+
+    .quiz-feedback-bar {
+      min-height: 74px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      background: var(--paper);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      flex-shrink: 0;
+    }
+
+    .quiz-feedback-text {
+      font-size: 13.5px;
+      line-height: 1.4;
+      color: var(--ink-soft);
+    }
+
+    .quiz-result-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 14px;
+    }
+
+    .quiz-score-big {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 62px;
+      font-weight: 700;
+      color: var(--terracotta);
+      line-height: 1;
+    }
+
+    /* --- 5. PENGATURAN PANEL --- */
+    #panel-pengaturan {
+      padding: 20px 26px;
+      background: var(--paper);
+      pointer-events: auto;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .settings-sheet {
+      width: min(860px, 100%);
+      background: var(--paper-card);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 16px;
+      padding: 22px 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--paper-muted);
+    }
+
+    .setting-row:last-child {
+      border-bottom: none;
+    }
+
+    .setting-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .setting-desc {
+      font-size: 12.5px;
+      color: var(--ink-soft);
+      margin-top: 2px;
+    }
+
+    .seg-group {
+      display: flex;
+      gap: 6px;
+    }
+
+    .seg-btn {
+      padding: 8px 14px;
+      border-radius: 9px;
+      border: 1.5px solid var(--paper-border);
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .seg-btn.active {
+      background: var(--ink);
+      color: #fbf8f2;
+      border-color: var(--ink);
+    }
+
+    /* =========================================================
+       IN-GAME 3D HUD (PID TOUCH-FRIENDLY, NO NEON)
+    ========================================================= */
+    #hud {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      pointer-events: none;
+      display: none;
+    }
+
+    #hud.visible {
+      display: block;
+    }
+
+    .hud-top {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .hud-stats-card {
+      pointer-events: auto;
+      background: rgba(251, 248, 242, 0.94);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 14px;
+      padding: 10px 14px;
+      min-width: 270px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .stat-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .stat-label {
+      width: 74px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .stat-bar-bg {
+      flex: 1;
+      min-width: 125px;
+      height: 11px;
+      background: var(--paper-muted);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--paper-border);
+    }
+
+    .stat-bar-fill {
+      height: 100%;
+      transition: width 0.25s ease;
+    }
+
+    .stat-bar-fill.energy {
+      background: var(--forest);
+    }
+
+    .stat-bar-fill.energy.low {
+      background: var(--terracotta);
+    }
+
+    .stat-bar-fill.harmony {
+      background: var(--ochre);
+    }
+
+    .stat-val {
+      width: 38px;
+      text-align: right;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .hud-center-badge {
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill-badge {
+      background: rgba(251, 248, 242, 0.94);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 999px;
+      padding: 7px 16px;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--ink);
+      white-space: nowrap;
+      box-shadow: var(--shadow-card);
+    }
+
+    .gotong-pill {
+      display: none;
+      background: var(--forest);
+      color: #fbf8f2;
+      border: 1.5px solid var(--forest-dark);
+      border-radius: 999px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .gotong-pill.active {
+      display: inline-block;
+    }
+
+    .hud-right-col {
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    .hud-btn-row {
+      display: flex;
+      gap: 7px;
+    }
+
+    .hud-btn {
+      background: rgba(251, 248, 242, 0.94);
+      border: 1.5px solid var(--paper-border);
+      color: var(--ink);
+      padding: 9px 13px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: var(--shadow-card);
+    }
+
+    .hud-btn:hover {
+      background: var(--paper-muted);
+    }
+
+    .hud-btn.menu-btn {
+      background: var(--ink);
+      color: #fbf8f2;
+      border-color: var(--ink);
+    }
+
+    #minimap-box {
+      width: 146px;
+      height: 146px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 2px solid var(--paper-border);
+      background: var(--paper-card);
+      box-shadow: var(--shadow-card);
+    }
+
+    #minimap {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Bottom Controls & Zone Dock */
+    #joystick-zone {
+      position: absolute;
+      left: 20px;
+      bottom: 22px;
+      width: 122px;
+      height: 122px;
+      border-radius: 50%;
+      background: rgba(251, 248, 242, 0.72);
+      border: 2px solid var(--paper-border);
+      pointer-events: auto;
+      touch-action: none;
+      display: grid;
+      place-items: center;
+      box-shadow: var(--shadow-card);
+    }
+
+    #joystick-knob {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: var(--ink);
+      border: 3px solid var(--paper-card);
+      box-shadow: 0 3px 10px rgba(34, 28, 22, 0.28);
+      pointer-events: none;
+      transform: translate(0, 0);
+    }
+
+    .zone-dock {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      padding: 6px 8px;
+      background: rgba(251, 248, 242, 0.94);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 14px;
+      pointer-events: auto;
+      box-shadow: var(--shadow-card);
+      max-width: calc(100vw - 380px);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .zone-dock::-webkit-scrollbar {
+      display: none;
+    }
+
+    .zone-chip {
+      border: 1.5px solid transparent;
+      background: var(--paper);
+      color: var(--ink);
+      padding: 8px 12px;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .zone-chip.active {
+      background: var(--indigo);
+      color: #fbf8f2;
+    }
+
+    .action-dock {
+      position: absolute;
+      right: 20px;
+      bottom: 22px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    #btn-action {
+      min-width: 170px;
+      padding: 15px 22px;
+      border-radius: 14px;
+      border: 2px solid var(--paper-border);
+      background: rgba(251, 248, 242, 0.94);
+      color: var(--ink-soft);
+      font-size: 14px;
+      font-weight: 800;
+      white-space: nowrap;
+      cursor: pointer;
+      box-shadow: var(--shadow-card);
+      transition: all 0.14s ease;
+    }
+
+    #btn-action.ready {
+      background: var(--forest);
+      color: #fbf8f2;
+      border-color: var(--forest-dark);
+      box-shadow: 0 4px 0 var(--forest-dark);
+    }
+
+    #btn-action.ready-gold {
+      background: var(--terracotta);
+      color: #fbf8f2;
+      border-color: var(--terracotta-dark);
+      box-shadow: 0 4px 0 var(--terracotta-dark);
+    }
+
+    .cam-mini-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    /* Dialogue & Mission Modal */
+    #dialogue-modal, #mission-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 35;
+      background: rgba(34, 28, 22, 0.45);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 22px;
+    }
+
+    #mission-modal {
+      align-items: center;
+    }
+
+    #dialogue-modal.open, #mission-modal.open {
+      display: flex;
+    }
+
+    .dialogue-box {
+      width: min(760px, 100%);
+      background: var(--paper-card);
+      border: 2px solid var(--paper-border);
+      border-radius: 18px;
+      padding: 20px 24px;
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .dlg-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1.5px solid var(--paper-muted);
+      padding-bottom: 10px;
+    }
+
+    .dlg-name {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .dlg-role {
+      font-size: 12.5px;
+      color: var(--ink-soft);
+      font-weight: 600;
+    }
+
+    .dlg-tag {
+      background: var(--ochre-soft);
+      color: var(--ink);
+      border: 1px solid #d9c091;
+      padding: 5px 11px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 800;
+    }
+
+    .dlg-text {
+      font-size: 15px;
+      line-height: 1.55;
+      color: var(--ink);
+    }
+
+    .dlg-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+    }
+
+    .dlg-btn {
+      padding: 11px 18px;
+      border-radius: 10px;
+      font-size: 13.5px;
+      font-weight: 800;
+      border: 1.5px solid var(--paper-border);
+      background: var(--paper);
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .dlg-btn.green {
+      background: var(--forest);
+      color: #fbf8f2;
+      border-color: var(--forest-dark);
+    }
+
+    .dlg-btn.gold {
+      background: var(--terracotta);
+      color: #fbf8f2;
+      border-color: var(--terracotta-dark);
+    }
+
+    .dlg-btn.sky {
+      background: var(--indigo);
+      color: #fbf8f2;
+      border-color: #1f3c4c;
+    }
+
+    .mission-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mission-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      background: var(--paper);
+      border: 1.5px solid var(--paper-border);
+      border-radius: 11px;
+      padding: 11px 14px;
+    }
+
+    .mission-item.done {
+      background: #e5f1e8;
+      border-color: #9ec4a9;
+    }
+
+    /* Toast notification (replaces alert) */
+    #toast {
+      position: fixed;
+      top: 76px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      z-index: 60;
+      background: #221c16;
+      color: #fbf8f2;
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 700;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      box-shadow: 0 8px 22px rgba(34, 28, 22, 0.28);
+      max-width: 90vw;
+      text-align: center;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @media (max-width: 960px) {
+      #panel-adventure { flex-direction: column; overflow-y: auto; }
+      .cust-stage-col { flex: 0 0 260px; min-width: 0; }
+      .materi-workspace { grid-template-columns: 1fr; }
+      .materi-topic-bar { grid-template-columns: repeat(2, 1fr); }
+      .quiz-options-grid { grid-template-columns: 1fr; }
+      .zone-dock { display: none; }
+      #minimap-box { width: 110px; height: 110px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- 3D Open-World Viewport & Floating World Labels -->
+  <div id="canvas-container"></div>
+  <div id="labels-layer"></div>
+
+  <!-- Toast Banner -->
+  <div id="toast"></div>
+
+  <!-- =========================================================
+       MAIN MENU HUB (Beranda · Adventure · Materi · Kuis · Pengaturan)
+  ========================================================= -->
+  <div id="menu-overlay">
+    <div class="tenun-bar"></div>
+    <header id="menu-topbar">
+      <div class="brand-block">
+        <div class="brand-seal">LN</div>
+        <div>
+          <div class="brand-title">Loka Nusantara 3D</div>
+          <div class="brand-sub">Pendidikan Pancasila SMP · Kurikulum Merdeka Fase D</div>
+        </div>
+      </div>
+
+      <nav class="nav-tabs">
+        <button class="nav-tab-btn active" data-tab="beranda" onclick="selectMenuTab('beranda')">Beranda</button>
+        <button class="nav-tab-btn" data-tab="adventure" onclick="selectMenuTab('adventure')">Adventure 3D</button>
+        <button class="nav-tab-btn" data-tab="materi" onclick="selectMenuTab('materi')">Materi</button>
+        <button class="nav-tab-btn" data-tab="kuis" onclick="selectMenuTab('kuis')">Kuis</button>
+        <button class="nav-tab-btn" data-tab="pengaturan" onclick="selectMenuTab('pengaturan')">Pengaturan</button>
+        <button id="btn-resume-3d" class="nav-tab-btn resume-btn" onclick="closeMainMenu()">Lanjut 3D</button>
+      </nav>
+    </header>
+
+    <main id="menu-body">
+      <!-- TAB 1: BERANDA -->
+      <section id="panel-beranda" class="menu-panel active">
+        <div class="home-rail">
+          <div>
+            <span class="kicker">Papan Interaktif Digital · SMP</span>
+            <h1 class="home-heading">Penjaga Desa Bhinneka</h1>
+            <p class="home-desc">
+              Jelajahi desa 3D Nusantara secara langsung. Kelola energi, ajak warga bergotong royong, seberangi jembatan lengkung, memancing di sungai, dan selesaikan musyawarah di Balai Desa.
+            </p>
+          </div>
+
+          <div class="home-menu-grid">
+            <button class="home-card-btn primary" onclick="selectMenuTab('adventure')">
+              <span class="hc-num">01 · Petualangan Dunia Terbuka</span>
+              <span class="hc-title">Mulai Adventure 3D</span>
+              <span class="hc-sub">Kustomisasi 17 busana adat Raka &amp; Tara, lalu jelajahi 6 zona desa</span>
+            </button>
+            <button class="home-card-btn" onclick="selectMenuTab('materi')">
+              <span class="hc-num">02 · 12 Diorama 3D</span>
+              <span class="hc-title">Ruang Materi</span>
+              <span class="hc-sub">Animasi 3D interaktif 4 elemen Kurikulum Merdeka</span>
+            </button>
+            <button class="home-card-btn" onclick="selectMenuTab('kuis')">
+              <span class="hc-num">03 · Uji Kasus</span>
+              <span class="hc-title">Kuis Pancasila</span>
+              <span class="hc-sub">10 studi kasus Fase D layar penuh tanpa gulir</span>
+            </button>
+            <button class="home-card-btn" onclick="selectMenuTab('pengaturan')">
+              <span class="hc-num">04 · Kendali Kelas</span>
+              <span class="hc-title">Pengaturan</span>
+              <span class="hc-sub">Mode Ringan PID, suara, kamera &amp; kecepatan</span>
+            </button>
+            <button class="home-card-btn" onclick="quickStartAdventure()">
+              <span class="hc-num">Pintasan Cepat</span>
+              <span class="hc-title">Langsung Main</span>
+              <span class="hc-sub">Masuk Desa Bhinneka dengan karakter saat ini</span>
+            </button>
+          </div>
+
+          <div class="home-footnote">
+            <span>Ketuk tanah 3D untuk berjalan · Joystick / WASD</span>
+            <strong id="home-status-label">Siap Dimainkan</strong>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: ADVENTURE 3D & CHARACTER CUSTOMIZER -->
+      <section id="panel-adventure" class="menu-panel">
+        <div class="cust-stage-col">
+          <div id="customizer-canvas-wrap" class="cust-canvas-box">
+            <div class="cust-stage-badge">
+              <span id="cust-preview-name" class="badge-chip">Raka · Relawan Desa</span>
+              <span id="cust-hijab-chip" class="badge-chip hijab-note" style="display:none;">Wajib Berhijab</span>
+            </div>
+            <div class="cust-stage-controls">
+              <button class="mini-ctrl-btn" onclick="cyclePreviewPose()">Ganti Pose</button>
+              <button class="mini-ctrl-btn" onclick="randomizeHero()">Acak Gaya</button>
+            </div>
+          </div>
+
+          <div class="hero-switch-row">
+            <button id="pick-raka" class="hero-pick-btn active" onclick="selectHero('raka')">
+              <span class="hero-pick-name">Raka (Pria)</span>
+              <span class="hero-pick-meta">Peci · Udeng · Blangkon · Tanjak</span>
+            </button>
+            <button id="pick-tara" class="hero-pick-btn" onclick="selectHero('tara')">
+              <span class="hero-pick-name">Tara (Wanita)</span>
+              <span class="hero-pick-meta">Berhijab sopan · 5 gaya hijab adat</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="cust-options-col">
+          <div class="cust-head-row">
+            <div class="cust-section-title">Kustomisasi Karakter Nusantara</div>
+            <div class="cust-tabs">
+              <button class="cust-tab active" data-ctab="kostum" onclick="selectCustTab('kostum')">Kostum (17)</button>
+              <button class="cust-tab" data-ctab="wajah" onclick="selectCustTab('wajah')">Wajah</button>
+              <button class="cust-tab" data-ctab="aksesoris" onclick="selectCustTab('aksesoris')">Aksesoris</button>
+            </div>
+          </div>
+
+          <div id="cust-body" class="cust-body"></div>
+
+          <div class="cust-footer">
+            <span id="cust-footer-hint" style="font-size:12.5px;color:var(--ink-soft);font-weight:600;">
+              Geser pratinjau 3D untuk memutar karakter 360 derajat.
+            </span>
+            <button class="btn-primary-large" onclick="startGame()">Masuk Desa Bhinneka (3D)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: MATERI (FULL-SCREEN 3D DIORAMA, NO SCROLL) -->
+      <section id="panel-materi" class="menu-panel">
+        <div id="materi-topic-bar" class="materi-topic-bar"></div>
+
+        <div class="materi-workspace">
+          <div class="materi-stage-col">
+            <div id="materi-canvas-wrap">
+              <div class="materi-stage-top">
+                <span id="materi-scene-badge" class="badge-chip">Adegan 1 / 3</span>
+                <span class="badge-chip">Geser panggung untuk putar 3D</span>
+              </div>
+            </div>
+
+            <div class="materi-dialogue-card">
+              <div>
+                <div id="materi-speaker" class="materi-speaker">Pak Hendra · Kepala Desa</div>
+                <div id="materi-speech" class="materi-speech">...</div>
+              </div>
+              <button id="btn-materi-action" class="btn-secondary-large" onclick="triggerMateriAction()">Jalankan Animasi</button>
+            </div>
+
+            <div class="materi-stage-actions">
+              <button class="mini-ctrl-btn" onclick="stepMateriScene(-1)">Adegan Sebelumnya</button>
+              <span id="materi-step-indicator" style="font-size:13px;font-weight:800;color:var(--ink-soft);">1 / 3</span>
+              <button class="mini-ctrl-btn" onclick="stepMateriScene(1)">Adegan Berikutnya</button>
+            </div>
+          </div>
+
+          <div class="materi-info-col">
+            <div>
+              <span id="materi-element-kicker" class="kicker">Elemen Pancasila</span>
+              <h2 id="materi-scene-title" class="materi-scene-title">Judul Materi</h2>
+            </div>
+
+            <div id="materi-points" class="materi-points"></div>
+
+            <div class="materi-footer-bar">
+              <span id="materi-zone-hint" style="font-size:12px;font-weight:700;color:var(--ink-soft);">
+                Praktik langsung di dunia 3D
+              </span>
+              <button id="btn-materi-practice" class="btn-primary-large" style="padding:10px 18px;font-size:13.5px;" onclick="practiceMateriIn3D()">
+                Praktik di Zona 3D
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: KUIS (FULL-SCREEN, NO SCROLL) -->
+      <section id="panel-kuis" class="menu-panel">
+        <div class="quiz-topbar">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span id="quiz-num-badge" class="kicker">Soal 1 / 10</span>
+            <strong id="quiz-topic-label" style="font-size:14px;">Pancasila · Kelas VII</strong>
+          </div>
+          <div class="quiz-progress-track">
+            <div id="quiz-progress-fill" class="quiz-progress-fill" style="width:10%;"></div>
+          </div>
+          <div style="font-size:14px;font-weight:800;">Skor: <span id="quiz-score-val">0</span></div>
+        </div>
+
+        <div id="quiz-card" class="quiz-main-card">
+          <h2 id="quiz-question" class="quiz-question-text">Memuat soal...</h2>
+          <div id="quiz-options" class="quiz-options-grid"></div>
+          <div class="quiz-feedback-bar">
+            <div id="quiz-feedback" class="quiz-feedback-text">
+              Pilih salah satu jawaban A, B, C, atau D di atas untuk melihat pembahasan konsep Pancasilanya.
+            </div>
+            <button id="btn-quiz-next" class="btn-primary-large" style="padding:11px 22px;font-size:14px;display:none;" onclick="nextQuizQuestion()">
+              Soal Berikutnya
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: PENGATURAN -->
+      <section id="panel-pengaturan" class="menu-panel">
+        <div class="settings-sheet">
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid var(--paper-muted);padding-bottom:12px;">
+            <div>
+              <span class="kicker">Kendali Perangkat PID</span>
+              <h2 style="font-family:'Fraunces',Georgia,serif;font-size:24px;margin-top:4px;">Pengaturan Gim</h2>
+            </div>
+            <button class="mini-ctrl-btn" onclick="selectMenuTab('beranda')">Kembali</button>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Efek Suara Interaktif</div>
+              <div class="setting-desc">Nada ketukan kayu, pemulihan energi, dan tarikan pancing</div>
+            </div>
+            <div class="seg-group" id="set-sound">
+              <button class="seg-btn active" onclick="setSoundSetting(true)">Aktif</button>
+              <button class="seg-btn" onclick="setSoundSetting(false)">Senyap</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Kualitas Grafis 3D</div>
+              <div class="setting-desc">Pilih Mode Ringan jika dijalankan di PID berspesifikasi rendah</div>
+            </div>
+            <div class="seg-group" id="set-quality">
+              <button class="seg-btn" onclick="setQualitySetting('ringan')">Ringan PID</button>
+              <button class="seg-btn active" onclick="setQualitySetting('normal')">Normal</button>
+              <button class="seg-btn" onclick="setQualitySetting('tinggi')">Tinggi</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Sudut Kamera 3D</div>
+              <div class="setting-desc">Ikuti belakang karakter atau pantau dari udara</div>
+            </div>
+            <div class="seg-group" id="set-camera">
+              <button class="seg-btn active" onclick="setCameraSetting('ikuti')">Ikuti Karakter</button>
+              <button class="seg-btn" onclick="setCameraSetting('atas')">Pantau Udara</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Kecepatan Jalan Karakter</div>
+              <div class="setting-desc">Atur kelincahan Raka/Tara saat melintasi desa</div>
+            </div>
+            <div class="seg-group" id="set-speed">
+              <button class="seg-btn" onclick="setSpeedSetting('santai')">Santai</button>
+              <button class="seg-btn active" onclick="setSpeedSetting('normal')">Normal</button>
+              <button class="seg-btn" onclick="setSpeedSetting('cepat')">Cepat</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Label Nama 3D di Atas NPC &amp; Zona</div>
+              <div class="setting-desc">Membantu siswa di bangku belakang membaca lokasi</div>
+            </div>
+            <div class="seg-group" id="set-labels">
+              <button class="seg-btn active" onclick="setLabelSetting(true)">Tampilkan</button>
+              <button class="seg-btn" onclick="setLabelSetting(false)">Sembunyikan</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Ulangi Progres Petualangan 3D</div>
+              <div class="setting-desc">Mengatur ulang misi, harmoni desa, dan posisi awal</div>
+            </div>
+            <button id="btn-reset-adv" class="dlg-btn gold" onclick="handleResetAdventure()">Reset Progres</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- =========================================================
+       IN-GAME 3D HUD
+  ========================================================= -->
+  <div id="hud">
+    <div class="hud-top">
+      <div class="hud-stats-card">
+        <div class="stat-line">
+          <span class="stat-label">Energi</span>
+          <div class="stat-bar-bg"><div id="bar-energy" class="stat-bar-fill energy" style="width:100%"></div></div>
+          <span id="val-energy" class="stat-val">100%</span>
+        </div>
+        <div class="stat-line">
+          <span class="stat-label">Harmoni</span>
+          <div class="stat-bar-bg"><div id="bar-harmony" class="stat-bar-fill harmony" style="width:20%"></div></div>
+          <span id="val-harmony" class="stat-val">20%</span>
+        </div>
+      </div>
+
+      <div class="hud-center-badge">
+        <div id="zone-pill" class="pill-badge">Alun-Alun Desa Bhinneka</div>
+        <div id="gotong-pill" class="gotong-pill">Gotong Royong Aktif (-60% Energi) · <span id="gotong-timer">90</span>d</div>
+      </div>
+
+      <div class="hud-right-col">
+        <div class="hud-btn-row">
+          <button class="hud-btn" onclick="openMissionModal()">Misi (<span id="mission-count">0</span>/5)</button>
+          <button class="hud-btn menu-btn" onclick="openMainMenu('beranda')">Menu</button>
+        </div>
+        <div id="minimap-box">
+          <canvas id="minimap" width="160" height="160"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Virtual Joystick (PID Left-Bottom) -->
+    <div id="joystick-zone">
+      <div id="joystick-knob"></div>
+    </div>
+
+    <!-- Quick Zone Guide Dock (PID Bottom-Center) -->
+    <div class="zone-dock">
+      <button class="zone-chip active" data-zone="balai" onclick="guideToZone('balai')">Balai Desa</button>
+      <button class="zone-chip" data-zone="pasar" onclick="guideToZone('pasar')">Pasar Nusantara</button>
+      <button class="zone-chip" data-zone="adat" onclick="guideToZone('adat')">Kampung Adat</button>
+      <button class="zone-chip" data-zone="dermaga" onclick="guideToZone('dermaga')">Dermaga &amp; Mancing</button>
+      <button class="zone-chip" data-zone="sekolah" onclick="guideToZone('sekolah')">SMP Nusantara</button>
+      <button class="zone-chip" data-zone="posronda" onclick="guideToZone('posronda')">Pos Ronda</button>
+    </div>
+
+    <!-- Contextual Primary Action + Camera Buttons (PID Right-Bottom) -->
+    <div class="action-dock">
+      <div class="cam-mini-row">
+        <button class="hud-btn" onclick="rotateCameraStep(-0.55)">Putar Kiri</button>
+        <button class="hud-btn" onclick="toggleCameraMode()">Kamera</button>
+        <button class="hud-btn" onclick="rotateCameraStep(0.55)">Putar Kanan</button>
+      </div>
+      <button id="btn-action" onclick="triggerPrimaryAction()">JELAJAHI DESA</button>
+    </div>
+  </div>
+
+  <!-- Dialogue Modal -->
+  <div id="dialogue-modal">
+    <div class="dialogue-box">
+      <div class="dlg-header">
+        <div>
+          <div id="dlg-name" class="dlg-name">Nama NPC</div>
+          <div id="dlg-role" class="dlg-role">Peran Warga</div>
+        </div>
+        <span id="dlg-tag" class="dlg-tag">Nilai Pancasila</span>
+      </div>
+      <div id="dlg-text" class="dlg-text">...</div>
+      <div id="dlg-actions" class="dlg-actions"></div>
+    </div>
+  </div>
+
+  <!-- Mission Checklist Modal -->
+  <div id="mission-modal">
+    <div class="dialogue-box">
+      <div class="dlg-header">
+        <div>
+          <div class="dlg-name">Catatan Misi Desa Bhinneka</div>
+          <div class="dlg-role">Selesaikan minimal 3 misi lapangan untuk membuka Musyawarah Besar di Balai Desa</div>
+        </div>
+        <button class="mini-ctrl-btn" onclick="closeMissionModal()">Tutup</button>
+      </div>
+      <div id="mission-list" class="mission-list"></div>
+    </div>
+  </div>
+
+  <script>
+  'use strict';
+
+  /* =========================================================
+     1. SOUND SYNTHESIZER (WEB AUDIO — NO EXTERNAL URLS)
+  ========================================================= */
+  const settings = {
+    sound: true,
+    quality: 'normal',
+    cameraMode: 'ikuti',
+    speed: 'normal',
+    showLabels: true
+  };
+
+  let audioCtx = null;
+  function ensureAudio() {
+    if (!settings.sound) return null;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    } catch (e) { return null; }
+  }
+
+  function playTone(freq, dur, type = 'triangle', vol = 0.09, delay = 0) {
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    const now = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, now);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(vol, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + dur + 0.02);
+  }
+
+  const SFX = {
+    tap: () => playTone(520, 0.08, 'triangle', 0.07),
+    pickup: () => { playTone(587, 0.1, 'triangle', 0.09, 0); playTone(880, 0.15, 'triangle', 0.09, 0.08); },
+    energy: () => { playTone(440, 0.12, 'sine', 0.09, 0); playTone(554, 0.12, 'sine', 0.09, 0.08); playTone(659, 0.2, 'sine', 0.1, 0.16); },
+    success: () => { playTone(523, 0.12, 'triangle', 0.1, 0); playTone(659, 0.12, 'triangle', 0.1, 0.1); playTone(784, 0.22, 'triangle', 0.11, 0.2); },
+    warn: () => { playTone(260, 0.14, 'sawtooth', 0.05, 0); playTone(210, 0.18, 'sawtooth', 0.05, 0.11); }
+  };
+
+  /* =========================================================
+     2. NUSANTARA CHARACTER CUSTOMIZATION DATA (17 OUTFITS)
+  ========================================================= */
+  const HERO_OUTFITS = [
+    { id: 'relawan', name: 'Relawan Desa', region: 'Nasional', group: 'nasional', shirt: 0x3b6e52, accent: 0xc28a38, pants: 0x3f4742, motif: 'vest', desc: 'Rompi lapangan karang taruna Desa Bhinneka untuk kerja bakti dan gotong royong.' },
+    { id: 'smp', name: 'Pelajar SMP', region: 'Nasional', group: 'nasional', shirt: 0xf0ece3, accent: 0x2f4d6b, pants: 0x2c4661, motif: 'collar', desc: 'Seragam putih biru pelajar SMP Indonesia sebagai identitas generasi penerus bangsa.' },
+    { id: 'pramuka', name: 'Pramuka Nusantara', region: 'Nasional', group: 'nasional', shirt: 0xb89668, accent: 0xa63d2f, pants: 0x5c422a, motif: 'scarf', desc: 'Seragam cokelat dan kacu merah putih melambangkan kemandirian dan kepedulian.' },
+
+    { id: 'aceh', name: 'Ulee Balang', region: 'Aceh', group: 'sumatra', shirt: 0x2c2826, accent: 0xc9963b, pants: 0x8f342b, motif: 'goldtrim', desc: 'Busana kebesaran Aceh dengan sulaman benang emas kasab dan songket merah marun.' },
+    { id: 'batak', name: 'Ulos Batak', region: 'Sumatera Utara', group: 'sumatra', shirt: 0x332c29, accent: 0x9e352d, pants: 0x2b2928, motif: 'ulos', desc: 'Kain tenun Ulos yang disampirkan sebagai simbol kehangatan, doa, dan persaudaraan.' },
+    { id: 'minang', name: 'Adat Minang', region: 'Sumatera Barat', group: 'sumatra', shirt: 0x8f2e28, accent: 0xd19f3e, pants: 0x2f2523, motif: 'goldtrim', desc: 'Baju kurung dan songket Pandai Sikek bernuansa merah marun emas khas Minangkabau.' },
+    { id: 'melayu', name: 'Teluk Belanga', region: 'Riau & Kepri', group: 'sumatra', shirt: 0x2d6659, accent: 0xd1a345, pants: 0x27574c, motif: 'songket', desc: 'Busana Melayu berkerah leher bulat dilengkapi kain samping songket tenun.' },
+
+    { id: 'betawi', name: 'Sadariah / Encim', region: 'DKI Jakarta', group: 'jawabali', shirt: 0xede5d8, accent: 0xb54437, pants: 0x453b34, motif: 'selendang', desc: 'Baju koko Sadariah berkalung sarung atau Kebaya Encim cerah khas budaya Betawi.' },
+    { id: 'batik', name: 'Batik Soga', region: 'Jawa Tengah', group: 'jawabali', shirt: 0x6e472b, accent: 0xd4aa68, pants: 0x3b2a1f, motif: 'batik', desc: 'Batik soga berwarna cokelat tanah warisan keraton yang melambangkan kesahajaan.' },
+    { id: 'lurik', name: 'Surjan Lurik', region: 'DI Yogyakarta', group: 'jawabali', shirt: 0x5c4b3b, accent: 0x998468, pants: 0x3b2d22, motif: 'lurik', desc: 'Tenun garis-garis Surjan Lurik Yogyakarta yang melambangkan perlindungan dan kesetiaan.' },
+    { id: 'madura', name: 'Pesa\'an Madura', region: 'Jawa Timur', group: 'jawabali', shirt: 0x292624, accent: 0xa8362c, pants: 0x2b2725, motif: 'stripe', desc: 'Kaus garis merah-putih berbalut luar hitam longgar simbol ketegasan masyarakat Madura.' },
+    { id: 'bali', name: 'Payas Madya', region: 'Bali', group: 'jawabali', shirt: 0xeae3d5, accent: 0xb88535, pants: 0x4a3425, motif: 'sash', desc: 'Busana adat Bali berpadu kain kamen dan selendang kuning kunyit yang santun.' },
+
+    { id: 'dayak', name: 'Ta\'a / Sapei Sapaq', region: 'Kalimantan', group: 'timur', shirt: 0x2b2623, accent: 0xc78930, pants: 0x3b2820, motif: 'beads', desc: 'Busana adat Dayak berhias manik-manik motif alam hutan Kalimantan.' },
+    { id: 'bugis', name: 'Baju Bodo / Bugis', region: 'Sulawesi Selatan', group: 'timur', shirt: 0x9e3b3b, accent: 0xd4a448, pants: 0x3d4f3c, motif: 'songket', desc: 'Busana Bugis-Makassar berpadu sarung sutra Sengkang bercorak kotak halus.' },
+    { id: 'ntt', name: 'Tenun Ikat NTT', region: 'Nusa Tenggara Timur', group: 'timur', shirt: 0x314a5c, accent: 0xb85233, pants: 0x263540, motif: 'ulos', desc: 'Kain tenun ikat bermotif geometris khas kepulauan Nusa Tenggara Timur.' },
+    { id: 'maluku', name: 'Baju Cele', region: 'Maluku', group: 'timur', shirt: 0xa1352c, accent: 0xefe7da, pants: 0x3a2e28, motif: 'cele', desc: 'Baju Cele merah bermotif garis kotak-kotak cerah khas Kepulauan Maluku.' },
+    { id: 'papua', name: 'Noken & Manik', region: 'Papua', group: 'timur', shirt: 0x6e4a2e, accent: 0xd9a84a, pants: 0x4a3524, motif: 'beads', desc: 'Busana modern sopan berpadu hiasan manik Papua dan tas rajut tradisional Noken.' }
+  ];
+
+  const HERO_SKINS = [
+    { id: 'cerah', name: 'Kuning Langsat', hex: 0xebcaa6 },
+    { id: 'sawo', name: 'Sawo Matang', hex: 0xd9a97c },
+    { id: 'hangat', name: 'Cokelat Hangat', hex: 0xbd895c },
+    { id: 'gelap', name: 'Cokelat Gelap', hex: 0x8f603c }
+  ];
+
+  const HERO_EXPRS = [
+    { id: 'ceria', name: 'Ceria', desc: 'Senyum lebar penuh antusias' },
+    { id: 'semangat', name: 'Semangat', desc: 'Siap gotong royong & beraksi' },
+    { id: 'ramah', name: 'Ramah', desc: 'Tatapan hangat & santun' },
+    { id: 'fokus', name: 'Fokus', desc: 'Tekun mengamati masalah desa' }
+  ];
+
+  const HERO_HAIR_COLORS = [
+    { id: 'hitam', name: 'Hitam Alami', hex: 0x241e1a },
+    { id: 'coklat', name: 'Cokelat Tua', hex: 0x4a3525 },
+    { id: 'kopi', name: 'Kopi Gelap', hex: 0x362820 }
+  ];
+
+  const HERO_HIJAB_COLORS = [
+    { id: 'krem', name: 'Krem Lontar', hex: 0xe6dac5 },
+    { id: 'terakota', name: 'Terakota', hex: 0x9e4234 },
+    { id: 'sage', name: 'Hijau Sage', hex: 0x4f755d },
+    { id: 'nila', name: 'Biru Nila', hex: 0x34556b },
+    { id: 'moka', name: 'Cokelat Moka', hex: 0x7a573e },
+    { id: 'marun', name: 'Marun Songket', hex: 0x6e2b2b }
+  ];
+
+  const HERO_MALE_HEADGEAR = [
+    { id: 'none', name: 'Rambut Rapi' },
+    { id: 'peci', name: 'Peci Hitam Nasional' },
+    { id: 'udeng', name: 'Udeng Bali' },
+    { id: 'blangkon', name: 'Blangkon Jawa' },
+    { id: 'tanjak', name: 'Tanjak Melayu' },
+    { id: 'caping', name: 'Caping Desa' }
+  ];
+
+  // Female character ALWAYS wears hijab (5 respectful options, none removes hijab)
+  const HERO_FEMALE_HIJAB_STYLES = [
+    { id: 'segiempat', name: 'Hijab Segiempat' },
+    { id: 'syari', name: 'Hijab Syar\'i Panjang' },
+    { id: 'bros', name: 'Hijab + Bros Emas' },
+    { id: 'pita', name: 'Hijab + Aksen Pita' },
+    { id: 'siger', name: 'Hijab + Siger Adat' }
+  ];
+
+  const HERO_GLASSES = [
+    { id: 'none', name: 'Tanpa Kacamata' },
+    { id: 'kotak', name: 'Kacamata Kotak' },
+    { id: 'bulat', name: 'Kacamata Bulat' }
+  ];
+
+  const HERO_GEARS = [
+    { id: 'ransel', name: 'Ransel Petualang' },
+    { id: 'selempang', name: 'Selempang Tenun' },
+    { id: 'keduanya', name: 'Ransel + Selempang' },
+    { id: 'none', name: 'Tanpa Tas' }
+  ];
+
+  let selectedHero = 'raka';
+  let activeCustTab = 'kostum';
+  let activeRegionFilter = 'semua';
+
+  const heroCustom = {
+    raka: { outfit: 'relawan', skin: 'sawo', expr: 'ceria', hairColor: 'hitam', headgear: 'peci', glasses: 'none', gear: 'ransel' },
+    tara: { outfit: 'batik', skin: 'cerah', expr: 'ramah', hijabColor: 'terakota', hijabStyle: 'bros', glasses: 'none', gear: 'selempang' }
+  };
+
+  function getHexColor(list, id, fallback) {
+    const f = list.find(x => x.id === id);
+    return f ? f.hex : fallback;
+  }
+
+  /* =========================================================
+     3. SHARED 3D ROBLOX-STYLE CHARACTER BUILDER
+  ========================================================= */
+  function makeFaceTexture(expr = 'ceria', skinHex = 0xd9a97c, isFemale = false) {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 256;
+    const ctx = c.getContext('2d');
+    const hexStr = '#' + skinHex.toString(16).padStart(6, '0');
+    ctx.fillStyle = hexStr;
+    ctx.fillRect(0, 0, 256, 256);
+
+    // Subtle cheek blush
+    ctx.fillStyle = 'rgba(196, 98, 82, 0.24)';
+    ctx.beginPath();
+    ctx.ellipse(66, 152, 20, 12, 0, 0, Math.PI * 2);
+    ctx.ellipse(190, 152, 20, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#241c16';
+    ctx.fillStyle = '#241c16';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Eyebrows & Eyes tailored per expression so changes are unmistakable
+    if (expr === 'ceria') {
+      // Raised cheerful brows
+      ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.moveTo(64, 86); ctx.quadraticCurveTo(86, 72, 108, 84); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(148, 84); ctx.quadraticCurveTo(170, 72, 192, 86); ctx.stroke();
+      // Large bright eyes
+      ctx.beginPath(); ctx.ellipse(88, 118, 15, 18, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(168, 118, 15, 18, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(93, 112, 5.5, 0, Math.PI * 2); ctx.arc(173, 112, 5.5, 0, Math.PI * 2); ctx.fill();
+      // Big open happy smile
+      ctx.fillStyle = '#8c3128';
+      ctx.beginPath();
+      ctx.moveTo(86, 162);
+      ctx.quadraticCurveTo(128, 214, 170, 162);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(98, 164, 60, 11);
+      ctx.lineWidth = 6;
+      ctx.stroke();
+    } else if (expr === 'semangat') {
+      // Determined angled brows
+      ctx.lineWidth = 9;
+      ctx.beginPath(); ctx.moveTo(62, 82); ctx.lineTo(110, 94); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(194, 82); ctx.lineTo(146, 94); ctx.stroke();
+      // Bold energetic eyes
+      ctx.beginPath(); ctx.arc(88, 120, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(168, 120, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(93, 115, 5, 0, Math.PI * 2); ctx.arc(173, 115, 5, 0, Math.PI * 2); ctx.fill();
+      // Wide confident grin
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(84, 162);
+      ctx.quadraticCurveTo(128, 198, 172, 162);
+      ctx.quadraticCurveTo(128, 174, 84, 162);
+      ctx.fill();
+      ctx.lineWidth = 7;
+      ctx.stroke();
+    } else if (expr === 'ramah') {
+      // Gentle arched brows
+      ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.moveTo(64, 90); ctx.quadraticCurveTo(86, 80, 108, 90); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(148, 90); ctx.quadraticCurveTo(170, 80, 192, 90); ctx.stroke();
+      // Warm smiling-arc eyes
+      ctx.lineWidth = 10;
+      ctx.beginPath(); ctx.arc(88, 126, 16, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
+      ctx.beginPath(); ctx.arc(168, 126, 16, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
+      // Gentle curved smile
+      ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.moveTo(94, 166); ctx.quadraticCurveTo(128, 194, 162, 166); ctx.stroke();
+    } else {
+      // 'fokus': straight thoughtful brows + crisp eyes + calm mouth
+      ctx.lineWidth = 9;
+      ctx.beginPath(); ctx.moveTo(62, 92); ctx.lineTo(112, 92); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(144, 92); ctx.lineTo(194, 92); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(88, 120, 14, 12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(168, 120, 14, 12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(92, 117, 4, 0, Math.PI * 2); ctx.arc(172, 117, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.moveTo(100, 174); ctx.quadraticCurveTo(128, 178, 156, 170); ctx.stroke();
+    }
+
+    // Subtle eyelashes for female character
+    if (isFemale && expr !== 'ramah') {
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(73, 112); ctx.lineTo(64, 105); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(183, 112); ctx.lineTo(192, 105); ctx.stroke();
+    }
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  function createRobloxChar(cfg = {}) {
+    const {
+      isFemale = false,
+      skin = 0xd9a97c,
+      shirt = 0x3b6e52,
+      accent = 0xc28a38,
+      pants = 0x3f4742,
+      motif = 'vest',
+      expr = 'ceria',
+      hairColor = 0x241e1a,
+      headgear = 'none',
+      hijabColor = 0x9e4234,
+      hijabStyle = 'segiempat',
+      glasses = 'none',
+      gear = 'none',
+      scale = 1
+    } = cfg;
+
+    const m = (col, extra = {}) => new THREE.MeshStandardMaterial(Object.assign({ color: col, roughness: 0.78, metalness: 0.04 }, extra));
+    const root = new THREE.Group();
+    root.scale.setScalar(scale);
+
+    // Legs (modest long skirt/tunic lower body for female)
+    const legGeo = new THREE.BoxGeometry(0.28, 0.72, 0.28);
+    const legL = new THREE.Group();
+    legL.position.set(-0.17, 0.72, 0);
+    const legLMesh = new THREE.Mesh(legGeo, m(pants));
+    legLMesh.position.y = -0.36;
+    legLMesh.castShadow = true;
+    const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 0.36), m(0x2c241d));
+    shoeL.position.set(0, -0.66, 0.04);
+    legL.add(legLMesh, shoeL);
+
+    const legR = new THREE.Group();
+    legR.position.set(0.17, 0.72, 0);
+    const legRMesh = new THREE.Mesh(legGeo, m(pants));
+    legRMesh.position.y = -0.36;
+    legRMesh.castShadow = true;
+    const shoeR = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 0.36), m(0x2c241d));
+    shoeR.position.set(0, -0.66, 0.04);
+    legR.add(legRMesh, shoeR);
+    root.add(legL, legR);
+
+    // Torso
+    const torso = new THREE.Group();
+    torso.position.set(0, 1.14, 0);
+    const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.82, 0.38), m(shirt));
+    bodyMesh.castShadow = true;
+    torso.add(bodyMesh);
+
+    if (isFemale) {
+      // Modest long skirt flare
+      const skirt = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.52, 0.44), m(pants));
+      skirt.position.set(0, -0.56, 0);
+      skirt.castShadow = true;
+      torso.add(skirt);
+    }
+
+    // Cultural outfit details
+    if (motif === 'vest') {
+      const stripL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.78, 0.41), m(accent));
+      stripL.position.set(-0.22, 0, 0);
+      const stripR = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.78, 0.41), m(accent));
+      stripR.position.set(0.22, 0, 0);
+      torso.add(stripL, stripR);
+    } else if (motif === 'ulos' || motif === 'selendang' || motif === 'sash') {
+      const sash = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.94, 0.43), m(accent));
+      sash.rotation.z = -0.58;
+      torso.add(sash);
+    } else if (motif === 'goldtrim' || motif === 'songket') {
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.8, 0.41), m(accent, { metalness: 0.25, roughness: 0.45 }));
+      const belt = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.16, 0.42), m(accent, { metalness: 0.2, roughness: 0.5 }));
+      belt.position.y = -0.32;
+      torso.add(trim, belt);
+    } else if (motif === 'batik' || motif === 'cele' || motif === 'lurik') {
+      for (let i = -2; i <= 2; i++) {
+        const line = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.06, 0.4), m(accent));
+        line.position.y = i * 0.15;
+        torso.add(line);
+      }
+    } else if (motif === 'stripe') {
+      for (let i = -2; i <= 2; i++) {
+        const st = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.08, 0.41), m(i % 2 === 0 ? accent : 0xf2ece1));
+        st.position.y = i * 0.14;
+        torso.add(st);
+      }
+    } else if (motif === 'beads') {
+      const neck = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.18, 0.42), m(accent));
+      neck.position.y = 0.26;
+      const hem = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.12, 0.41), m(0xb53c2e));
+      hem.position.y = -0.34;
+      torso.add(neck, hem);
+    } else if (motif === 'scarf' || motif === 'collar') {
+      const collar = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.32, 4), m(accent));
+      collar.rotation.x = Math.PI;
+      collar.position.set(0, 0.22, 0.16);
+      torso.add(collar);
+    }
+
+    // Accessories: Backpack / Selempang Tenun
+    if (gear === 'ransel' || gear === 'keduanya') {
+      const pack = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.58, 0.24), m(0x7d532d));
+      pack.position.set(0, 0.02, -0.3);
+      pack.castShadow = true;
+      const flap = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.16, 0.26), m(0x5c3c1e));
+      flap.position.set(0, 0.24, -0.3);
+      torso.add(pack, flap);
+    }
+    if (gear === 'selempang' || gear === 'keduanya') {
+      const strap = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.92, 0.44), m(0xa63d2f));
+      strap.rotation.z = 0.62;
+      const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.24, 0.14), m(0xb87d32));
+      pouch.position.set(0.32, -0.32, 0.14);
+      torso.add(strap, pouch);
+    }
+    root.add(torso);
+
+    // Arms (long sleeves for female hijab compliance)
+    const sleeveCol = isFemale ? shirt : shirt;
+    const armL = new THREE.Group();
+    armL.position.set(-0.5, 1.48, 0);
+    const armLUpper = new THREE.Mesh(new THREE.BoxGeometry(0.24, isFemale ? 0.62 : 0.4, 0.24), m(sleeveCol));
+    armLUpper.position.y = isFemale ? -0.26 : -0.15;
+    armLUpper.castShadow = true;
+    const handL = new THREE.Mesh(new THREE.BoxGeometry(0.22, isFemale ? 0.16 : 0.34, 0.22), m(skin));
+    handL.position.y = isFemale ? -0.62 : -0.5;
+    armL.add(armLUpper, handL);
+
+    const armR = new THREE.Group();
+    armR.position.set(0.5, 1.48, 0);
+    const armRUpper = new THREE.Mesh(new THREE.BoxGeometry(0.24, isFemale ? 0.62 : 0.4, 0.24), m(sleeveCol));
+    armRUpper.position.y = isFemale ? -0.26 : -0.15;
+    armRUpper.castShadow = true;
+    const handR = new THREE.Mesh(new THREE.BoxGeometry(0.22, isFemale ? 0.16 : 0.34, 0.22), m(skin));
+    handR.position.y = isFemale ? -0.62 : -0.5;
+    armR.add(armRUpper, handR);
+    root.add(armL, armR);
+
+    // Head with dedicated CanvasTexture face on +Z
+    const head = new THREE.Group();
+    head.position.set(0, 1.86, 0);
+    const skinMat = m(skin);
+    const faceTex = makeFaceTexture(expr, skin, isFemale);
+    const faceMat = new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.72 });
+    const headMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.56, 0.56, 0.56),
+      [skinMat, skinMat, skinMat, skinMat, faceMat, skinMat]
+    );
+    headMesh.castShadow = true;
+    head.add(headMesh);
+
+    // Glasses
+    if (glasses === 'kotak' || glasses === 'bulat') {
+      const frameMat = m(0x221c16, { roughness: 0.4 });
+      const lensMat = m(0xdbe8ed, { transparent: true, opacity: 0.38, roughness: 0.1 });
+      for (const sx of [-0.12, 0.12]) {
+        const rim = glasses === 'kotak'
+          ? new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.04), frameMat)
+          : new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.04, 14), frameMat);
+        if (glasses === 'bulat') rim.rotation.x = Math.PI / 2;
+        rim.position.set(sx, 0.03, 0.3);
+        const glass = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.08, 0.045), lensMat);
+        glass.position.set(sx, 0.03, 0.3);
+        head.add(rim, glass);
+      }
+      const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.04), frameMat);
+      bridge.position.set(0, 0.04, 0.3);
+      head.add(bridge);
+    }
+
+    if (isFemale) {
+      // Mandatory Modest Hijab for Female Character (leaves forehead/eyebrows clearly visible!)
+      const hMat = m(hijabColor);
+      const topCap = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.15, 0.64), hMat);
+      topCap.position.set(0, 0.27, -0.02);
+      const backDrape = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.66, 0.22), hMat);
+      backDrape.position.set(0, -0.02, -0.24);
+      const sideL = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.62, 0.52), hMat);
+      sideL.position.set(-0.29, -0.02, -0.03);
+      const sideR = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.62, 0.52), hMat);
+      sideR.position.set(0.29, -0.02, -0.03);
+      const chinWrap = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.14, 0.44), hMat);
+      chinWrap.position.set(0, -0.32, 0.06);
+      head.add(topCap, backDrape, sideL, sideR, chinWrap);
+
+      const chestH = hijabStyle === 'syari' ? 0.56 : 0.32;
+      const chestDrape = new THREE.Mesh(new THREE.BoxGeometry(0.68, chestH, 0.45), hMat);
+      chestDrape.position.set(0, -0.32 - chestH * 0.45, 0.02);
+      head.add(chestDrape);
+
+      if (hijabStyle === 'bros') {
+        const bros = new THREE.Mesh(new THREE.OctahedronGeometry(0.06, 0), m(0xd9a845, { metalness: 0.4, roughness: 0.3 }));
+        bros.position.set(0.16, -0.38, 0.26);
+        head.add(bros);
+      } else if (hijabStyle === 'pita') {
+        const pita = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.09, 0.07), m(0xb87d32));
+        pita.position.set(-0.26, 0.22, 0.18);
+        head.add(pita);
+      } else if (hijabStyle === 'siger') {
+        const gold = m(0xd9a845, { metalness: 0.45, roughness: 0.32 });
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.09, 0.12), gold);
+        band.position.set(0, 0.35, 0.24);
+        const crest = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.28, 4), gold);
+        crest.rotation.y = Math.PI / 4;
+        crest.position.set(0, 0.5, 0.22);
+        head.add(band, crest);
+      }
+    } else {
+      // Male Hair + Optional Traditional Indonesian Headgear
+      const hairMat = m(hairColor);
+      const hairTop = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.16, 0.6), hairMat);
+      hairTop.position.set(0, 0.28, -0.02);
+      const hairBack = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.44, 0.14), hairMat);
+      hairBack.position.set(0, 0.08, -0.26);
+      head.add(hairTop, hairBack);
+
+      if (headgear === 'peci') {
+        const peci = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.26, 0.58), m(0x1f1d1b));
+        peci.position.set(0, 0.4, 0);
+        head.add(peci);
+      } else if (headgear === 'udeng') {
+        const udeng = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.16, 0.64), m(0xf0eadf));
+        udeng.position.set(0, 0.32, 0);
+        const knot = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.24, 4), m(0xf0eadf));
+        knot.position.set(0, 0.46, 0.22);
+        head.add(udeng, knot);
+      } else if (headgear === 'blangkon') {
+        const bl = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.34, 0.24, 10), m(0x6b4528));
+        bl.position.set(0, 0.36, 0);
+        const mondolan = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), m(0x57371f));
+        mondolan.position.set(0, 0.3, -0.32);
+        head.add(bl, mondolan);
+      } else if (headgear === 'tanjak') {
+        const tanjak = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.18, 0.62), m(0x8f2e28));
+        tanjak.position.set(0, 0.34, 0);
+        const peak = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.32, 4), m(0xc9963b));
+        peak.position.set(0.12, 0.52, 0.08);
+        peak.rotation.z = -0.22;
+        head.add(tanjak, peak);
+      } else if (headgear === 'caping') {
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(0.64, 0.3, 12), m(0xb89658));
+        cap.position.set(0, 0.45, 0);
+        head.add(cap);
+      }
+    }
+
+    root.add(head);
+    return { root, head, torso, armL, armR, legL, legR };
+  }
+
+  function buildCustomHero3D(heroId = selectedHero, scale = 1) {
+    const isFemale = heroId === 'tara';
+    const c = heroCustom[heroId];
+    const outfit = HERO_OUTFITS.find(o => o.id === c.outfit) || HERO_OUTFITS[0];
+    return createRobloxChar({
+      isFemale,
+      skin: getHexColor(HERO_SKINS, c.skin, 0xd9a97c),
+      shirt: outfit.shirt,
+      accent: outfit.accent,
+      pants: outfit.pants,
+      motif: outfit.motif,
+      expr: c.expr,
+      hairColor: getHexColor(HERO_HAIR_COLORS, c.hairColor, 0x241e1a),
+      headgear: c.headgear || 'none',
+      hijabColor: getHexColor(HERO_HIJAB_COLORS, c.hijabColor, 0x9e4234),
+      hijabStyle: c.hijabStyle || 'segiempat',
+      glasses: c.glasses || 'none',
+      gear: c.gear || 'none',
+      scale
+    });
+  }
+
+  function createHuman(opts = {}) {
+    const {
+      shirt = 0x3b6e52,
+      pants = 0x3b3834,
+      hat = 'none',
+      isFemale = false,
+      hijabColor = 0x9e4234,
+      skin = 0xd9a97c,
+      expr = 'ramah',
+      scale = 0.86
+    } = opts;
+    return createRobloxChar({
+      isFemale,
+      skin,
+      shirt,
+      accent: 0xc28a38,
+      pants,
+      motif: 'none',
+      expr,
+      headgear: isFemale ? 'none' : hat,
+      hijabColor,
+      hijabStyle: 'segiempat',
+      scale
+    });
+  }
+
+  function animateHumanWalk(h, phase, moving) {
+    if (!h) return;
+    const s = moving ? Math.sin(phase) * 0.72 : 0;
+    h.legL.rotation.x = s;
+    h.legR.rotation.x = -s;
+    h.armL.rotation.x = -s * 0.85;
+    h.armR.rotation.x = s * 0.85;
+  }
+
+  /* =========================================================
+     4. MAIN 3D OPEN-WORLD ENGINE (DESA BHINNEKA)
+  ========================================================= */
+  const container = document.getElementById('canvas-container');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xc9dceb);
+  scene.fog = new THREE.Fog(0xc9dceb, 78, 175);
+
+  const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.2, 260);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  container.appendChild(renderer.domElement);
+
+  // Warm Natural Indonesian Daylight (No Neon)
+  const hemiLight = new THREE.HemisphereLight(0xfaf4e6, 0x6b7c54, 0.78);
+  scene.add(hemiLight);
+
+  const sunLight = new THREE.DirectionalLight(0xfff1d6, 0.96);
+  sunLight.position.set(36, 54, 28);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.set(1024, 1024);
+  sunLight.shadow.camera.near = 10;
+  sunLight.shadow.camera.far = 160;
+  const dCam = 62;
+  sunLight.shadow.camera.left = -dCam;
+  sunLight.shadow.camera.right = dCam;
+  sunLight.shadow.camera.top = dCam;
+  sunLight.shadow.camera.bottom = -dCam;
+  scene.add(sunLight);
+  scene.add(sunLight.target);
+
+  function mat(col, extra = {}) {
+    return new THREE.MeshStandardMaterial(Object.assign({ color: col, roughness: 0.82, metalness: 0.04 }, extra));
+  }
+
+  function makeSignTexture(text, bg = '#2e5266', fg = '#fbf8f2', w = 420, h = 84, border = '#d5c7b2') {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 6;
+    ctx.strokeRect(5, 5, w - 10, h - 10);
+    ctx.fillStyle = fg;
+    ctx.font = '800 30px "Plus Jakarta Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, w / 2, h / 2 + 1);
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  /* =========================================================
+     5. WORLD GEOMETRY MATH, RIVER, HIGH-ARCH BRIDGES & COLLISIONS
+  ========================================================= */
+  const walkableMeshes = [];
+  const colliders = []; // { x, z, r } or { minX, maxX, minZ, maxZ }
+
+  function addCircleCollider(x, z, r) { colliders.push({ type: 'circle', x, z, r }); }
+  function addBoxCollider(minX, maxX, minZ, maxZ) { colliders.push({ type: 'box', minX, maxX, minZ, maxZ }); }
+
+  function riverCenterZ(x) {
+    return 24 + Math.sin(x * 0.055) * 4.5;
+  }
+
+  function riverSlopeDZDX(x) {
+    return 4.5 * 0.055 * Math.cos(x * 0.055);
+  }
+
+  const BRIDGES = [
+    { x: -36, halfWidth: 3.1, halfLen: 12.2, zCenter: riverCenterZ(-36) },
+    { x: 0,   halfWidth: 3.4, halfLen: 12.2, zCenter: riverCenterZ(0) },
+    { x: 34,  halfWidth: 3.1, halfLen: 12.2, zCenter: riverCenterZ(34) }
+  ];
+
+  // Smooth high-arch deck height (~3.8m vertical boat clearance over river center)
+  function bridgeDeckY(localZ, halfLen) {
+    const t = Math.max(-1, Math.min(1, localZ / halfLen));
+    const c = Math.cos(t * Math.PI * 0.5);
+    return 0.18 + c * c * 3.65;
+  }
+
+  function getBridgeSurfaceAt(x, z) {
+    for (let i = 0; i < BRIDGES.length; i++) {
+      const br = BRIDGES[i];
+      if (Math.abs(x - br.x) <= br.halfWidth && Math.abs(z - br.zCenter) <= br.halfLen) {
+        return { bridge: br, y: bridgeDeckY(z - br.zCenter, br.halfLen) };
+      }
+    }
+    return null;
+  }
+
+  function getDermagaPierHeight(x, z) {
+    // Walkable main wooden pier jutting north into river
+    if (x >= 6.4 && x <= 11.6 && z >= 26.8 && z <= 40.6) return 0.42;
+    // Ramp connecting quay to main pier
+    if (x >= 6.4 && x <= 11.6 && z > 40.6 && z <= 41.8) {
+      const t = 1 - (z - 40.6) / 1.2;
+      return 0.18 + t * 0.24;
+    }
+    // East finger pier for mooring & fishing
+    if (x >= 11.4 && x <= 16.2 && z >= 30.8 && z <= 34.4) return 0.42;
+    return null;
+  }
+
+  const FISHING_DECKS = [
+    { id: 'barat', minX: -12.4, maxX: -6.8, minZ: 26.6, maxZ: 31.8, y: 0.30 },
+    { id: 'timur', minX: 18.0,  maxX: 23.8, minZ: 18.2, maxZ: 23.0, y: 0.30 }
+  ];
+
+  function getFishingDeckHeight(x, z) {
+    for (let i = 0; i < FISHING_DECKS.length; i++) {
+      const d = FISHING_DECKS[i];
+      if (x >= d.minX && x <= d.maxX && z >= d.minZ && z <= d.maxZ) return d.y;
+    }
+    return null;
+  }
+
+  function isInsideBalai(x, z) {
+    return Math.abs(x) <= 6.2 && z >= -41.2 && z <= -31.5;
+  }
+
+  function isDeepRiver(x, z) {
+    const distRiver = Math.abs(z - riverCenterZ(x));
+    return (
+      distRiver < 6.4 &&
+      !getBridgeSurfaceAt(x, z) &&
+      getDermagaPierHeight(x, z) === null &&
+      getFishingDeckHeight(x, z) === null
+    );
+  }
+
+  function getTerrainHeight(x, z) {
+    const brHit = getBridgeSurfaceAt(x, z);
+    if (brHit) return brHit.y;
+
+    const pierY = getDermagaPierHeight(x, z);
+    if (pierY !== null) return pierY;
+
+    const deckY = getFishingDeckHeight(x, z);
+    if (deckY !== null) return deckY;
+
+    // Balai Desa raised floor & south entrance stairs
+    if (Math.abs(x) <= 6.8 && z >= -41.8 && z <= -31.2) return 0.62;
+    if (Math.abs(x) <= 2.4 && z > -31.2 && z <= -28.8) {
+      const t = 1 - (z - (-31.2)) / 2.4;
+      return 0.08 + t * 0.54;
+    }
+
+    // Gentle outer rim hills
+    const distEdge = Math.max(Math.abs(x), Math.abs(z));
+    if (distEdge > 60) {
+      return Math.min(4.2, (distEdge - 60) * 0.25);
+    }
+    return 0.02;
+  }
+
+  const ZONES = {
+    balai:    { id: 'balai',    name: 'Balai Desa (Pendopo)', x: 0,    z: -33,  color: '#a63d2f' },
+    pasar:    { id: 'pasar',    name: 'Pasar Nusantara',      x: -40,  z: -8,   color: '#b87d32' },
+    adat:     { id: 'adat',     name: 'Kampung Adat',         x: 42,   z: -10,  color: '#7a5130' },
+    dermaga:  { id: 'dermaga',  name: 'Dermaga Nelayan',      x: 9,    z: 42,   color: '#2e5266' },
+    sekolah:  { id: 'sekolah',  name: 'Sekolah SMP Nusantara',x: -36,  z: 46,   color: '#2f6146' },
+    posronda: { id: 'posronda', name: 'Pos Ronda & Warung',   x: 17.5, z: -18,  color: '#4f755d' }
+  };
+
+  /* =========================================================
+     6. WORLD OBJECT REGISTRIES & GAME STATE
+  ========================================================= */
+  const npcs = [];
+  const floatingLabels = [];
+  const marketCarts = [];
+  const bambooItems = [];
+  const riverTrash = [];
+  const energyPickups = [];
+  const boats = [];
+  const riverTrafficBoats = [];
+  const dermagaFish = [];
+  const strollingVillagers = [];
+  const fishingSpots = [];
+  const fishingNPCs = [];
+  const clouds = [];
+
+  let balaiRoofGroup = null;
+  let balaiInteriorLight = null;
+  let gapuraGroup = null;
+  let textbookPickup = null;
+  let posRondaBeacon = null;
+  let lighthouseBeam = null;
+  let monumentGroup = null;
+  let festivalLanterns = null;
+  let tapRing = null;
+  let guideArrowGroup = null;
+
+  const state = {
+    energy: 100,
+    harmony: 20,
+    guidedZone: 'balai',
+    carrying: null,
+    gotongTimer: 0,
+    missions: {
+      pasar: false,
+      sungai: false,
+      gapura: false,
+      buku: false,
+      musyawarah: false
+    },
+    counts: {
+      cartsFixed: 0,
+      trashCleaned: 0,
+      bambooPicked: 0
+    }
+  };
+
+  const fishingState = {
+    active: false,
+    spot: null,
+    phase: 'idle',
+    timer: 0,
+    fishCaught: 0,
+    playerRod: null,
+    bobber: null,
+    ripple: null,
+    line: null,
+    caughtFishMesh: null,
+    reelTimer: 0
+  };
+
+  const player = {
+    x: 0, y: 0.02, z: -4,
+    rotY: 0,
+    walkPhase: 0,
+    moveTarget: null,
+    human: null,
+    carryProp: null
+  };
+
+  const helpers = []; // Budi & Sinta
+
+  /* =========================================================
+     7. BUILD WORLD TERRAIN, WINDING RIVER, HIGH-ARCH BRIDGES
+  ========================================================= */
+  function buildTerrainAndRiver() {
+    // Lush Nusantara Grass Ground
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(155, 155, 32, 32), mat(0x7c945c, { roughness: 0.95 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+    walkableMeshes.push(ground);
+
+    // Winding River Channel (recessed water ribbon)
+    const segs = 70;
+    const riverGeo = new THREE.PlaneGeometry(150, 14.2, segs, 4);
+    riverGeo.rotateX(-Math.PI / 2);
+    const pos = riverGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const vx = pos.getX(i);
+      const vz = pos.getZ(i);
+      pos.setZ(i, vz + riverCenterZ(vx));
+    }
+    riverGeo.computeVertexNormals();
+    const riverMesh = new THREE.Mesh(
+      riverGeo,
+      mat(0x4a7b8c, { roughness: 0.28, metalness: 0.12 })
+    );
+    riverMesh.position.y = -0.34;
+    riverMesh.receiveShadow = true;
+    scene.add(riverMesh);
+
+    // Sandy/Earthy Riverbanks along both sides
+    for (const side of [-1, 1]) {
+      const bankGeo = new THREE.PlaneGeometry(150, 2.4, segs, 1);
+      bankGeo.rotateX(-Math.PI / 2);
+      const bp = bankGeo.attributes.position;
+      for (let i = 0; i < bp.count; i++) {
+        const vx = bp.getX(i);
+        const vz = bp.getZ(i);
+        bp.setZ(i, vz + riverCenterZ(vx) + side * 7.4);
+      }
+      const bank = new THREE.Mesh(bankGeo, mat(0xb8a382, { roughness: 0.95 }));
+      bank.position.y = -0.02;
+      bank.receiveShadow = true;
+      scene.add(bank);
+    }
+
+    // Village Stone/Earth Roads connecting all zones cleanly
+    const roadMat = mat(0xc7b698, { roughness: 0.92 });
+    const addRoad = (x, z, w, d) => {
+      const r = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, d), roadMat);
+      r.position.set(x, 0.02, z);
+      r.receiveShadow = true;
+      scene.add(r);
+      walkableMeshes.push(r);
+    };
+    addRoad(0, -14, 5.2, 42);     // Central N-S road (Balai -> Alun-Alun -> Central Bridge)
+    addRoad(0, 38, 5.2, 18);      // South of Central Bridge -> Dermaga
+    addRoad(0, -8, 86, 4.8);      // Main E-W road (Pasar <-> Alun-Alun <-> Kampung Adat)
+    addRoad(-36, 6, 4.4, 24);     // West N-S road (Pasar -> West Bridge)
+    addRoad(-36, 39, 4.4, 18);    // South of West Bridge -> Sekolah SMP
+    addRoad(34, 4, 4.4, 26);      // East N-S road (Kampung Adat -> East Bridge)
+    addRoad(17.5, -13, 3.4, 10);  // Path to Pos Ronda garden
+    addRoad(-17, 44, 42, 4.2);    // South cross-road (Sekolah <-> Dermaga)
+
+    // Central Alun-Alun Courtyard
+    const alun = new THREE.Mesh(new THREE.CylinderGeometry(8.8, 9.2, 0.14, 24), mat(0xd4c6ae));
+    alun.position.set(0, 0.04, -8);
+    alun.receiveShadow = true;
+    scene.add(alun);
+    walkableMeshes.push(alun);
+
+    // Terraced Sawah (Rice Fields) in Northeast & Southeast corners
+    const sawahCols = [0x6e8c4c, 0x7a9954, 0x85a35d];
+    const sawahSpots = [
+      { x: -20, z: -36 }, { x: -20, z: -26 }, { x: 24, z: -36 }, { x: 46, z: 42 }
+    ];
+    sawahSpots.forEach((sp, idx) => {
+      for (let t = 0; t < 3; t++) {
+        const pad = new THREE.Mesh(
+          new THREE.BoxGeometry(11 - t * 1.4, 0.14 + t * 0.06, 7 - t * 0.9),
+          mat(sawahCols[(idx + t) % sawahCols.length])
+        );
+        pad.position.set(sp.x, 0.06 + t * 0.04, sp.z);
+        pad.receiveShadow = true;
+        scene.add(pad);
+      }
+    });
+
+    // Distant Rolling Nusantara Hills around perimeter
+    const hillMat = mat(0x637d4c, { roughness: 0.95 });
+    for (let i = 0; i < 20; i++) {
+      const ang = (i / 20) * Math.PI * 2;
+      const dist = 76 + (i % 3) * 7;
+      const h = new THREE.Mesh(new THREE.ConeGeometry(16 + (i % 4) * 4, 14 + (i % 3) * 6, 7), hillMat);
+      h.position.set(Math.cos(ang) * dist, 5.5, Math.sin(ang) * dist);
+      scene.add(h);
+    }
+
+    // Soft Floating Clouds
+    const cloudMat = mat(0xf7f4ee, { roughness: 0.95 });
+    for (let i = 0; i < 12; i++) {
+      const cg = new THREE.Group();
+      for (let k = 0; k < 3; k++) {
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(2.6 + (k === 1 ? 0.9 : 0), 8, 7), cloudMat);
+        puff.scale.set(1.5, 0.72, 1.1);
+        puff.position.set((k - 1) * 2.5, k === 1 ? 0.5 : 0, 0);
+        cg.add(puff);
+      }
+      cg.position.set(-60 + i * 11, 28 + (i % 3) * 4, -55 + (i % 5) * 24);
+      scene.add(cg);
+      clouds.push({ mesh: cg, speed: 0.4 + (i % 3) * 0.25 });
+    }
+  }
+
+  function buildBridges() {
+    const plankMat = mat(0x8c6239);
+    const plankAltMat = mat(0x7e5631);
+    const postMat = mat(0x52341c);
+    const railMat = mat(0xa67c52);
+    const stoneMat = mat(0x8c8273);
+    const redAccentMat = mat(0x9e3f35);
+    const lanternMat = mat(0xf2d184, { emissive: 0xc48b3b, emissiveIntensity: 0.65 });
+
+    BRIDGES.forEach(br => {
+      const group = new THREE.Group();
+      const numPlanks = 24;
+      const width = br.halfWidth * 2;
+      const stepZ = (br.halfLen * 2) / numPlanks;
+
+      // 1. Sloped High-Arch Wooden Deck Planks (open channel beneath for boats)
+      for (let i = 0; i < numPlanks; i++) {
+        const z1 = -br.halfLen + i * stepZ;
+        const z2 = z1 + stepZ;
+        const zMid = (z1 + z2) * 0.5;
+        const y1 = bridgeDeckY(z1, br.halfLen);
+        const y2 = bridgeDeckY(z2, br.halfLen);
+        const yMid = (y1 + y2) * 0.5;
+        const segLen = Math.hypot(stepZ, y2 - y1);
+        const slopeAngle = -Math.atan2(y2 - y1, stepZ);
+
+        const plank = new THREE.Mesh(
+          new THREE.BoxGeometry(width, 0.22, segLen + 0.06),
+          i % 2 === 0 ? plankMat : plankAltMat
+        );
+        plank.position.set(br.x, yMid - 0.11, br.zCenter + zMid);
+        plank.rotation.x = slopeAngle;
+        plank.castShadow = true;
+        plank.receiveShadow = true;
+        group.add(plank);
+        walkableMeshes.push(plank);
+
+        for (const side of [-1, 1]) {
+          const rx = br.x + side * (br.halfWidth - 0.16);
+          const underRib = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.34, segLen + 0.08), postMat);
+          underRib.position.set(rx, yMid - 0.32, br.zCenter + zMid);
+          underRib.rotation.x = slopeAngle;
+          group.add(underRib);
+
+          const topRail = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, segLen + 0.06), railMat);
+          topRail.position.set(rx, yMid + 1.05, br.zCenter + zMid);
+          topRail.rotation.x = slopeAngle;
+          group.add(topRail);
+
+          const midRail = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.1, segLen + 0.06), redAccentMat);
+          midRail.position.set(rx, yMid + 0.56, br.zCenter + zMid);
+          midRail.rotation.x = slopeAngle;
+          group.add(midRail);
+        }
+      }
+
+      // 2. Vertical Handrail Posts & Warm Lanterns
+      for (let i = 0; i <= numPlanks; i += 3) {
+        const localZ = -br.halfLen + i * stepZ;
+        const yTop = bridgeDeckY(localZ, br.halfLen);
+        const isPeak = i === numPlanks / 2;
+        const isEntrance = i === 0 || i === numPlanks;
+
+        for (const side of [-1, 1]) {
+          const px = br.x + side * (br.halfWidth - 0.16);
+          const postH = isPeak || isEntrance ? 1.75 : 1.18;
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.24, postH, 0.24), postMat);
+          post.position.set(px, yTop + postH * 0.5 - 0.08, br.zCenter + localZ);
+          group.add(post);
+
+          if (isPeak || isEntrance) {
+            const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.32, 0.26), lanternMat);
+            lamp.position.set(px, yTop + postH + 0.08, br.zCenter + localZ);
+            const cap = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.2, 4), postMat);
+            cap.rotation.y = Math.PI / 4;
+            cap.position.set(px, yTop + postH + 0.32, br.zCenter + localZ);
+            group.add(lamp, cap);
+          }
+        }
+      }
+
+      // 3. Stone Abutments ONLY on Outer Riverbanks so boats sail cleanly through the center!
+      for (const endSide of [-1, 1]) {
+        const abutZ = endSide * 7.8;
+        const abutY = bridgeDeckY(abutZ, br.halfLen);
+        const abutment = new THREE.Mesh(new THREE.BoxGeometry(width + 0.6, abutY + 1.4, 2.2), stoneMat);
+        abutment.position.set(br.x, (abutY - 1.4) * 0.5, br.zCenter + abutZ);
+        abutment.castShadow = true;
+        abutment.receiveShadow = true;
+        group.add(abutment);
+
+        for (const side of [-1, 1]) {
+          const bx = br.x + side * (br.halfWidth - 0.22);
+          const brace = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.26, 4.2), postMat);
+          brace.position.set(bx, abutY + 0.45, br.zCenter + endSide * 5.6);
+          brace.rotation.x = endSide * 0.52;
+          group.add(brace);
+        }
+      }
+
+      scene.add(group);
+    });
+  }
+
+  /* =========================================================
+     8. BUILD 6 ZONES: BALAI DESA (WITH INTERIOR), PASAR (7 STALLS),
+        KAMPUNG ADAT, DERMAGA NELAYAN, FISHING SPOTS, SEKOLAH, POS RONDA
+  ========================================================= */
+  function buildBalaiDesa() {
+    const g = new THREE.Group();
+    g.position.set(0, 0, -36.5);
+
+    // Raised Wooden Interior Floor
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(13.8, 0.64, 11.0), mat(0x9e7448));
+    floor.position.y = 0.30;
+    floor.receiveShadow = true;
+    g.add(floor);
+    walkableMeshes.push(floor);
+
+    // South Entrance Wooden Stairs
+    for (let s = 0; s < 3; s++) {
+      const step = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.22, 0.85), mat(0x8a6139));
+      step.position.set(0, 0.1 + s * 0.2, 7.2 - s * 0.8);
+      step.receiveShadow = true;
+      g.add(step);
+      walkableMeshes.push(step);
+    }
+
+    // Woven Nusantara Tenun Carpet inside Balai
+    const carpet = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.04, 5.4), mat(0x8f342b));
+    carpet.position.set(0, 0.64, 0.2);
+    const carpetTrim = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.05, 4.6), mat(0xc9963b));
+    carpetTrim.position.set(0, 0.645, 0.2);
+    g.add(carpet, carpetTrim);
+
+    // Walls (North full wall, West & East walls, South wall with wide central doorway)
+    const wallMat = mat(0xe8decd);
+    const woodMat = mat(0x5c3c20);
+    const northWall = new THREE.Mesh(new THREE.BoxGeometry(13.4, 3.8, 0.36), wallMat);
+    northWall.position.set(0, 2.52, -5.2);
+    northWall.castShadow = true;
+    g.add(northWall);
+
+    for (const sx of [-6.5, 6.5]) {
+      const sideW = new THREE.Mesh(new THREE.BoxGeometry(0.36, 3.8, 10.6), wallMat);
+      sideW.position.set(sx, 2.52, 0);
+      sideW.castShadow = true;
+      g.add(sideW);
+    }
+    for (const sx of [-4.4, 4.4]) {
+      const frontW = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.8, 0.36), wallMat);
+      frontW.position.set(sx, 2.52, 5.2);
+      frontW.castShadow = true;
+      g.add(frontW);
+    }
+
+    // Wall colliders (leave south doorway x: -2.2..2.2 open!)
+    addBoxCollider(-6.9, 6.9, -42.1, -41.3);
+    addBoxCollider(-6.9, -6.1, -42.0, -31.0);
+    addBoxCollider(6.1, 6.9, -42.0, -31.0);
+    addBoxCollider(-6.9, -2.2, -31.7, -30.9);
+    addBoxCollider(2.2, 6.9, -31.7, -30.9);
+
+    // Interior Props: Musyawarah Table, Chairs, Garuda Emblem, Flags, Archive Shelves, Map Board
+    const table = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.86, 1.5), woodMat);
+    table.position.set(0, 1.05, -2.2);
+    table.castShadow = true;
+    const cloth = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.06, 1.3), mat(0x2f6146));
+    cloth.position.set(0, 1.5, -2.2);
+    const gavel = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.12, 0.16), mat(0x3a2312));
+    gavel.position.set(0.7, 1.58, -2.2);
+    g.add(table, cloth, gavel);
+    addBoxCollider(-2.3, 2.3, -39.6, -37.8);
+
+    // Chairs around table
+    for (const cx of [-1.4, 0, 1.4]) {
+      const ch = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.52, 0.65), mat(0x78502e));
+      ch.position.set(cx, 0.88, -0.7);
+      g.add(ch);
+    }
+
+    // Garuda Pancasila Golden Medallion & Merah-Putih Banners on North Wall
+    const garuda = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.12, 16), mat(0xd4a13c, { metalness: 0.35, roughness: 0.4 }));
+    garuda.rotation.x = Math.PI / 2;
+    garuda.position.set(0, 3.25, -4.96);
+    g.add(garuda);
+
+    for (const bx of [-2.4, 2.4]) {
+      const rBand = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.06), mat(0xb0362c));
+      rBand.position.set(bx, 3.35, -4.98);
+      const wBand = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.06), mat(0xf5f2eb));
+      wBand.position.set(bx, 2.65, -4.98);
+      g.add(rBand, wBand);
+    }
+
+    // Archive Bookshelves on West Wall & Village Map on East Wall
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.85, 2.4, 3.2), woodMat);
+    shelf.position.set(-5.8, 1.82, -1.8);
+    g.add(shelf);
+
+    const mapBoard = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 1.6, 2.6),
+      mat(0x3d634f)
+    );
+    mapBoard.position.set(6.2, 2.6, -1.2);
+    g.add(mapBoard);
+
+    // Textbook Crate Pickup inside Balai Desa (Mission 4: Deliver to Sekolah SMP)
+    textbookPickup = new THREE.Group();
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.62, 0.68), mat(0x9e713c));
+    crate.position.y = 0.31;
+    const bookTop = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.14, 0.42), mat(0x2e5266));
+    bookTop.position.y = 0.66;
+    textbookPickup.add(crate, bookTop);
+    textbookPickup.position.set(-4.3, 0.62, -0.5);
+    g.add(textbookPickup);
+
+    // Interior Warm PointLight (brightens when roof hides!)
+    balaiInteriorLight = new THREE.PointLight(0xffe4b0, 0.45, 16);
+    balaiInteriorLight.position.set(0, 3.8, 0);
+    g.add(balaiInteriorLight);
+
+    // Two-Tiered Joglo Roof Group (automatically fades & hides when player enters Balai Desa!)
+    balaiRoofGroup = new THREE.Group();
+    const roofMat1 = mat(0x9c4632, { transparent: true, opacity: 1 });
+    const roofMat2 = mat(0x873a28, { transparent: true, opacity: 1 });
+    const trimMat = mat(0x5c3c20, { transparent: true, opacity: 1 });
+
+    const lowerRoof = new THREE.Mesh(new THREE.ConeGeometry(10.8, 2.6, 4), roofMat1);
+    lowerRoof.rotation.y = Math.PI / 4;
+    lowerRoof.position.set(0, 5.6, 0);
+    lowerRoof.castShadow = true;
+
+    const upperRoof = new THREE.Mesh(new THREE.ConeGeometry(5.6, 3.1, 4), roofMat2);
+    upperRoof.rotation.y = Math.PI / 4;
+    upperRoof.position.set(0, 7.6, 0);
+    upperRoof.castShadow = true;
+
+    const eave = new THREE.Mesh(new THREE.BoxGeometry(14.8, 0.24, 12.0), trimMat);
+    eave.position.set(0, 4.35, 0);
+
+    balaiRoofGroup.add(lowerRoof, upperRoof, eave);
+    balaiRoofGroup.userData.mats = [roofMat1, roofMat2, trimMat];
+    balaiRoofGroup.userData.opacity = 1;
+    g.add(balaiRoofGroup);
+
+    // Outdoor Flagpole with Merah-Putih Flag in front of Balai
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 7.2, 8), mat(0xd8d3c8));
+    pole.position.set(6.5, 3.6, 8.6);
+    const flagR = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.55, 0.06), mat(0xb53830));
+    flagR.position.set(7.4, 6.7, 8.6);
+    const flagW = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.55, 0.06), mat(0xf5f2eb));
+    flagW.position.set(7.4, 6.15, 8.6);
+    g.add(pole, flagR, flagW);
+
+    scene.add(g);
+
+    // NPC Pak Hendra inside Balai Desa in front of Musyawarah table
+    const hendra = createHuman({ shirt: 0x6e472b, hat: 'peci' });
+    hendra.root.position.set(0, 0.62, -39.8);
+    scene.add(hendra.root);
+    npcs.push({ id: 'hendra', name: 'Pak Hendra', role: 'Kepala Desa Bhinneka', x: 0, z: -39.8, y: 0.62, zone: 'balai', human: hendra });
+  }
+
+  function buildPasarNusantara() {
+    // Wide, Bustling 30x26 Courtyard at (-40, -8)
+    const g = new THREE.Group();
+    g.position.set(-40, 0, -8);
+
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(30, 0.14, 26), mat(0xd1c2a9));
+    floor.position.y = 0.05;
+    floor.receiveShadow = true;
+    g.add(floor);
+    walkableMeshes.push(floor);
+
+    // Cross paved alleys inside market
+    const alleyEW = new THREE.Mesh(new THREE.BoxGeometry(30.2, 0.16, 4.6), mat(0xbda98c));
+    alleyEW.position.y = 0.06;
+    const alleyNS = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.16, 26.2), mat(0xbda98c));
+    alleyNS.position.y = 0.06;
+    g.add(alleyEW, alleyNS);
+
+    // Two Timber Entrance Gates (East & South)
+    const signTex = makeSignTexture('PASAR NUSANTARA', '#8f342b', '#fbf8f2', 420, 74, '#d9b97e');
+    const postMat = mat(0x5c3c20);
+    const buildGate = (gx, gz, rotY) => {
+      const gate = new THREE.Group();
+      gate.position.set(gx, 0, gz);
+      gate.rotation.y = rotY;
+      for (const sx of [-2.6, 2.6]) {
+        const p = new THREE.Mesh(new THREE.BoxGeometry(0.32, 4.1, 0.32), postMat);
+        p.position.set(sx, 2.05, 0);
+        const lan = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), mat(0xf2d184, { emissive: 0xc48b3b, emissiveIntensity: 0.55 }));
+        lan.position.set(sx, 3.6, 0.3);
+        gate.add(p, lan);
+      }
+      const board = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.85, 0.2), mat(0x5c3c20));
+      board.position.set(0, 3.9, 0);
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 0.72), new THREE.MeshBasicMaterial({ map: signTex }));
+      face.position.set(0, 3.9, 0.12);
+      const faceB = face.clone();
+      faceB.rotation.y = Math.PI;
+      faceB.position.z = -0.12;
+      gate.add(board, face, faceB);
+      g.add(gate);
+    };
+    buildGate(14.8, 0, Math.PI / 2);
+    buildGate(0, 12.8, 0);
+
+    // Helper for building a distinct Nusantara market stall
+    function makeStall(lx, lz, rotY, canopyCol, title, propsFn, vendorCfg) {
+      const st = new THREE.Group();
+      st.position.set(lx, 0.12, lz);
+      st.rotation.y = rotY;
+
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.95, 1.5), mat(0x855a34));
+      counter.position.set(0, 0.48, 0.5);
+      counter.castShadow = true;
+      st.add(counter);
+
+      for (const px of [-2.1, 2.1]) {
+        for (const pz of [-1.2, 1.2]) {
+          const p = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 3.0, 6), postMat);
+          p.position.set(px, 1.5, pz);
+          st.add(p);
+        }
+      }
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.2, 3.2), mat(canopyCol));
+      roof.position.set(0, 3.08, 0);
+      roof.rotation.x = 0.14;
+      roof.castShadow = true;
+      st.add(roof);
+
+      const sTex = makeSignTexture(title, '#2b241d', '#fbf8f2', 360, 62, '#c9963b');
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.5), new THREE.MeshBasicMaterial({ map: sTex }));
+      sign.position.set(0, 2.68, 1.48);
+      st.add(sign);
+
+      if (propsFn) propsFn(st);
+
+      // Dedicated vendor standing behind counter
+      if (vendorCfg) {
+        const vh = createHuman(vendorCfg);
+        vh.root.position.set(0, 0, -0.55);
+        st.add(vh.root);
+        if (vendorCfg.npcId) {
+          const wx = -40 + lx;
+          const wz = -8 + lz;
+          npcs.push({ id: vendorCfg.npcId, name: vendorCfg.name, role: vendorCfg.role, x: wx, z: wz, y: 0.12, zone: 'pasar', human: vh });
+        }
+      }
+
+      g.add(st);
+      addCircleCollider(-40 + lx, -8 + lz, 2.3);
+    }
+
+    // 7 DISTINCT NUSANTARA MARKET STALLS
+    // 1. Buah Tropis (Ibu Sari)
+    makeStall(-8.5, -8.2, 0, 0x9e3f35, 'BUAH TROPIS', st => {
+      const melon = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 8), mat(0x3b6e42));
+      melon.position.set(-1.2, 1.18, 0.55);
+      const mango = new THREE.Mesh(new THREE.SphereGeometry(0.22, 7, 7), mat(0xd49635));
+      mango.position.set(0, 1.12, 0.55);
+      const banana = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.25, 0.35), mat(0xd9b845));
+      banana.position.set(1.2, 1.12, 0.55);
+      st.add(melon, mango, banana);
+    }, { npcId: 'sari', name: 'Ibu Sari', role: 'Pedagang Buah Tropis', shirt: 0x9e3f35, isFemale: true, hijabColor: 0xe6dac5 });
+
+    // 2. Sayur & Rempah
+    makeStall(0, -8.8, 0, 0x3b6e4c, 'SAYUR & REMPAH', st => {
+      for (let i = -1; i <= 1; i++) {
+        const crate = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.32, 0.8), mat(0xa37c4d));
+        crate.position.set(i * 1.25, 1.1, 0.55);
+        const veg = new THREE.Mesh(new THREE.SphereGeometry(0.28, 7, 7), mat(i === 0 ? 0xc24c30 : 0x5c8c42));
+        veg.position.set(i * 1.25, 1.32, 0.55);
+        st.add(crate, veg);
+      }
+    }, { shirt: 0x4f755d, hat: 'caping' });
+
+    // 3. Warung Bakso & Soto Nusantara (Pak Jaya)
+    makeStall(8.5, -8.2, 0, 0xb87d32, 'BAKSO & SOTO', st => {
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.42, 0.55, 12), mat(0x9a9ea1, { metalness: 0.4, roughness: 0.35 }));
+      pot.position.set(-1.1, 1.22, 0.5);
+      const bowl1 = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.16, 0.18, 10), mat(0xf2ede4));
+      bowl1.position.set(0.5, 1.05, 0.55);
+      const bowl2 = bowl1.clone();
+      bowl2.position.set(1.2, 1.05, 0.55);
+      st.add(pot, bowl1, bowl2);
+    }, { npcId: 'jaya', name: 'Pak Jaya', role: 'Penjual Bakso & Soto', shirt: 0xb87d32, hat: 'peci' });
+
+    // 4. Batik & Kain Tenun (Mbak Wulan)
+    makeStall(-10.5, 0, Math.PI / 2, 0x2e5266, 'BATIK & TENUN', st => {
+      const cols = [0x6e472b, 0x9e3f35, 0x2e5266, 0xb87d32];
+      cols.forEach((c, i) => {
+        const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.14), mat(c));
+        cloth.position.set(-1.35 + i * 0.9, 1.65, 0.5);
+        st.add(cloth);
+      });
+    }, { npcId: 'wulan', name: 'Mbak Wulan', role: 'Pengrajin Batik & Tenun', shirt: 0x2e5266, isFemale: true, hijabColor: 0x9e4234 });
+
+    // 5. Ikan Segar
+    makeStall(-8.5, 8.2, Math.PI, 0x3b6878, 'IKAN SEGAR', st => {
+      const tub = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.36, 0.95), mat(0x6c8c9c));
+      tub.position.set(0, 1.12, 0.5);
+      const ice = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.12, 0.78), mat(0xe3edf0));
+      ice.position.set(0, 1.28, 0.5);
+      st.add(tub, ice);
+    }, { shirt: 0x3b6878, hat: 'caping' });
+
+    // 6. Jajanan Pasar & Jamu (Bu Ningsih)
+    makeStall(8.5, 8.2, Math.PI, 0x875436, 'JAJANAN & JAMU', st => {
+      for (let i = -1; i <= 1; i++) {
+        const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.4, 0.08, 12), mat(0xb58d52));
+        tray.position.set(i * 1.1, 1.02, 0.5);
+        const kue = new THREE.Mesh(new THREE.SphereGeometry(0.18, 7, 7), mat(i === 0 ? 0x4f7d42 : 0xd49a3a));
+        kue.position.set(i * 1.1, 1.14, 0.5);
+        st.add(tray, kue);
+      }
+    }, { npcId: 'ningsih', name: 'Bu Ningsih', role: 'Penjual Jajanan & Jamu', shirt: 0x7d4c32, isFemale: true, hijabColor: 0x4f755d });
+
+    // 7. Gerabah & Anyaman
+    makeStall(10.5, 0, -Math.PI / 2, 0x7a5130, 'GERABAH & ANYAMAN', st => {
+      for (let i = -1; i <= 1; i++) {
+        const pot = new THREE.Mesh(new THREE.SphereGeometry(0.32, 9, 8), mat(0xa65336));
+        pot.position.set(i * 1.1, 1.24, 0.5);
+        st.add(pot);
+      }
+    }, { shirt: 0x6e4a2e, hat: 'blangkon' });
+
+    // Bustling Market Shoppers strolling inside Pasar Nusantara
+    const shopperSpecs = [
+      { cx: -40, cz: -8, rx: 6.5, rz: 4.5, speed: 0.34, phase: 0.2, shirt: 0x4f755d, isFemale: true, hijabColor: 0xe6dac5 },
+      { cx: -40, cz: -8, rx: 4.2, rz: 6.2, speed: -0.28, phase: 1.9, shirt: 0x2e5266, isFemale: false, hat: 'peci' },
+      { cx: -40, cz: -8, rx: 7.4, rz: 2.2, speed: 0.26, phase: 3.6, shirt: 0xb87d32, isFemale: true, hijabColor: 0x34556b },
+      { cx: -40, cz: -8, rx: 2.4, rz: 7.4, speed: -0.31, phase: 5.1, shirt: 0x7a5130, isFemale: false, hat: 'none' }
+    ];
+    shopperSpecs.forEach(sp => {
+      const h = createHuman(sp);
+      scene.add(h.root);
+      strollingVillagers.push(Object.assign({}, sp, { human: h, phaseWalk: sp.phase }));
+    });
+
+    // Mission 1: 3 Misaligned Wooden Pushcarts blocking market footpaths
+    const cartDefs = [
+      { bx: -34.5, bz: -8.0, tx: -32.2, tz: -13.0, rot: 0.4 },
+      { bx: -40.0, bz: -3.2, tx: -44.8, tz: -13.0, rot: -0.5 },
+      { bx: -45.5, bz: -8.2, tx: -46.8, tz: -3.0, rot: 0.8 }
+    ];
+    cartDefs.forEach((cd, idx) => {
+      const cg = new THREE.Group();
+      const box = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.8, 1.1), mat(0x946539));
+      box.position.y = 0.75;
+      box.castShadow = true;
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 1.3), mat(0xa63d2f));
+      roof.position.y = 1.65;
+      for (const wx of [-0.55, 0.55]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.14, 10), mat(0x3a2a1e));
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(wx, 0.35, 0.6);
+        const wheelB = wheel.clone();
+        wheelB.position.z = -0.6;
+        cg.add(wheel, wheelB);
+      }
+      cg.add(box, roof);
+      cg.position.set(cd.bx, 0.12, cd.bz);
+      cg.rotation.y = cd.rot;
+      scene.add(cg);
+      marketCarts.push({ id: idx, mesh: cg, x: cd.bx, z: cd.bz, tx: cd.tx, tz: cd.tz, fixed: false });
+    });
+
+    scene.add(g);
+  }
+
+  function buildKampungAdat() {
+    const g = new THREE.Group();
+    g.position.set(42, 0, -10);
+
+    const yard = new THREE.Mesh(new THREE.BoxGeometry(22, 0.14, 22), mat(0xc9b99d));
+    yard.position.y = 0.05;
+    yard.receiveShadow = true;
+    g.add(yard);
+    walkableMeshes.push(yard);
+
+    // Two Traditional Elevated Nusantara Peaked-Roof Houses
+    const buildAdatHouse = (hx, hz, rotY) => {
+      const h = new THREE.Group();
+      h.position.set(hx, 0.12, hz);
+      h.rotation.y = rotY;
+
+      for (const sx of [-2.4, 2.4]) {
+        for (const sz of [-1.8, 1.8]) {
+          const stilt = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 1.4, 7), mat(0x52341c));
+          stilt.position.set(sx, 0.7, sz);
+          h.add(stilt);
+        }
+      }
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(5.6, 2.5, 4.2), mat(0x7a5130));
+      wall.position.y = 2.6;
+      wall.castShadow = true;
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(4.6, 3.8, 4), mat(0x473326));
+      roof.rotation.y = Math.PI / 4;
+      roof.scale.set(1.25, 1, 0.95);
+      roof.position.y = 5.5;
+      roof.castShadow = true;
+      h.add(wall, roof);
+      g.add(h);
+      addCircleCollider(42 + hx, -10 + hz, 3.6);
+    };
+    buildAdatHouse(4.5, -5.5, -0.35);
+    buildAdatHouse(4.8, 5.2, -2.7);
+
+    // Traditional Gong Stand
+    const gongFrame = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.2, 1.8), mat(0x5c3c20));
+    gongFrame.position.set(-1.5, 1.1, -6.8);
+    const gongDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.14, 16), mat(0xc49438, { metalness: 0.45, roughness: 0.35 }));
+    gongDisc.rotation.z = Math.PI / 2;
+    gongDisc.position.set(-1.5, 1.35, -6.8);
+    g.add(gongFrame, gongDisc);
+
+    // Mission 3: Gapura Persatuan (Starts tilted; straightens when repaired!)
+    gapuraGroup = new THREE.Group();
+    gapuraGroup.position.set(-8.8, 0.12, 0);
+    for (const sz of [-2.2, 2.2]) {
+      const col = new THREE.Mesh(new THREE.BoxGeometry(0.75, 4.6, 0.75), mat(0x8f432e));
+      col.position.set(0, 2.3, sz);
+      col.castShadow = true;
+      gapuraGroup.add(col);
+    }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.75, 5.6), mat(0x5c3c20));
+    lintel.position.set(0, 4.75, 0);
+    const crest = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.3, 4), mat(0xc49438));
+    crest.rotation.y = Math.PI / 4;
+    crest.position.set(0, 5.6, 0);
+    gapuraGroup.add(lintel, crest);
+    gapuraGroup.rotation.z = 0.28; // Tilted initially
+    g.add(gapuraGroup);
+
+    scene.add(g);
+
+    // 3 Bamboo Bundles scattered near Kampung Adat for Mission 3
+    const bSpots = [
+      { x: 30, z: -20 },
+      { x: 32, z: 3 },
+      { x: 46, z: 4 }
+    ];
+    bSpots.forEach((bs, idx) => {
+      const bg = new THREE.Group();
+      for (let k = 0; k < 3; k++) {
+        const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 1.9, 6), mat(0x788f4c));
+        stalk.rotation.z = Math.PI / 2;
+        stalk.position.set(0, 0.18 + (k === 2 ? 0.16 : 0), (k - 1) * 0.18);
+        bg.add(stalk);
+      }
+      bg.position.set(bs.x, 0.04, bs.z);
+      scene.add(bg);
+      bambooItems.push({ id: idx, mesh: bg, x: bs.x, z: bs.z, picked: false });
+    });
+
+    // NPC Datuk Bimo
+    const bimo = createHuman({ shirt: 0x6e472b, hat: 'udeng' });
+    bimo.root.position.set(37.5, 0.12, -10);
+    bimo.root.rotation.y = -Math.PI / 2;
+    scene.add(bimo.root);
+    npcs.push({ id: 'bimo', name: 'Datuk Bimo', role: 'Tetua Kampung Adat', x: 37.5, z: -10, y: 0.12, zone: 'adat', human: bimo });
+  }
+
+  function createNusantaraBoat(opts = {}) {
+    const { hullCol = 0x734928, stripeCol = 0xa63d2f, hasSail = true, hasOutrigger = true, hasCabin = false, mastScale = 1.0, hasDriver = false } = opts;
+    const boat = new THREE.Group();
+
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.56, 4.2), mat(hullCol));
+    hull.position.y = 0.22;
+    hull.castShadow = true;
+    const bow = new THREE.Mesh(new THREE.ConeGeometry(0.76, 1.3, 4), mat(hullCol));
+    bow.rotation.x = Math.PI / 2;
+    bow.rotation.y = Math.PI / 4;
+    bow.position.set(0, 0.24, 2.65);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.56, 0.16, 4.25), mat(stripeCol));
+    stripe.position.y = 0.42;
+    boat.add(hull, bow, stripe);
+
+    if (hasOutrigger) {
+      for (const sx of [-1.45, 1.45]) {
+        const floatBar = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.8, 6), mat(0xa88a56));
+        floatBar.rotation.x = Math.PI / 2;
+        floatBar.position.set(sx, 0.08, 0);
+        boat.add(floatBar);
+      }
+      for (const sz of [-0.9, 0.9]) {
+        const cross = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.9, 6), mat(0x7c5a35));
+        cross.rotation.z = Math.PI / 2;
+        cross.position.set(0, 0.36, sz);
+        boat.add(cross);
+      }
+    }
+
+    if (hasCabin) {
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.05, 1.6), mat(0xeae2d3));
+      cab.position.set(0, 0.95, -0.35);
+      const cabRoof = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.14, 1.8), mat(stripeCol));
+      cabRoof.position.set(0, 1.52, -0.35);
+      boat.add(cab, cabRoof);
+    }
+
+    if (hasSail) {
+      const mastH = 3.2 * mastScale;
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, mastH, 7), mat(0x6b4728));
+      mast.position.set(0, 0.2 + mastH * 0.5, 0.15);
+      const sail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.7 * mastScale, 1.3), mat(0xf2eadc));
+      sail.position.set(0.14, 0.2 + mastH * 0.54, -0.32);
+      sail.rotation.y = 0.18;
+      const topY = 0.2 + mastH;
+      const pR = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, 0.45), mat(0xb53830));
+      pR.position.set(0, topY - 0.05, -0.24);
+      const pW = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, 0.45), mat(0xf5f2eb));
+      pW.position.set(0, topY - 0.2, -0.24);
+      boat.add(mast, sail, pR, pW);
+    }
+
+    if (hasDriver) {
+      const driver = createHuman({ shirt: stripeCol, hat: 'caping', scale: 0.82 });
+      driver.root.position.set(0, 0.15, -0.9);
+      driver.legL.rotation.x = -1.3;
+      driver.legR.rotation.x = -1.3;
+      boat.add(driver.root);
+    }
+
+    return boat;
+  }
+
+  function buildDermaga() {
+    const g = new THREE.Group();
+    const plank1 = mat(0x8a6139);
+    const plank2 = mat(0x78532f);
+    const postMat = mat(0x52341c);
+
+    // 1. Stone Quay Plaza at South Bank (x: 1..20, z: 38..48)
+    const quay = new THREE.Mesh(new THREE.BoxGeometry(20, 0.24, 10.5), mat(0xc4b59c));
+    quay.position.set(10.5, 0.08, 43.2);
+    quay.receiveShadow = true;
+    g.add(quay);
+    walkableMeshes.push(quay);
+
+    // 2. Walkable Wooden Main Pier (x: 6.4..11.6, z: 26.8..40.6) & East Finger Pier (x: 11.4..16.2, z: 30.8..34.4)
+    const mainPierBase = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.18, 14.0), plank2);
+    mainPierBase.position.set(9.0, 0.32, 33.8);
+    mainPierBase.receiveShadow = true;
+    g.add(mainPierBase);
+    walkableMeshes.push(mainPierBase);
+
+    for (let i = 0; i < 16; i++) {
+      const pl = new THREE.Mesh(new THREE.BoxGeometry(5.3, 0.06, 0.72), i % 2 === 0 ? plank1 : plank2);
+      pl.position.set(9.0, 0.42, 27.2 + i * 0.86);
+      pl.receiveShadow = true;
+      g.add(pl);
+    }
+
+    const sidePier = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.2, 3.6), plank1);
+    sidePier.position.set(13.8, 0.34, 32.6);
+    sidePier.receiveShadow = true;
+    g.add(sidePier);
+    walkableMeshes.push(sidePier);
+
+    // Timber pilings & warm pier bollards
+    for (const px of [6.6, 11.4]) {
+      for (const pz of [27.2, 31.4, 35.6, 39.8]) {
+        const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 2.2, 7), postMat);
+        pil.position.set(px, -0.22, pz);
+        g.add(pil);
+      }
+    }
+
+    // 3. Entrance Gate Signboard "DERMAGA NELAYAN"
+    const gateTex = makeSignTexture('DERMAGA NELAYAN', '#2e5266', '#fbf8f2', 420, 74, '#d9b97e');
+    for (const sx of [6.6, 11.4]) {
+      const gp = new THREE.Mesh(new THREE.BoxGeometry(0.28, 3.8, 0.28), postMat);
+      gp.position.set(sx, 2.1, 40.4);
+      g.add(gp);
+    }
+    const gBoard = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.78, 0.18), postMat);
+    gBoard.position.set(9.0, 3.8, 40.4);
+    const gFace = new THREE.Mesh(new THREE.PlaneGeometry(5.1, 0.66), new THREE.MeshBasicMaterial({ map: gateTex }));
+    gFace.position.set(9.0, 3.8, 40.51);
+    const gFaceB = gFace.clone();
+    gFaceB.rotation.y = Math.PI;
+    gFaceB.position.z = 40.29;
+    g.add(gBoard, gFace, gFaceB);
+
+    // 4. Bale TPI (Tempat Pelelangan Ikan) at West of Quay
+    const tpi = new THREE.Group();
+    tpi.position.set(3.4, 0.2, 43.2);
+    for (const px of [-2.2, 2.2]) {
+      for (const pz of [-1.8, 1.8]) {
+        const p = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 3.0, 7), postMat);
+        p.position.set(px, 1.5, pz);
+        tpi.add(p);
+      }
+    }
+    const tpiRoof = new THREE.Mesh(new THREE.ConeGeometry(3.8, 1.8, 4), mat(0x9c4632));
+    tpiRoof.rotation.y = Math.PI / 4;
+    tpiRoof.position.y = 3.85;
+    tpiRoof.castShadow = true;
+    const tpiTable = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.85, 1.4), mat(0x7c5432));
+    tpiTable.position.y = 0.42;
+    const basket1 = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.34, 0.42, 10), mat(0xb58d52));
+    basket1.position.set(-0.8, 1.04, 0);
+    const basket2 = basket1.clone();
+    basket2.position.x = 0.8;
+    tpi.add(tpiRoof, tpiTable, basket1, basket2);
+    g.add(tpi);
+    addCircleCollider(3.4, 43.2, 2.2);
+
+    // 5. Mini Lighthouse (Mercusuar) with Rotating Warm Beam
+    const lh = new THREE.Group();
+    lh.position.set(18.2, 0.2, 38.6);
+    const lhBase = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.35, 3.2, 8), mat(0xede6d8));
+    lhBase.position.y = 1.6;
+    const lhBand = new THREE.Mesh(new THREE.CylinderGeometry(0.92, 1.05, 1.6, 8), mat(0xa63d2f));
+    lhBand.position.y = 4.0;
+    const lhTop = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.92, 1.4, 8), mat(0xede6d8));
+    lhTop.position.y = 5.5;
+    const lhLantern = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.95, 8), mat(0xf5d98e, { emissive: 0xd49c3d, emissiveIntensity: 0.75 }));
+    lhLantern.position.y = 6.65;
+    const lhDome = new THREE.Mesh(new THREE.ConeGeometry(0.82, 0.8, 8), mat(0x842d21));
+    lhDome.position.y = 7.5;
+    lh.add(lhBase, lhBand, lhTop, lhLantern, lhDome);
+
+    lighthouseBeam = new THREE.Group();
+    lighthouseBeam.position.set(0, 6.65, 0);
+    const beamCone = new THREE.Mesh(
+      new THREE.ConeGeometry(1.8, 11, 12, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xf7e3a8, transparent: true, opacity: 0.16, side: THREE.DoubleSide })
+    );
+    beamCone.rotation.z = -Math.PI / 2;
+    beamCone.position.x = 5.6;
+    lighthouseBeam.add(beamCone);
+    lh.add(lighthouseBeam);
+    g.add(lh);
+    addCircleCollider(18.2, 38.6, 1.6);
+
+    // 6. Warung Ikan Bakar & Es Kelapa (Bu Rahma)
+    const warung = new THREE.Group();
+    warung.position.set(16.0, 0.2, 44.6);
+    const wCounter = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.95, 1.3), mat(0x825732));
+    wCounter.position.y = 0.48;
+    const wRoof = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.18, 2.8), mat(0x3b6e52));
+    wRoof.position.set(0, 2.9, 0);
+    for (const sx of [-1.9, 1.9]) {
+      const wp = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 2.8, 6), postMat);
+      wp.position.set(sx, 1.4, 0.5);
+      warung.add(wp);
+    }
+    const grill = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.22, 0.6), mat(0x3a3532));
+    grill.position.set(-0.9, 1.05, 0);
+    warung.add(wCounter, wRoof, grill);
+    g.add(warung);
+    addCircleCollider(16.0, 44.6, 2.0);
+
+    const rahma = createHuman({ shirt: 0x3b6e52, isFemale: true, hijabColor: 0xe6dac5 });
+    rahma.root.position.set(16.0, 0.2, 43.2);
+    scene.add(rahma.root);
+    npcs.push({ id: 'rahma', name: 'Bu Rahma', role: 'Warung Ikan Bakar Dermaga', x: 16.0, z: 43.2, y: 0.2, zone: 'dermaga', human: rahma });
+
+    // NPC Pak Bahri on Main Pier
+    const bahri = createHuman({ shirt: 0x2e5266, hat: 'caping' });
+    bahri.root.position.set(8.2, 0.42, 36.2);
+    scene.add(bahri.root);
+    npcs.push({ id: 'bahri', name: 'Pak Bahri', role: 'Ketua Nelayan Desa', x: 8.2, z: 36.2, y: 0.42, zone: 'dermaga', human: bahri });
+
+    // 7. Two Moored Boats + Two Continuous River Traffic Boats Sailing Under All 3 Bridges!
+    const boat1 = createNusantaraBoat({ hullCol: 0x734928, stripeCol: 0xa63d2f, hasSail: true, hasOutrigger: true });
+    boat1.position.set(4.1, -0.18, 31.2);
+    boat1.rotation.y = 0.08;
+    scene.add(boat1);
+    boats.push({ mesh: boat1, baseY: -0.18, phase: 0.4 });
+
+    const boat2 = createNusantaraBoat({ hullCol: 0x3b596b, stripeCol: 0xc48b3b, hasSail: false, hasOutrigger: false, hasCabin: true });
+    boat2.position.set(14.3, -0.18, 28.4);
+    boat2.rotation.y = 1.48;
+    scene.add(boat2);
+    boats.push({ mesh: boat2, baseY: -0.18, phase: 2.3 });
+
+    const traffic1 = createNusantaraBoat({ hullCol: 0x6b4226, stripeCol: 0x3d7354, hasSail: true, hasOutrigger: true, mastScale: 0.72, hasDriver: true });
+    scene.add(traffic1);
+    riverTrafficBoats.push({ mesh: traffic1, x: -46, dir: 1, speed: 3.1, laneOffset: -1.35, phase: 0.3 });
+
+    const traffic2 = createNusantaraBoat({ hullCol: 0x425c6e, stripeCol: 0xb87930, hasSail: false, hasOutrigger: false, hasCabin: true, hasDriver: true });
+    scene.add(traffic2);
+    riverTrafficBoats.push({ mesh: traffic2, x: 42, dir: -1, speed: 2.7, laneOffset: 1.45, phase: 2.2 });
+
+    // 8. Leaping River Fish near Dermaga
+    for (let i = 0; i < 4; i++) {
+      const f = new THREE.Mesh(new THREE.SphereGeometry(0.2, 7, 6), mat(0xc99c4c));
+      f.scale.set(1.6, 0.7, 0.55);
+      scene.add(f);
+      dermagaFish.push({ mesh: f, bx: 4 + i * 4.2, bz: 25 + (i % 2) * 2.5, phase: i * 1.7 });
+    }
+
+    // 9. Mission 2: 4 Floating River Trash Clusters (reachable from pier & bank)
+    const trashSpots = [
+      { x: 6.1, z: 35.2 },
+      { x: 9.2, z: 26.8 },
+      { x: 14.5, z: 34.8 },
+      { x: 4.8, z: 37.2 }
+    ];
+    trashSpots.forEach((ts, idx) => {
+      const tg = new THREE.Group();
+      const b1 = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.28, 0.52), mat(0x9e8b73));
+      const b2 = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.45, 7), mat(0x4b7485));
+      b2.rotation.z = 1.2;
+      b2.position.set(0.38, 0.12, 0.22);
+      tg.add(b1, b2);
+      tg.position.set(ts.x, -0.22, ts.z);
+      scene.add(tg);
+      riverTrash.push({ id: idx, mesh: tg, x: ts.x, z: ts.z, cleaned: false });
+    });
+
+    scene.add(g);
+  }
+
+  /* =========================================================
+     8B. FISHING SPOTS (SPOT MANCING) & 4 ANIMATED FISHING NPCS
+  ========================================================= */
+  function createFishingRodRig(rodLen = 2.6) {
+    const rodGroup = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.048, rodLen, 6), mat(0x9e824c));
+    pole.rotation.x = Math.PI * 0.32;
+    pole.position.set(0, Math.cos(Math.PI * 0.32) * rodLen * 0.5, Math.sin(Math.PI * 0.32) * rodLen * 0.5);
+    rodGroup.add(pole);
+
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.42, 6), mat(0x4f321c));
+    grip.rotation.x = Math.PI * 0.32;
+    grip.position.set(0, 0.1, 0.14);
+    rodGroup.add(grip);
+
+    const tipLocal = new THREE.Vector3(0, Math.cos(Math.PI * 0.32) * rodLen, Math.sin(Math.PI * 0.32) * rodLen);
+    return { rodGroup, tipLocal };
+  }
+
+  function createBobberMesh() {
+    const g = new THREE.Group();
+    const top = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), mat(0xb53830));
+    top.position.y = 0.07;
+    const bot = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), mat(0xf5f2eb));
+    bot.position.y = -0.02;
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.24, 5), mat(0x2b2623));
+    pin.position.y = 0.16;
+    g.add(top, bot, pin);
+    return g;
+  }
+
+  function createFishingLineMesh() {
+    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -1, 0)]);
+    return new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xeae4d8, transparent: true, opacity: 0.78 }));
+  }
+
+  function updateLinePoints(line, pA, pB) {
+    const pos = line.geometry.attributes.position;
+    pos.setXYZ(0, pA.x, pA.y, pA.z);
+    pos.setXYZ(1, pB.x, pB.y, pB.z);
+    pos.needsUpdate = true;
+  }
+
+  function addFishingNPC(opts) {
+    const { name, x, y, z, yaw, shirt, hat = 'caping', bobberX, bobberZ, phase = 0, registerTalkId = null } = opts;
+    const stool = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.42, 0.56), mat(0x7a512e));
+    stool.position.set(x, y + 0.21, z);
+    stool.rotation.y = yaw;
+    scene.add(stool);
+
+    const h = createHuman({ shirt, hat });
+    h.root.position.set(x, y + 0.06, z);
+    h.root.rotation.y = yaw;
+    h.legL.rotation.x = -1.35;
+    h.legR.rotation.x = -1.35;
+    h.armR.rotation.x = -0.95;
+    h.armL.rotation.x = -0.78;
+    scene.add(h.root);
+
+    const { rodGroup, tipLocal } = createFishingRodRig(2.65);
+    rodGroup.position.set(0.42, 0.96, 0.34);
+    h.root.add(rodGroup);
+
+    const bobber = createBobberMesh();
+    bobber.position.set(bobberX, -0.31, bobberZ);
+    scene.add(bobber);
+
+    const line = createFishingLineMesh();
+    scene.add(line);
+
+    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.2, 0.38, 8), mat(0xb58d52));
+    bucket.position.set(x + Math.cos(yaw) * 0.75, y + 0.19, z - Math.sin(yaw) * 0.75);
+    scene.add(bucket);
+
+    fishingNPCs.push({ name, human: h, rodGroup, tipLocal, bobber, line, bobberX, bobberZ, phase });
+
+    if (registerTalkId) {
+      npcs.push({ id: registerTalkId, name, role: 'Pemancing & Penjaga Sungai', x, z, y, zone: 'dermaga', human: h });
+    }
+  }
+
+  function buildFishingSpots() {
+    const plank1 = mat(0x875f38);
+    const plank2 = mat(0x76512e);
+    const postMat = mat(0x52341c);
+
+    function buildDeckProp(deck, signText, facingNorth) {
+      const cx = (deck.minX + deck.maxX) * 0.5;
+      const cz = (deck.minZ + deck.maxZ) * 0.5;
+      const w = deck.maxX - deck.minX;
+      const d = deck.maxZ - deck.minZ;
+      const g = new THREE.Group();
+      g.position.set(cx, 0, cz);
+
+      const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.18, d), plank2);
+      base.position.y = deck.y - 0.09;
+      base.receiveShadow = true;
+      g.add(base);
+      walkableMeshes.push(base);
+
+      const planks = 9;
+      const pw = w / planks;
+      for (let i = 0; i < planks; i++) {
+        const pl = new THREE.Mesh(new THREE.BoxGeometry(pw * 0.9, 0.06, d + 0.04), i % 2 === 0 ? plank1 : plank2);
+        pl.position.set(-w * 0.5 + pw * (i + 0.5), deck.y, 0);
+        pl.receiveShadow = true;
+        g.add(pl);
+      }
+
+      for (const px of [-w * 0.45, 0, w * 0.45]) {
+        for (const pz of [-d * 0.44, d * 0.44]) {
+          const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.17, 2.2, 7), postMat);
+          pil.position.set(px, -0.55, pz);
+          g.add(pil);
+        }
+      }
+
+      const backZ = facingNorth ? d * 0.34 : -d * 0.34;
+      for (const sx of [-w * 0.38, w * 0.38]) {
+        const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 2.6, 6), postMat);
+        sp.position.set(sx, deck.y + 1.3, backZ);
+        g.add(sp);
+      }
+      const shade = new THREE.Mesh(new THREE.BoxGeometry(w * 0.88, 0.14, 1.9), mat(0xa88b56));
+      shade.position.set(0, deck.y + 2.62, backZ + (facingNorth ? -0.35 : 0.35));
+      shade.rotation.x = facingNorth ? 0.18 : -0.18;
+      g.add(shade);
+
+      const signTex = makeSignTexture(signText, '#2c4f63', '#f5f2eb', 380, 68, '#d4c8b5');
+      const sign = new THREE.Mesh(
+        new THREE.BoxGeometry(2.6, 0.46, 0.1),
+        [postMat, postMat, postMat, postMat, new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.7 }), new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.7 })]
+      );
+      sign.position.set(0, deck.y + 2.2, backZ);
+      g.add(sign);
+
+      const lan = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), mat(0xf2d184, { emissive: 0xc48b3b, emissiveIntensity: 0.65 }));
+      lan.position.set(w * 0.38, deck.y + 2.1, backZ + (facingNorth ? -0.25 : 0.25));
+      g.add(lan);
+      scene.add(g);
+    }
+
+    buildDeckProp(FISHING_DECKS[0], 'SPOT MANCING BARAT', true);
+    buildDeckProp(FISHING_DECKS[1], 'SPOT MANCING TIMUR', false);
+
+    const spotDefs = [
+      { id: 'barat',   name: 'Spot Mancing Tepian Barat', x: -8.0, z: 27.6, y: 0.30, faceYaw: Math.PI,       bobberX: -8.0, bobberZ: 24.4 },
+      { id: 'dermaga', name: 'Spot Mancing Dermaga',      x: 15.1, z: 32.4, y: 0.42, faceYaw: Math.PI * 0.5, bobberX: 18.6, bobberZ: 32.0 },
+      { id: 'timur',   name: 'Spot Mancing Tepian Timur', x: 22.4, z: 22.0, y: 0.30, faceYaw: 0,             bobberX: 22.4, bobberZ: 25.2 }
+    ];
+
+    spotDefs.forEach(sp => {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.62, 0.88, 20),
+        new THREE.MeshBasicMaterial({ color: 0x3f7691, side: THREE.DoubleSide, transparent: true, opacity: 0.78 })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(sp.x, sp.y + 0.06, sp.z);
+      scene.add(ring);
+      fishingSpots.push(Object.assign({}, sp, { ring }));
+    });
+
+    // 4 Animated NPC Anglers
+    addFishingNPC({ name: 'Pak Slamet', x: -10.8, y: 0.30, z: 27.8, yaw: Math.PI, shirt: 0x467a58, hat: 'caping', bobberX: -10.8, bobberZ: 24.5, phase: 0.2, registerTalkId: 'slamet' });
+    addFishingNPC({ name: 'Mas Agus',   x: 10.6,  y: 0.42, z: 27.6, yaw: Math.PI, shirt: 0x3b6e8c, hat: 'peci',   bobberX: 11.1,  bobberZ: 24.6, phase: 1.7 });
+    addFishingNPC({ name: 'Dek Rio',    x: 19.6,  y: 0.30, z: 22.0, yaw: 0,       shirt: 0xb87930, hat: 'caping', bobberX: 19.6,  bobberZ: 25.3, phase: 3.1 });
+    addFishingNPC({ name: 'Pak Tono',   x: -19.5, y: 0.02, z: 13.8, yaw: 0,       shirt: 0x7a5130, hat: 'caping', bobberX: -19.5, bobberZ: 17.0, phase: 4.5 });
+
+    // Player Fishing Visuals
+    fishingState.bobber = createBobberMesh();
+    fishingState.bobber.visible = false;
+    scene.add(fishingState.bobber);
+
+    fishingState.ripple = new THREE.Mesh(
+      new THREE.RingGeometry(0.18, 0.32, 18),
+      new THREE.MeshBasicMaterial({ color: 0xf5f2eb, side: THREE.DoubleSide, transparent: true, opacity: 0.7 })
+    );
+    fishingState.ripple.rotation.x = -Math.PI / 2;
+    fishingState.ripple.visible = false;
+    scene.add(fishingState.ripple);
+
+    fishingState.line = createFishingLineMesh();
+    fishingState.line.visible = false;
+    scene.add(fishingState.line);
+
+    const cf = new THREE.Group();
+    const cBody = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6), mat(0xd49a3a));
+    cBody.scale.set(1.65, 0.8, 0.58);
+    const cTail = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.3, 4), mat(0xa66b28));
+    cTail.rotation.z = -Math.PI / 2;
+    cTail.position.x = -0.36;
+    cf.add(cBody, cTail);
+    cf.visible = false;
+    fishingState.caughtFishMesh = cf;
+    scene.add(cf);
+  }
+
+  function buildSekolah() {
+    const g = new THREE.Group();
+    g.position.set(-36, 0, 48);
+
+    const yard = new THREE.Mesh(new THREE.BoxGeometry(20, 0.14, 16), mat(0xd1c4ae));
+    yard.position.set(0, 0.05, -2);
+    yard.receiveShadow = true;
+    g.add(yard);
+    walkableMeshes.push(yard);
+
+    const bldg = new THREE.Mesh(new THREE.BoxGeometry(14, 3.8, 6.2), mat(0xf0e9db));
+    bldg.position.set(0, 2.0, 2.2);
+    bldg.castShadow = true;
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(10.6, 2.8, 4), mat(0x9c4632));
+    roof.rotation.y = Math.PI / 4;
+    roof.scale.set(1.1, 1, 0.65);
+    roof.position.set(0, 5.2, 2.2);
+    roof.castShadow = true;
+    g.add(bldg, roof);
+    addBoxCollider(-43.4, -28.6, 46.8, 53.5);
+
+    const signTex = makeSignTexture('SMP NUSANTARA', '#2f6146', '#fbf8f2', 420, 72, '#e6dac5');
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 0.78), new THREE.MeshBasicMaterial({ map: signTex }));
+    sign.position.set(0, 3.4, -0.95);
+    sign.rotation.y = Math.PI;
+    g.add(sign);
+
+    scene.add(g);
+
+    const rina = createHuman({ shirt: 0x2f6146, isFemale: true, hijabColor: 0xe6dac5 });
+    rina.root.position.set(-36, 0.12, 44.5);
+    rina.root.rotation.y = Math.PI;
+    scene.add(rina.root);
+    npcs.push({ id: 'rina', name: 'Bu Rina', role: 'Guru PPKn SMP Nusantara', x: -36, z: 44.5, y: 0.12, zone: 'sekolah', human: rina });
+  }
+
+  function buildPosRonda() {
+    // Relocated cleanly away from central bridge to NE garden crossroads (17.5, -18)
+    const g = new THREE.Group();
+    g.position.set(17.5, 0, -18);
+
+    const base = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.34, 4.6), mat(0x8c6239));
+    base.position.y = 0.17;
+    base.receiveShadow = true;
+    g.add(base);
+
+    const postMat = mat(0x52341c);
+    for (const sx of [-2.4, 2.4]) {
+      for (const sz of [-1.9, 1.9]) {
+        const p = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 2.8, 7), postMat);
+        p.position.set(sx, 1.6, sz);
+        g.add(p);
+      }
+    }
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(4.4, 1.9, 4), mat(0x9c4632));
+    roof.rotation.y = Math.PI / 4;
+    roof.position.y = 3.8;
+    roof.castShadow = true;
+    g.add(roof);
+
+    // Bamboo Kentongan & Warm Lantern
+    const kentongan = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.95, 8), mat(0xa88b56));
+    kentongan.position.set(2.1, 2.1, 1.8);
+    const lan = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), mat(0xf2d184, { emissive: 0xc48b3b, emissiveIntensity: 0.7 }));
+    lan.position.set(0, 2.65, 0);
+    g.add(kentongan, lan);
+
+    // Subtle green rest ring right in front of Pos Ronda
+    posRondaBeacon = new THREE.Mesh(
+      new THREE.RingGeometry(1.15, 1.48, 24),
+      new THREE.MeshBasicMaterial({ color: 0x2f6146, side: THREE.DoubleSide, transparent: true, opacity: 0.72 })
+    );
+    posRondaBeacon.rotation.x = -Math.PI / 2;
+    posRondaBeacon.position.set(0, 0.08, 2.9);
+    g.add(posRondaBeacon);
+
+    scene.add(g);
+    addCircleCollider(17.5, -18, 2.2);
+
+    const udin = createHuman({ shirt: 0x4f755d, hat: 'peci' });
+    udin.root.position.set(17.5, 0.04, -15.0);
+    scene.add(udin.root);
+    npcs.push({ id: 'udin', name: 'Bang Udin', role: 'Penjaga Pos Ronda', x: 17.5, z: -15.0, y: 0.04, zone: 'posronda', human: udin });
+  }
+
+  function buildTreesAndDecor() {
+    const trunkMat = mat(0x634328);
+    const leafCols = [0x4c7342, 0x5c854d, 0x3f6338];
+    const treeCoords = [
+      [-12, -26], [12, -26], [-22, -16], [24, -26], [-22, 4], [24, 4],
+      [-50, 10], [-18, 12], [14, 10], [48, 12], [-50, 36], [-18, 38],
+      [28, 38], [40, 34], [-14, -46], [14, -46], [34, -28], [-48, -28]
+    ];
+    treeCoords.forEach(([tx, tz], i) => {
+      const tg = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.36, 2.6, 7), trunkMat);
+      trunk.position.y = 1.3;
+      trunk.castShadow = true;
+      const crown = new THREE.Mesh(new THREE.DodecahedronGeometry(1.75 + (i % 3) * 0.25, 0), mat(leafCols[i % 3]));
+      crown.position.y = 3.2;
+      crown.castShadow = true;
+      tg.add(trunk, crown);
+      tg.position.set(tx, 0, tz);
+      scene.add(tg);
+      addCircleCollider(tx, tz, 0.7);
+    });
+
+    // Fresh Coconut Energy Pickups along roads
+    const cocoSpots = [[-16, -8], [14, -8], [0, 8], [-32, 36], [26, 36], [10, -24]];
+    cocoSpots.forEach((cs, i) => {
+      const cg = new THREE.Group();
+      const nut = new THREE.Mesh(new THREE.SphereGeometry(0.32, 9, 8), mat(0x5d8746));
+      const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.45, 5), mat(0xe6dac5));
+      straw.position.set(0.08, 0.32, 0);
+      straw.rotation.z = -0.3;
+      cg.add(nut, straw);
+      cg.position.set(cs[0], 0.55, cs[1]);
+      scene.add(cg);
+      energyPickups.push({ mesh: cg, x: cs[0], z: cs[1], cooldown: 0, phase: i });
+    });
+
+    // Gotong Royong Volunteer NPCs (Budi & Sinta) at Alun-Alun
+    const budi = createHuman({ shirt: 0x3b6e52, hat: 'none' });
+    budi.root.position.set(-4.2, 0.1, -6.5);
+    scene.add(budi.root);
+    helpers.push({ name: 'Budi', human: budi, x: -4.2, z: -6.5, homeX: -4.2, homeZ: -6.5, walkPhase: 0 });
+    npcs.push({ id: 'budi', name: 'Budi', role: 'Relawan Karang Taruna', x: -4.2, z: -6.5, y: 0.1, zone: 'balai', human: budi });
+
+    const sinta = createHuman({ shirt: 0xa63d2f, isFemale: true, hijabColor: 0xe6dac5 });
+    sinta.root.position.set(4.2, 0.1, -6.5);
+    scene.add(sinta.root);
+    helpers.push({ name: 'Sinta', human: sinta, x: 4.2, z: -6.5, homeX: 4.2, homeZ: -6.5, walkPhase: 1 });
+    npcs.push({ id: 'sinta', name: 'Sinta', role: 'Relawan Karang Taruna', x: 4.2, z: -6.5, y: 0.1, zone: 'balai', human: sinta });
+
+    // Subtle tap-to-move ground ring & Overhead Zone Guide Arrow
+    tapRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.42, 0.62, 20),
+      new THREE.MeshBasicMaterial({ color: 0xa63d2f, side: THREE.DoubleSide, transparent: true, opacity: 0.78 })
+    );
+    tapRing.rotation.x = -Math.PI / 2;
+    tapRing.visible = false;
+    scene.add(tapRing);
+
+    guideArrowGroup = new THREE.Group();
+    const arrowCone = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.55, 6), mat(0xa63d2f));
+    arrowCone.rotation.x = Math.PI / 2;
+    arrowCone.position.z = 0.25;
+    guideArrowGroup.add(arrowCone);
+    scene.add(guideArrowGroup);
+  }
+
+  function buildPlayer() {
+    if (player.human) scene.remove(player.human.root);
+    player.human = buildCustomHero3D(selectedHero, 0.86);
+
+    player.carryProp = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.5, 0.54), mat(0x9e713c));
+    player.carryProp.position.set(0, 1.18, 0.56);
+    player.carryProp.visible = state.carrying === 'buku';
+    player.human.root.add(player.carryProp);
+
+    const { rodGroup, tipLocal } = createFishingRodRig(2.85);
+    rodGroup.position.set(0.46, 1.16, 0.42);
+    rodGroup.visible = fishingState.active;
+    player.human.root.add(rodGroup);
+    fishingState.playerRod = { rodGroup, tipLocal };
+
+    player.y = getTerrainHeight(player.x, player.z);
+    player.human.root.position.set(player.x, player.y, player.z);
+    scene.add(player.human.root);
+  }
+
+  function registerLabel(text, posFn, cls = '', opts = {}) {
+    const el = document.createElement('div');
+    el.className = 'world-label' + (cls ? ' ' + cls : '');
+    el.textContent = text;
+    document.getElementById('labels-layer').appendChild(el);
+    floatingLabels.push({ el, posFn, opts });
+  }
+
+  function buildLabels() {
+    npcs.forEach(n => {
+      registerLabel(n.name, () => new THREE.Vector3(n.x, n.y + 2.45, n.z), 'npc-bubble');
+    });
+    registerLabel('Pos Ronda · Pulihkan Energi 100%', () => new THREE.Vector3(17.5, 4.4, -18), 'energy');
+    registerLabel('Balai Desa (Masuk)', () => new THREE.Vector3(0, 9.4, -36.5), '', { hideInsideBalai: true });
+    registerLabel('Pasar Nusantara (7 Lapak)', () => new THREE.Vector3(-40, 5.2, -8));
+    registerLabel('Kampung Adat', () => new THREE.Vector3(42, 6.2, -10));
+    registerLabel('Dermaga Nelayan · TPI & Mercusuar', () => new THREE.Vector3(9.0, 5.2, 40.4));
+    registerLabel('Spot Mancing Barat', () => new THREE.Vector3(-9.4, 3.3, 29.2));
+    registerLabel('Spot Mancing Timur', () => new THREE.Vector3(21.0, 3.3, 20.6));
+    registerLabel('Sekolah SMP Nusantara', () => new THREE.Vector3(-36, 6.6, 46));
+  }
+
+  /* =========================================================
+     9. INTERACTIONS, DIALOGUES, GOTONG ROYONG & FISHING
+  ========================================================= */
+  let gameStarted = false;
+  let menuOpen = true;
+  let gamePausedForDialogue = false;
+  let toastTimer = null;
+
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  }
+
+  function addHarmony(val) {
+    state.harmony = Math.min(100, state.harmony + val);
+    updateHUD();
+  }
+
+  function consumeEnergy(baseCost) {
+    const cost = state.gotongTimer > 0 ? Math.max(2, Math.round(baseCost * 0.4)) : baseCost;
+    if (state.energy < cost) {
+      SFX.warn();
+      showToast('Energi tidak cukup! Istirahat di Pos Ronda, makan di warung, atau ajak Gotong Royong.');
+      return false;
+    }
+    state.energy = Math.max(0, state.energy - cost);
+    updateHUD();
+    return true;
+  }
+
+  function activateGotongRoyong() {
+    state.gotongTimer = 90;
+    SFX.success();
+    showToast('Budi & Sinta bergabung! Biaya energi semua aksi lapangan hemat 60% selama 90 detik.');
+    updateHUD();
+  }
+
+  function updateHUD() {
+    const ePct = Math.round(state.energy);
+    const hPct = Math.round(state.harmony);
+    const bE = document.getElementById('bar-energy');
+    bE.style.width = ePct + '%';
+    bE.classList.toggle('low', ePct < 25);
+    document.getElementById('val-energy').textContent = ePct + '%';
+
+    document.getElementById('bar-harmony').style.width = hPct + '%';
+    document.getElementById('val-harmony').textContent = hPct + '%';
+
+    const doneCount = Object.values(state.missions).filter(Boolean).length;
+    document.getElementById('mission-count').textContent = doneCount;
+
+    const gp = document.getElementById('gotong-pill');
+    gp.classList.toggle('active', state.gotongTimer > 0);
+    if (state.gotongTimer > 0) {
+      document.getElementById('gotong-timer').textContent = Math.ceil(state.gotongTimer);
+    }
+  }
+
+  function openDialogue({ name, role, tag, text, actions }) {
+    gamePausedForDialogue = true;
+    document.getElementById('dlg-name').textContent = name;
+    document.getElementById('dlg-role').textContent = role;
+    document.getElementById('dlg-tag').textContent = tag || 'Nilai Pancasila';
+    document.getElementById('dlg-text').textContent = text;
+    const actBox = document.getElementById('dlg-actions');
+    actBox.innerHTML = '';
+    actions.forEach(a => {
+      const btn = document.createElement('button');
+      btn.className = 'dlg-btn' + (a.style ? ' ' + a.style : '');
+      btn.textContent = a.label;
+      btn.onclick = () => { SFX.tap(); a.onClick(); };
+      actBox.appendChild(btn);
+    });
+    document.getElementById('dialogue-modal').classList.add('open');
+  }
+
+  function closeDialogue() {
+    document.getElementById('dialogue-modal').classList.remove('open');
+    gamePausedForDialogue = false;
+  }
+
+  function openMissionModal() {
+    const list = document.getElementById('mission-list');
+    const items = [
+      { key: 'pasar', title: '1. Tata 3 Gerobak Pasar Nusantara', desc: `Bantu Ibu Sari menertibkan jalur pasar (${state.counts.cartsFixed}/3)`, zone: 'pasar' },
+      { key: 'sungai', title: '2. Bersihkan 4 Titik Sampah Sungai', desc: `Bantu Pak Bahri menjaga ekosistem Dermaga (${state.counts.trashCleaned}/4)`, zone: 'dermaga' },
+      { key: 'gapura', title: '3. Kumpulkan 3 Bambu & Tegakkan Gapura', desc: `Bantu Datuk Bimo di Kampung Adat (${state.counts.bambooPicked}/3)`, zone: 'adat' },
+      { key: 'buku', title: '4. Antar Kotak Buku ke SMP Nusantara', desc: 'Ambil kotak buku di dalam Balai Desa, serahkan ke Bu Rina', zone: 'sekolah' },
+      { key: 'musyawarah', title: '5. Musyawarah Besar di Balai Desa', desc: 'Terbuka setelah minimal 3 misi lapangan selesai', zone: 'balai' }
+    ];
+    list.innerHTML = '';
+    items.forEach(it => {
+      const done = state.missions[it.key];
+      const div = document.createElement('div');
+      div.className = 'mission-item' + (done ? ' done' : '');
+      div.innerHTML = `
+        <div>
+          <div style="font-size:14px;font-weight:800;">${done ? '[Selesai] ' : ''}${it.title}</div>
+          <div style="font-size:12px;color:var(--ink-soft);">${it.desc}</div>
+        </div>
+        <button class="mini-ctrl-btn" onclick="guideToZone('${it.zone}');closeMissionModal();">Arahkan</button>
+      `;
+      list.appendChild(div);
+    });
+    document.getElementById('mission-modal').classList.add('open');
+  }
+
+  function closeMissionModal() {
+    document.getElementById('mission-modal').classList.remove('open');
+  }
+
+  function completeMusyawarah(choiceName) {
+    state.missions.musyawarah = true;
+    addHarmony(25);
+    closeDialogue();
+
+    if (!monumentGroup) {
+      monumentGroup = new THREE.Group();
+      monumentGroup.position.set(0, 0.12, -8);
+      const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 1.4, 8), mat(0xd8cbb6));
+      ped.position.y = 0.7;
+      const spire = new THREE.Mesh(new THREE.OctahedronGeometry(0.95, 0), mat(0xd4a13c, { metalness: 0.4, roughness: 0.3 }));
+      spire.position.y = 2.6;
+      monumentGroup.add(ped, spire);
+      scene.add(monumentGroup);
+
+      // Warm Festival Lanterns around Alun-Alun
+      festivalLanterns = new THREE.Group();
+      for (let i = 0; i < 8; i++) {
+        const ang = (i / 8) * Math.PI * 2;
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 3.2, 6), mat(0x52341c));
+        post.position.set(Math.cos(ang) * 7.8, 1.6, -8 + Math.sin(ang) * 7.8);
+        const orb = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), mat(0xf5cf7a, { emissive: 0xc98a2e, emissiveIntensity: 0.85 }));
+        orb.position.set(Math.cos(ang) * 7.8, 3.3, -8 + Math.sin(ang) * 7.8);
+        festivalLanterns.add(post, orb);
+      }
+      scene.add(festivalLanterns);
+    }
+
+    // Warm golden sunset lighting
+    scene.background = new THREE.Color(0xdfb895);
+    scene.fog.color.setHex(0xdfb895);
+    sunLight.color.setHex(0xffc98c);
+
+    SFX.success();
+    showToast(`Mufakat tercapai! ${choiceName} diresmikan dan Festival Lentera Nusantara dimulai!`);
+  }
+
+  function talkToNPC(npc) {
+    const doneField = ['pasar', 'sungai', 'gapura', 'buku'].filter(k => state.missions[k]).length;
+
+    if (npc.id === 'hendra') {
+      if (state.missions.musyawarah) {
+        openDialogue({
+          name: npc.name, role: npc.role, tag: 'Sila ke-4 · Musyawarah Mufakat',
+          text: 'Selamat! Desa Bhinneka kini rukun dan tertata berkat gotong royong kita. Silakan terus menjelajah, memancing di sungai, atau menguji pemahaman di menu Kuis!',
+          actions: [{ label: 'Siap, Pak Hendra!', style: 'green', onClick: closeDialogue }]
+        });
+      } else if (doneField < 3) {
+        openDialogue({
+          name: npc.name, role: npc.role, tag: 'Sila ke-3 & ke-4 · Kepemimpinan',
+          text: `Selamat datang di dalam Balai Desa! Selesaikan minimal 3 dari 4 misi lapangan warga dulu (saat ini ${doneField}/4 selesai). Jangan lupa ambil kotak buku di sudut ruangan ini untuk Bu Rina di SMP Nusantara!`,
+          actions: [
+            { label: 'Buka Daftar Misi', style: 'sky', onClick: () => { closeDialogue(); openMissionModal(); } },
+            { label: 'Baik, Pak!', style: 'ghost', onClick: closeDialogue }
+          ]
+        });
+      } else {
+        openDialogue({
+          name: npc.name, role: npc.role, tag: 'Musyawarah Besar Desa Bhinneka',
+          text: 'Luar biasa! Minimal 3 misi lapangan telah selesai. Mari bermusyawarah bersama siswa sekelas: fasilitas apa yang paling tepat kita bangun di Alun-Alun Desa?',
+          actions: [
+            { label: 'Tugu Bhinneka & Taman Baca', style: 'gold', onClick: () => completeMusyawarah('Tugu Bhinneka & Taman Baca') },
+            { label: 'Panggung Seni Budaya Nusantara', style: 'green', onClick: () => completeMusyawarah('Panggung Seni Budaya Nusantara') },
+            { label: 'Tunda Sebentar', style: 'ghost', onClick: closeDialogue }
+          ]
+        });
+      }
+      return;
+    }
+
+    if (npc.id === 'sari') {
+      openDialogue({
+        name: npc.name, role: npc.role, tag: 'Norma Ketertiban · Pasar Nusantara',
+        text: state.missions.pasar
+          ? 'Terima kasih banyak! Jalur Pasar Nusantara kini rapi sehingga semua 7 lapak ramai dikunjungi pembeli.'
+          : `Ada 3 gerobak dagangan yang menghalangi jalur utama pasar (${state.counts.cartsFixed}/3 sudah dirapikan). Dekati gerobak dan tekan tombol aksi untuk menatanya!`,
+        actions: [{ label: 'Siap, Ibu Sari!', style: 'green', onClick: closeDialogue }]
+      });
+      return;
+    }
+
+    if (npc.id === 'jaya' || npc.id === 'ningsih') {
+      const food = npc.id === 'jaya' ? 'Semangkuk Soto Hangat' : 'Jamu Beras Kencur & Klepon';
+      openDialogue({
+        name: npc.name, role: npc.role, tag: 'Kerukunan Ekonomi Rakyat',
+        text: `Mampir dulu ke lapak kami! Menikmati ${food} bisa memulihkan +30% energi sebelum melanjutkan kerja bakti.`,
+        actions: [
+          {
+            label: `Nikmati ${food} (+30% Energi)`, style: 'green',
+            onClick: () => {
+              state.energy = Math.min(100, state.energy + 30);
+              SFX.energy(); updateHUD(); closeDialogue();
+              showToast(`${food} menyegarkan! Energi +30%.`);
+            }
+          },
+          { label: 'Terima kasih!', style: 'ghost', onClick: closeDialogue }
+        ]
+      });
+      return;
+    }
+
+    if (npc.id === 'wulan') {
+      openDialogue({
+        name: npc.name, role: npc.role, tag: 'Bhinneka Tunggal Ika · Wastra Nusantara',
+        text: 'Setiap daerah di Indonesia punya kain khas—dari Batik Soga, Ulos Batak, Songket Minang, sampai Tenun Ikat NTT. Kamu bisa mencoba semuanya lewat menu Adventure 3D!',
+        actions: [{ label: 'Indah sekali!', style: 'sky', onClick: closeDialogue }]
+      });
+      return;
+    }
+
+    if (npc.id === 'bimo') {
+      openDialogue({
+        name: npc.name, role: npc.role, tag: 'Bhinneka Tunggal Ika · Sila ke-3',
+        text: state.missions.gapura
+          ? 'Gapura Persatuan sudah tegak kembali! Semangat persatuan kita terpancar kuat di Kampung Adat.'
+          : `Gapura Persatuan kita miring tertiup angin. Kumpulkan 3 ikat bambu di sekitar Kampung Adat (${state.counts.bambooPicked}/3), lalu dekati gapura untuk menegakkannya bersama!`,
+        actions: [{ label: 'Siap, Datuk Bimo!', style: 'green', onClick: closeDialogue }]
+      });
+      return;
+    }
+
+    if (npc.id === 'bahri') {
+      openDialogue({
+        name: npc.name, role: npc.role, tag: 'Wawasan Nusantara · Kelestarian Sungai',
+        text: state.missions.sungai
+          ? 'Sungai sudah bersih! Kapal-kapal nelayan leluasa melintas di bawah jembatan lengkung dan ikan kembali ramai.'
+          : `Ada 4 tumpukan sampah mengapung di sekitar Dermaga (${state.counts.trashCleaned}/4 bersih). Berjalanlah ke dermaga kayu dan bersihkan sampahnya!`,
+        actions: [{ label: 'Ayo bersihkan sungai!', style: 'sky', onClick: closeDialogue }]
+      });
+      return;
+    }
+
+    if (npc.id === 'rahma') {
+      openDialogue({
+        name: npc.name, role: npc.role, tag: 'Ekonomi Maritim & Wawasan Nusantara',
+        text: 'Aroma ikan bakar segar hasil tangkapan nelayan Desa Bhinneka! Perairan yang bersih membuat hasil tangkapan melimpah. Mau menyantap ikan bakar & es kelapa untuk memulihkan tenaga?',
+        actions: [
+          {
+            label: 'Santap Ikan Bakar (+35% Energi)', style: 'green',
+            onClick: () => {
+              state.energy = Math.min(100, state.energy + 35);
+              SFX.energy(); updateHUD(); closeDialogue();
+              showToast('Ikan bakar & es kelapa dermaga menyegarkan! Energi +35%.');
+            }
+          },
+          { label: 'Nanti ya, Bu Rahma!', style: 'ghost', onClick: closeDialogue }
+        ]
+      });
+      return;
+    }
+
+    if (npc.id === 'slamet') {
+      openDialogue({
+        name: npc.name, role: npc.role, tag: 'Wawasan Nusantara & Kelestarian Alam',
+        text: 'Sungai yang bersih dan jembatan lengkung yang tinggi bikin kapal nelayan bebas melintas dan ikan makin melimpah! Berdiri di lingkaran biru sebelah saya lalu ketuk MANCING IKAN untuk ikut memancing ramah lingkungan!',
+        actions: [{ label: 'Siap, saya ikut mancing!', style: 'sky', onClick: closeDialogue }]
+      });
+      return;
+    }
+
+    if (npc.id === 'rina') {
+      if (state.missions.buku) {
+        openDialogue({
+          name: npc.name, role: npc.role, tag: 'Hak Atas Pendidikan · UUD 1945 Pasal 31',
+          text: 'Buku Pendidikan Pancasila sudah diterima siswa SMP Nusantara! Terima kasih atas kepedulianmu.',
+          actions: [{ label: 'Sama-sama, Bu Rina!', style: 'green', onClick: closeDialogue }]
+        });
+      } else if (state.carrying === 'buku') {
+        openDialogue({
+          name: npc.name, role: npc.role, tag: 'Hak Atas Pendidikan · Sila ke-5',
+          text: 'Wah, kotak buku dari Balai Desa sudah sampai! Mari kita bagikan ke kelas agar semua siswa belajar dengan adil.',
+          actions: [{
+            label: 'Serahkan Kotak Buku (+20 Harmoni)', style: 'green',
+            onClick: () => {
+              state.carrying = null;
+              if (player.carryProp) player.carryProp.visible = false;
+              state.missions.buku = true;
+              addHarmony(20);
+              SFX.success();
+              closeDialogue();
+              showToast('Misi 4 Selesai! Kotak buku berhasil diantarkan ke SMP Nusantara.');
+            }
+          }]
+        });
+      } else {
+        openDialogue({
+          name: npc.name, role: npc.role, tag: 'Hak Atas Pendidikan · Sila ke-5',
+          text: 'Siswa kelas VII–IX membutuhkan kotak buku Pendidikan Pancasila yang disimpan di dalam Balai Desa. Tolong bantu ambil dan antarkan ke sini ya!',
+          actions: [
+            { label: 'Arahkan ke Balai Desa', style: 'sky', onClick: () => { guideToZone('balai'); closeDialogue(); } },
+            { label: 'Siap, Bu Rina!', style: 'ghost', onClick: closeDialogue }
+          ]
+        });
+      }
+      return;
+    }
+
+    if (npc.id === 'udin') {
+      openDialogue({
+        name: npc.name, role: npc.role, tag: 'Siskamling & Kesehatan Bersama',
+        text: 'Singgah dulu di Pos Ronda taman desa! Beristirahat sejenak dan minum teh hangat akan memulihkan energimu penuh 100%.',
+        actions: [
+          {
+            label: 'Istirahat Penuh (Energi 100%)', style: 'green',
+            onClick: () => {
+              state.energy = 100;
+              SFX.energy(); updateHUD(); closeDialogue();
+              showToast('Energi kembali penuh 100% di Pos Ronda!');
+            }
+          },
+          { label: 'Nanti dulu, Bang Udin', style: 'ghost', onClick: closeDialogue }
+        ]
+      });
+      return;
+    }
+
+    if (npc.id === 'budi' || npc.id === 'sinta') {
+      openDialogue({
+        name: npc.name, role: npc.role, tag: 'Gotong Royong · Sila ke-3 & ke-5',
+        text: 'Pekerjaan berat terasa ringan jika dikerjakan bersama! Ajak saya dan teman relawan ikut berkeliling agar penggunaan energimu hemat 60% saat menyelesaikan misi.',
+        actions: [
+          { label: 'Ajak Gotong Royong (90 detik)', style: 'green', onClick: () => { activateGotongRoyong(); closeDialogue(); } },
+          { label: 'Nanti saja', style: 'ghost', onClick: closeDialogue }
+        ]
+      });
+    }
+  }
+
+  /* --- Fishing Minigame Controls --- */
+  function startFishing(spot) {
+    fishingState.active = true;
+    fishingState.spot = spot;
+    fishingState.phase = 'waiting';
+    fishingState.timer = 1.6 + Math.random() * 1.9;
+    player.moveTarget = null;
+    if (tapRing) tapRing.visible = false;
+
+    player.x = spot.x;
+    player.z = spot.z;
+    player.y = spot.y;
+    player.rotY = spot.faceYaw;
+    if (fishingState.playerRod) fishingState.playerRod.rodGroup.visible = true;
+    fishingState.bobber.visible = true;
+    fishingState.bobber.position.set(spot.bobberX, -0.30, spot.bobberZ);
+    fishingState.line.visible = true;
+    fishingState.ripple.visible = true;
+    fishingState.ripple.position.set(spot.bobberX, -0.31, spot.bobberZ);
+
+    SFX.tap();
+    showToast('Joran dilempar! Tunggu pelampung menyambar lalu tekan TARIK JORAN.');
+    updateActionButton();
+  }
+
+  function stopFishing() {
+    if (!fishingState.active) return;
+    fishingState.active = false;
+    fishingState.spot = null;
+    fishingState.phase = 'idle';
+    if (fishingState.playerRod) fishingState.playerRod.rodGroup.visible = false;
+    if (fishingState.bobber) fishingState.bobber.visible = false;
+    if (fishingState.ripple) fishingState.ripple.visible = false;
+    if (fishingState.line) fishingState.line.visible = false;
+    updateActionButton();
+  }
+
+  function reelInFish() {
+    if (!fishingState.active) return;
+    if (fishingState.phase === 'biting') {
+      const fishNames = ['Ikan Gurame', 'Ikan Patin Sungai', 'Ikan Nila Segar', 'Udang Galah', 'Ikan Kakap Muara'];
+      const caught = fishNames[Math.floor(Math.random() * fishNames.length)];
+      fishingState.fishCaught++;
+      state.energy = Math.min(100, state.energy + 15);
+      if (fishingState.fishCaught <= 3) addHarmony(2);
+
+      fishingState.reelTimer = 0.9;
+      fishingState.caughtFishMesh.visible = true;
+      fishingState.caughtFishMesh.position.set(fishingState.spot.bobberX, -0.2, fishingState.spot.bobberZ);
+
+      SFX.pickup();
+      showToast(`Berhasil menangkap ${caught}! (+15% Energi · Total: ${fishingState.fishCaught})`);
+      fishingState.phase = 'waiting';
+      fishingState.timer = 2.0 + Math.random() * 2.0;
+      updateHUD();
+    } else {
+      SFX.tap();
+      showToast('Belum ada tarikan ikan — tunggu pelampung turun atau bergerak untuk berhenti mancing.');
+    }
+  }
+
+  function findNearestInteractable() {
+    if (fishingState.active) {
+      if (fishingState.phase === 'biting') return { dist: 0, type: 'fish_reel', label: 'TARIK JORAN!', style: 'ready-gold' };
+      return { dist: 0, type: 'fish_wait', label: 'MENUNGGU IKAN...', style: 'ready' };
+    }
+
+    const cands = [];
+    const dPos = Math.hypot(player.x - 17.5, player.z + 15.1);
+    if (dPos < 3.8 && state.energy < 98) cands.push({ dist: dPos, type: 'rest', label: 'ISTIRAHAT (100%)', style: 'ready' });
+
+    fishingSpots.forEach(sp => {
+      const d = Math.hypot(player.x - sp.x, player.z - sp.z);
+      if (d < 3.0) cands.push({ dist: d - 0.3, type: 'fish_start', spot: sp, label: 'MANCING IKAN', style: 'ready' });
+    });
+
+    marketCarts.forEach(c => {
+      if (!c.fixed) {
+        const d = Math.hypot(player.x - c.x, player.z - c.z);
+        if (d < 3.2) cands.push({ dist: d, type: 'cart', obj: c, label: 'RAPIKAN GEROBAK', style: 'ready-gold' });
+      }
+    });
+
+    riverTrash.forEach(t => {
+      if (!t.cleaned) {
+        const d = Math.hypot(player.x - t.x, player.z - t.z);
+        if (d < 3.9) cands.push({ dist: d, type: 'trash', obj: t, label: 'BERSIHKAN SAMPAH', style: 'ready-gold' });
+      }
+    });
+
+    bambooItems.forEach(b => {
+      if (!b.picked) {
+        const d
