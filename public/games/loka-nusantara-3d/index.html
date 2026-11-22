@@ -4558,4 +4558,1449 @@
 
     bambooItems.forEach(b => {
       if (!b.picked) {
-        const d
+        const d = Math.hypot(player.x - b.x, player.z - b.z);
+        if (d < 3.2) cands.push({ dist: d, type: 'bamboo', obj: b, label: 'AMBIL BAMBU', style: 'ready-gold' });
+      }
+    });
+
+    if (!state.missions.gapura && state.counts.bambooPicked >= 3) {
+      const d = Math.hypot(player.x - 29.2, player.z - (-10));
+      if (d < 4.5) cands.push({ dist: d, type: 'gapura', label: 'TEGAKKAN GAPURA', style: 'ready-gold' });
+    }
+
+    if (!state.missions.buku && state.carrying !== 'buku') {
+      const d = Math.hypot(player.x - (-30.3), player.z - (-16.5));
+      if (d < 3.5) cands.push({ dist: d, type: 'textbook', label: 'AMBIL KOTAK BUKU', style: 'ready-gold' });
+    }
+
+    npcs.forEach(n => {
+      const d = Math.hypot(player.x - n.x, player.z - n.z);
+      if (d < 3.6) cands.push({ dist: d, type: 'npc', obj: n, label: 'BICARA: ' + n.name.toUpperCase(), style: 'ready' });
+    });
+
+    if (cands.length > 0) {
+      cands.sort((a, b) => a.dist - b.dist);
+      return cands[0];
+    }
+    return null;
+  }
+
+  function updateActionButton() {
+    const btn = document.getElementById('btn-action');
+    if (!btn) return;
+    const it = findNearestInteractable();
+    if (it) {
+      btn.textContent = it.label;
+      btn.className = it.style || 'ready';
+    } else {
+      btn.textContent = 'JELAJAHI DESA';
+      btn.className = '';
+    }
+  }
+
+  function triggerPrimaryAction() {
+    const it = findNearestInteractable();
+    if (!it) {
+      SFX.tap();
+      showToast('Dekati warga desa atau objek tugas untuk berinteraksi!');
+      return;
+    }
+
+    if (it.type === 'fish_reel') {
+      reelInFish();
+      return;
+    }
+    if (it.type === 'fish_wait') {
+      stopFishing();
+      showToast('Berhenti memancing.');
+      return;
+    }
+    if (it.type === 'fish_start') {
+      startFishing(it.spot);
+      return;
+    }
+    if (it.type === 'rest') {
+      state.energy = 100;
+      SFX.energy();
+      updateHUD();
+      showToast('Beristirahat di Pos Ronda. Energi pulih 100%!');
+      updateActionButton();
+      return;
+    }
+    if (it.type === 'cart') {
+      if (!consumeEnergy(12)) return;
+      it.obj.fixed = true;
+      if (it.obj.group) it.obj.group.position.x += (it.obj.x < -16 ? -0.8 : 0.8);
+      state.counts.cartsFixed++;
+      addHarmony(6);
+      SFX.success();
+      showToast('Gerobak pasar dirapikan! (' + state.counts.cartsFixed + '/3)');
+      if (state.counts.cartsFixed >= 3) {
+        state.missions.pasar = true;
+        showToast('Misi 1 Selesai: Jalur Pasar Nusantara kini rapi & tertib!');
+      }
+      updateHUD();
+      updateActionButton();
+      return;
+    }
+    if (it.type === 'trash') {
+      if (!consumeEnergy(10)) return;
+      it.obj.cleaned = true;
+      if (it.obj.mesh) it.obj.mesh.visible = false;
+      state.counts.trashCleaned++;
+      addHarmony(5);
+      SFX.pickup();
+      showToast('Sampah perairan dermaga dibersihkan! (' + state.counts.trashCleaned + '/4)');
+      if (state.counts.trashCleaned >= 4) {
+        state.missions.sungai = true;
+        showToast('Misi 2 Selesai: Ekosistem sungai & dermaga asri kembali!');
+      }
+      updateHUD();
+      updateActionButton();
+      return;
+    }
+    if (it.type === 'bamboo') {
+      if (!consumeEnergy(8)) return;
+      it.obj.picked = true;
+      if (it.obj.mesh) it.obj.mesh.visible = false;
+      state.counts.bambooPicked++;
+      SFX.pickup();
+      showToast('Bambu berhasil dikumpulkan! (' + state.counts.bambooPicked + '/3)');
+      if (state.counts.bambooPicked >= 3) {
+        showToast('3 bambu terkumpul! Dekati Gapura di Kampung Adat untuk menegakkannya.');
+      }
+      updateHUD();
+      updateActionButton();
+      return;
+    }
+    if (it.type === 'gapura') {
+      if (!consumeEnergy(15)) return;
+      state.missions.gapura = true;
+      if (gapuraGroup) gapuraGroup.rotation.z = 0;
+      addHarmony(20);
+      SFX.success();
+      showToast('Misi 3 Selesai: Gapura Persatuan Kampung Adat berdiri tegak!');
+      updateHUD();
+      updateActionButton();
+      return;
+    }
+    if (it.type === 'textbook') {
+      state.carrying = 'buku';
+      if (textbookPickup) textbookPickup.visible = false;
+      if (player.carryProp) player.carryProp.visible = true;
+      SFX.pickup();
+      showToast('Kotak Buku Pendidikan Pancasila diambil! Antarkan ke Bu Rina di SMP Nusantara.');
+      updateHUD();
+      updateActionButton();
+      return;
+    }
+    if (it.type === 'npc') {
+      talkToNPC(it.obj);
+      return;
+    }
+  }
+
+  /* =========================================================
+     10. MAIN MENU NAVIGATION & TABS
+  ========================================================= */
+  let activeMenuTab = 'beranda';
+
+  function selectMenuTab(tabId) {
+    activeMenuTab = tabId;
+    document.querySelectorAll('.nav-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tabId);
+    });
+    document.querySelectorAll('.menu-panel').forEach(panel => {
+      panel.classList.toggle('active', panel.id === 'panel-' + tabId);
+    });
+
+    if (tabId === 'adventure') {
+      initCustomizerView();
+    } else if (tabId === 'materi') {
+      initMateriView();
+    } else if (tabId === 'kuis') {
+      initQuizView();
+    }
+    SFX.tap();
+  }
+
+  function openMainMenu(tabId = 'beranda') {
+    menuOpen = true;
+    const overlay = document.getElementById('menu-overlay');
+    if (overlay) overlay.style.display = 'flex';
+    selectMenuTab(tabId);
+  }
+
+  function closeMainMenu() {
+    menuOpen = false;
+    const overlay = document.getElementById('menu-overlay');
+    if (overlay) overlay.style.display = 'none';
+    ensureAudio();
+    SFX.tap();
+  }
+
+  function quickStartAdventure() {
+    closeMainMenu();
+    showToast('Selamat menjelajah Desa Bhinneka!');
+  }
+
+  function startGame() {
+    buildPlayer();
+    closeMainMenu();
+    showToast('Karakter ' + (selectedHero === 'raka' ? 'Raka' : 'Tara') + ' siap bertualang di Desa Bhinneka!');
+  }
+
+  /* =========================================================
+     11. CHARACTER CUSTOMIZER 3D & UI
+  ========================================================= */
+  let custScene = null, custCamera = null, custRenderer = null, custHeroGroup = null;
+  let custAnimId = null;
+  let custPoseAngle = 0;
+  let custDragActive = false, custPrevX = 0;
+
+  function initCustomizerView() {
+    const wrap = document.getElementById('customizer-canvas-wrap');
+    if (!wrap) return;
+
+    if (!custRenderer) {
+      custScene = new THREE.Scene();
+      custScene.background = new THREE.Color(0xf6efe5);
+
+      const lightA = new THREE.AmbientLight(0xfff6ea, 0.95);
+      const lightD = new THREE.DirectionalLight(0xfffaed, 1.1);
+      lightD.position.set(2, 4, 3);
+      custScene.add(lightA, lightD);
+
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.45, 0.14, 24), mat(0xdecbb7));
+      pad.position.y = -0.07;
+      custScene.add(pad);
+
+      custCamera = new THREE.PerspectiveCamera(36, wrap.clientWidth / Math.max(wrap.clientHeight, 1), 0.1, 50);
+      custCamera.position.set(0, 1.15, 3.7);
+      custCamera.lookAt(0, 0.9, 0);
+
+      custRenderer = new THREE.WebGLRenderer({ antialias: true });
+      custRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      custRenderer.setSize(wrap.clientWidth, wrap.clientHeight);
+      wrap.appendChild(custRenderer.domElement);
+
+      wrap.addEventListener('pointerdown', (e) => {
+        custDragActive = true;
+        custPrevX = e.clientX;
+      });
+      window.addEventListener('pointermove', (e) => {
+        if (!custDragActive || !custHeroGroup) return;
+        const dx = e.clientX - custPrevX;
+        custPrevX = e.clientX;
+        custHeroGroup.rotation.y += dx * 0.015;
+      });
+      window.addEventListener('pointerup', () => { custDragActive = false; });
+
+      function renderCustLoop() {
+        custAnimId = requestAnimationFrame(renderCustLoop);
+        if (activeMenuTab === 'adventure' && custRenderer && custScene && custCamera) {
+          if (!custDragActive && custHeroGroup) {
+            custHeroGroup.rotation.y += 0.003;
+          }
+          custRenderer.render(custScene, custCamera);
+        }
+      }
+      renderCustLoop();
+    } else {
+      custRenderer.setSize(wrap.clientWidth, wrap.clientHeight);
+      custCamera.aspect = wrap.clientWidth / Math.max(wrap.clientHeight, 1);
+      custCamera.updateProjectionMatrix();
+    }
+
+    renderCustBody();
+    updateCustPreviewMesh();
+  }
+
+  function updateCustPreviewMesh() {
+    if (!custScene) return;
+    if (custHeroGroup) custScene.remove(custHeroGroup);
+
+    const charObj = buildCustomHero3D(selectedHero, 1.0);
+    custHeroGroup = charObj.root;
+    custHeroGroup.position.set(0, 0, 0);
+    custScene.add(custHeroGroup);
+  }
+
+  function selectHero(heroId) {
+    selectedHero = heroId;
+    const bR = document.getElementById('pick-raka');
+    const bT = document.getElementById('pick-tara');
+    if (bR) bR.classList.toggle('active', heroId === 'raka');
+    if (bT) bT.classList.toggle('active', heroId === 'tara');
+
+    const nameLbl = document.getElementById('cust-preview-name');
+    if (nameLbl) nameLbl.textContent = heroId === 'raka' ? 'Raka · Relawan Desa (Pria)' : 'Tara · Siswi Teladan (Wanita)';
+
+    const hijabChip = document.getElementById('cust-hijab-chip');
+    if (hijabChip) hijabChip.style.display = heroId === 'tara' ? 'inline-flex' : 'none';
+
+    renderCustBody();
+    updateCustPreviewMesh();
+    SFX.tap();
+  }
+
+  function selectCustTab(tabId) {
+    activeCustTab = tabId;
+    document.querySelectorAll('.cust-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.ctab === tabId);
+    });
+    renderCustBody();
+    SFX.tap();
+  }
+
+  function cyclePreviewPose() {
+    if (!custHeroGroup) return;
+    custPoseAngle = (custPoseAngle + Math.PI * 0.5) % (Math.PI * 2);
+    custHeroGroup.rotation.y = custPoseAngle;
+    SFX.tap();
+  }
+
+  function randomizeHero() {
+    const cur = heroCustom[selectedHero];
+    const randOutfit = HERO_OUTFITS[Math.floor(Math.random() * HERO_OUTFITS.length)];
+    const randSkin = HERO_SKINS[Math.floor(Math.random() * HERO_SKINS.length)];
+    const randExpr = HERO_EXPRS[Math.floor(Math.random() * HERO_EXPRS.length)];
+    cur.outfit = randOutfit.id;
+    cur.skin = randSkin.id;
+    cur.expr = randExpr.id;
+
+    if (selectedHero === 'raka') {
+      const randHead = HERO_HEADGEARS[Math.floor(Math.random() * HERO_HEADGEARS.length)];
+      cur.headgear = randHead.id;
+    } else {
+      const randHijab = HERO_HIJAB_COLORS[Math.floor(Math.random() * HERO_HIJAB_COLORS.length)];
+      cur.hijabColor = randHijab.id;
+    }
+    renderCustBody();
+    updateCustPreviewMesh();
+    SFX.pickup();
+  }
+
+  function renderCustBody() {
+    const body = document.getElementById('cust-body');
+    if (!body) return;
+    body.innerHTML = '';
+    const cur = heroCustom[selectedHero];
+
+    if (activeCustTab === 'kostum') {
+      const grid = document.createElement('div');
+      grid.className = 'cust-grid';
+      HERO_OUTFITS.forEach(o => {
+        const item = document.createElement('div');
+        item.className = 'cust-card-item' + (cur.outfit === o.id ? ' active' : '');
+        item.innerHTML = '<div class="cust-card-color" style="background:#' + o.shirt.toString(16).padStart(6,'0') + ';"></div>' +
+          '<div class="cust-card-info">' +
+            '<div class="cust-card-title">' + o.name + '</div>' +
+            '<div class="cust-card-sub">' + o.region + '</div>' +
+          '</div>';
+        item.onclick = () => {
+          cur.outfit = o.id;
+          SFX.tap();
+          renderCustBody();
+          updateCustPreviewMesh();
+        };
+        grid.appendChild(item);
+      });
+      body.appendChild(grid);
+    } else if (activeCustTab === 'wajah') {
+      const secSkin = document.createElement('div');
+      secSkin.innerHTML = '<div style="font-size:13px;font-weight:800;margin-bottom:8px;">Warna Kulit Nusantara</div>';
+      const skinRow = document.createElement('div');
+      skinRow.className = 'cust-swatch-row';
+      HERO_SKINS.forEach(s => {
+        const btn = document.createElement('button');
+        btn.className = 'cust-swatch' + (cur.skin === s.id ? ' active' : '');
+        btn.style.backgroundColor = '#' + s.hex.toString(16).padStart(6, '0');
+        btn.title = s.name;
+        btn.onclick = () => {
+          cur.skin = s.id;
+          SFX.tap();
+          renderCustBody();
+          updateCustPreviewMesh();
+        };
+        skinRow.appendChild(btn);
+      });
+      secSkin.appendChild(skinRow);
+      body.appendChild(secSkin);
+
+      const secExpr = document.createElement('div');
+      secExpr.style.marginTop = '16px';
+      secExpr.innerHTML = '<div style="font-size:13px;font-weight:800;margin-bottom:8px;">Ekspresi Wajah</div>';
+      const exprGrid = document.createElement('div');
+      exprGrid.className = 'cust-btn-group';
+      HERO_EXPRS.forEach(e => {
+        const btn = document.createElement('button');
+        btn.className = 'cust-pill-btn' + (cur.expr === e.id ? ' active' : '');
+        btn.textContent = e.name;
+        btn.onclick = () => {
+          cur.expr = e.id;
+          SFX.tap();
+          renderCustBody();
+          updateCustPreviewMesh();
+        };
+        exprGrid.appendChild(btn);
+      });
+      secExpr.appendChild(exprGrid);
+      body.appendChild(secExpr);
+
+      if (selectedHero === 'tara') {
+        const secHijab = document.createElement('div');
+        secHijab.style.marginTop = '16px';
+        secHijab.innerHTML = '<div style="font-size:13px;font-weight:800;margin-bottom:8px;">Warna Hijab Adat Sopan</div>';
+        const hijabRow = document.createElement('div');
+        hijabRow.className = 'cust-swatch-row';
+        HERO_HIJAB_COLORS.forEach(h => {
+          const btn = document.createElement('button');
+          btn.className = 'cust-swatch' + (cur.hijabColor === h.id ? ' active' : '');
+          btn.style.backgroundColor = '#' + h.hex.toString(16).padStart(6, '0');
+          btn.title = h.name;
+          btn.onclick = () => {
+            cur.hijabColor = h.id;
+            SFX.tap();
+            renderCustBody();
+            updateCustPreviewMesh();
+          };
+          hijabRow.appendChild(btn);
+        });
+        secHijab.appendChild(hijabRow);
+        body.appendChild(secHijab);
+      }
+    } else if (activeCustTab === 'aksesoris') {
+      if (selectedHero === 'raka') {
+        const secHead = document.createElement('div');
+        secHead.innerHTML = '<div style="font-size:13px;font-weight:800;margin-bottom:8px;">Penutup Kepala Tradisional</div>';
+        const hGrid = document.createElement('div');
+        hGrid.className = 'cust-btn-group';
+        HERO_HEADGEARS.forEach(h => {
+          const btn = document.createElement('button');
+          btn.className = 'cust-pill-btn' + (cur.headgear === h.id ? ' active' : '');
+          btn.textContent = h.name;
+          btn.onclick = () => {
+            cur.headgear = h.id;
+            SFX.tap();
+            renderCustBody();
+            updateCustPreviewMesh();
+          };
+          hGrid.appendChild(btn);
+        });
+        secHead.appendChild(hGrid);
+        body.appendChild(secHead);
+      }
+
+      const secGear = document.createElement('div');
+      secGear.style.marginTop = '16px';
+      secGear.innerHTML = '<div style="font-size:13px;font-weight:800;margin-bottom:8px;">Perlengkapan Relawan</div>';
+      const gGrid = document.createElement('div');
+      gGrid.className = 'cust-btn-group';
+      HERO_GEARS.forEach(g => {
+        const btn = document.createElement('button');
+        btn.className = 'cust-pill-btn' + (cur.gear === g.id ? ' active' : '');
+        btn.textContent = g.name;
+        btn.onclick = () => {
+          cur.gear = g.id;
+          SFX.tap();
+          renderCustBody();
+          updateCustPreviewMesh();
+        };
+        gGrid.appendChild(btn);
+      });
+      secGear.appendChild(gGrid);
+      body.appendChild(secGear);
+    }
+  }
+
+  /* =========================================================
+     12. MATERI DIORAMA 3D (KURIKULUM MERDEKA FASE D)
+  ========================================================= */
+  const MATERI_TOPICS = [
+    {
+      id: 'pancasila',
+      title: 'Pancasila: Fondasi Hidup Berbangsa',
+      kicker: 'Elemen 1 · Nilai-Nilai Dasar Pancasila',
+      scenes: [
+        {
+          title: 'Ketuhanan & Kemanusiaan yang Adil',
+          speaker: 'Pak Hendra · Kepala Desa',
+          speech: 'Di Desa Bhinneka, setiap warga saling menghormati waktu ibadah dan bahu-membahu menolong sesama tanpa memandang latar belakang keyakinan.',
+          points: [
+            'Sila ke-1: Menjamin kebebasan memeluk agama dan toleransi aktif.',
+            'Sila ke-2: Menjunjung tinggi kesetaraan derajat, hak, dan kewajiban asasi manusia.',
+            'Aplikasi nyata: Sikap empati, anti-perundungan, dan solidaritas warga.'
+          ],
+          zone: 'balai'
+        },
+        {
+          title: 'Persatuan Indonesia & Semangat Gotong Royong',
+          speaker: 'Datuk Bimo · Tetua Adat',
+          speech: 'Gapura Persatuan berdiri tegak bukan karena satu orang sakti, melainkan karena kebersamaan warga mengangkat tiang bambu secara serempak.',
+          points: [
+            'Sila ke-3: Mengutamakan kepentingan bangsa di atas kepentingan pribadi.',
+            'Gotong royong merupakan jiwa bangsa Indonesia sejak zaman nenek moyang.',
+            'Aplikasi nyata: Kerja bakti membersihkan lingkungan dan melestarikan budaya.'
+          ],
+          zone: 'adat'
+        },
+        {
+          title: 'Musyawarah Mufakat & Keadilan Sosial',
+          speaker: 'Bu Rina · Pendidik Pancasila',
+          speech: 'Keputusan terbaik di balai desa lahir dari mendengarkan semua suara, bukan memaksakan kehendak kelompok mayoritas.',
+          points: [
+            'Sila ke-4: Menghargai perbedaan pendapat dalam forum musyawarah mufakat.',
+            'Sila ke-5: Menjamin pemerataan keadilan bagi seluruh lapisan masyarakat.',
+            'Aplikasi nyata: Pemilihan perwakilan kelas yang demokratis dan adil.'
+          ],
+          zone: 'balai'
+        }
+      ]
+    },
+    {
+      id: 'uud1945',
+      title: 'UUD NRI 1945: Konstitusi & Norma Hukum',
+      kicker: 'Elemen 2 · Ketaatan Norma & Aturan Hukum',
+      scenes: [
+        {
+          title: 'Norma Ketertiban di Ruang Publik',
+          speaker: 'Ibu Sari · Tokoh Pasar',
+          speech: 'Pasar yang ramai tetap aman dan nyaman karena seluruh pedagang taat menata gerobak pada jalurnya. Itulah wujud kepatuhan terhadap norma kesopanan dan hukum.',
+          points: [
+            'Norma hukum memiliki sanksi tegas dan mengikat untuk ketertiban bersama.',
+            'Ketaatan pada peraturan menciptakan rasa aman bagi semua warga.',
+            'Aplikasi nyata: Menjaga fasilitas umum dan mematuhi tata tertib sekolah.'
+          ],
+          zone: 'pasar'
+        },
+        {
+          title: 'Hak Atas Pendidikan (Pasal 31 UUD 1945)',
+          speaker: 'Bu Rina · Guru SMP Nusantara',
+          speech: 'Setiap anak Indonesia berhak memperoleh pendidikan yang bermutu. Buku dan sarana belajar harus bisa dinikmati secara merata.',
+          points: [
+            'Pasal 31 ayat (1): Setiap warga negara berhak mendapatkan pendidikan.',
+            'Pemerintah dan masyarakat wajib memfasilitasi kelangsungan belajar peserta didik.',
+            'Aplikasi nyata: Berbagi sumber belajar dan menghargai kesempatan sekolah.'
+          ],
+          zone: 'sekolah'
+        },
+        {
+          title: 'Kewajiban Bela Negara & Menjaga Fasilitas',
+          speaker: 'Bang Udin · Penjaga Pos Ronda',
+          speech: 'Bela negara bagi pelajar bukan memegang senjata, tapi menjaga keamanan lingkungan, ronda malam, dan tidak merusak fasilitas publik.',
+          points: [
+            'Pasal 27 ayat (3): Setiap warga negara berhak dan wajib ikut serta dalam pembelaan negara.',
+            'Bentuk bela negara pelajar: Berprestasi, cinta tanah air, dan menjaga ketertiban.',
+            'Aplikasi nyata: Ikut siskamling dan menjaga kebersihan fasilitas bersama.'
+          ],
+          zone: 'posronda'
+        }
+      ]
+    },
+    {
+      id: 'bhinneka',
+      title: 'Bhinneka Tunggal Ika: Harmoni Keberagaman',
+      kicker: 'Elemen 3 · Wastra, Budaya & Persaudaraan',
+      scenes: [
+        {
+          title: 'Wastra Nusantara: Kekayaan Tenun & Batik',
+          speaker: 'Mbak Wulan · Pengrajin Kain',
+          speech: 'Dari Batik Soga Solo, Songket Minang, Tenun Ikat Flores hingga Ulos Batak, helai benang yang berbeda bersatu membentuk motif yang memukau.',
+          points: [
+            'Keberagaman kain daerah mencerminkan filosofi dan identitas suku bangsa.',
+            'Pelestarian warisan budaya lokal memperkokoh kepribadian nasional.',
+            'Aplikasi nyata: Bangga mengenakan busana tradisional nusantara.'
+          ],
+          zone: 'adat'
+        },
+        {
+          title: 'Toleransi & Moderasi Antarbudaya',
+          speaker: 'Pak Hendra · Kepala Desa',
+          speech: 'Perbedaan adat dan bahasa daerah bukanlah sekat pemisah, melainkan kekayaan intelektual yang mempersatukan kita di bawah panji NKRI.',
+          points: [
+            'Menolak stereotip dan prasangka antarsuku, ras, atau golongan.',
+            'Mengedepankan dialog santun dan saling menghargai kearifan lokal.',
+            'Aplikasi nyata: Berteman akrab dengan siapa saja tanpa diskriminasi.'
+          ],
+          zone: 'balai'
+        },
+        {
+          title: 'Seni Pertunjukan & Festival Rakyat',
+          speaker: 'Datuk Bimo · Tetua Adat',
+          speech: 'Ketika gamelan, tifa, talempong, dan kolintang berpadu di panggung Alun-Alun, terciptalah harmoni yang menggetarkan jiwa nusantara.',
+          points: [
+            'Kolaborasi seni lintas budaya menumbuhkan rasa saling mengagumi.',
+            'Kebudayaan nasional lahir dari puncak-puncak kebudayaan daerah.',
+            'Aplikasi nyata: Ikut memeriahkan pentas seni sekolah bertema nusantara.'
+          ],
+          zone: 'adat'
+        }
+      ]
+    },
+    {
+      id: 'nkri',
+      title: 'Negara Kesatuan RI: Wawasan Nusantara',
+      kicker: 'Elemen 4 · Kedaulatan Wilayah & Maritim',
+      scenes: [
+        {
+          title: 'Kelestarian Ekosistem Pesisir & Sungai',
+          speaker: 'Pak Bahri · Nelayan Pesisir',
+          speech: 'Dua pertiga nusantara adalah lautan dan perairan. Jika kita menjaga sungai tetap jernih dan bebas sampah, anak cucu kita tetap makmur melimpah.',
+          points: [
+            'Wawasan Nusantara memandang daratan dan lautan sebagai satu kesatuan utuh.',
+            'Pelestarian sumber daya maritim bagian penting ketahanan ekonomi bangsa.',
+            'Aplikasi nyata: Tidak membuang sampah sembarangan ke sungai dan parit.'
+          ],
+          zone: 'dermaga'
+        },
+        {
+          title: 'Ekonomi Kerakyatan & Kemandirian Pangan',
+          speaker: 'Mang Jaya · Pedagang Soto',
+          speech: 'Pasar tradisional menghidupkan nelayan, petani, dan peternak lokal. Berbelanja di warung rakyat memperkuat roda ekonomi bangsa.',
+          points: [
+            'Pasal 33 UUD 1945: Perekonomian disusun atas asas kekeluargaan.',
+            'Mendukung produk dan UMKM dalam negeri memajukan kemandirian nasional.',
+            'Aplikasi nyata: Mencintai produk lokal buatan anak bangsa.'
+          ],
+          zone: 'pasar'
+        },
+        {
+          title: 'Pemuda Penjaga Kedaulatan Bangsa',
+          speaker: 'Bu Rina · Guru SMP Nusantara',
+          speech: 'Masa depan Indonesia terletak di tangan generasi muda yang cerdas, berkarakter Pancasila, dan menjunjung integritas moral.',
+          points: [
+            'Integritas pelajar diwujudkan lewat kejujuran akademik dan kerja keras.',
+            'Kesadaran hukum sejak dini menghindarkan bangsa dari perpecahan.',
+            'Aplikasi nyata: Belajar sungguh-sungguh untuk masa depan ibu pertiwi.'
+          ],
+          zone: 'sekolah'
+        }
+      ]
+    }
+  ];
+
+  let currentTopicIdx = 0;
+  let currentSceneIdx = 0;
+  let materiScene3D = null, materiCamera3D = null, materiRenderer3D = null, materiDioramaGroup = null;
+
+  function initMateriView() {
+    renderMateriTopicBar();
+    renderMateriScene();
+
+    const wrap = document.getElementById('materi-canvas-wrap');
+    if (!wrap) return;
+
+    if (!materiRenderer3D) {
+      materiScene3D = new THREE.Scene();
+      materiScene3D.background = new THREE.Color(0xf1e8dc);
+
+      const aL = new THREE.AmbientLight(0xfff5ea, 0.9);
+      const dL = new THREE.DirectionalLight(0xffeedd, 1.15);
+      dL.position.set(3, 5, 4);
+      materiScene3D.add(aL, dL);
+
+      materiCamera3D = new THREE.PerspectiveCamera(40, wrap.clientWidth / Math.max(wrap.clientHeight, 1), 0.1, 50);
+      materiCamera3D.position.set(0, 1.8, 4.4);
+      materiCamera3D.lookAt(0, 0.8, 0);
+
+      materiRenderer3D = new THREE.WebGLRenderer({ antialias: true });
+      materiRenderer3D.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      materiRenderer3D.setSize(wrap.clientWidth, wrap.clientHeight);
+      wrap.appendChild(materiRenderer3D.domElement);
+
+      function renderMateriLoop() {
+        requestAnimationFrame(renderMateriLoop);
+        if (activeMenuTab === 'materi' && materiRenderer3D && materiScene3D && materiCamera3D) {
+          if (materiDioramaGroup) materiDioramaGroup.rotation.y += 0.005;
+          materiRenderer3D.render(materiScene3D, materiCamera3D);
+        }
+      }
+      renderMateriLoop();
+    } else {
+      materiRenderer3D.setSize(wrap.clientWidth, wrap.clientHeight);
+      materiCamera3D.aspect = wrap.clientWidth / Math.max(wrap.clientHeight, 1);
+      materiCamera3D.updateProjectionMatrix();
+    }
+
+    rebuildMateriDiorama();
+  }
+
+  function rebuildMateriDiorama() {
+    if (!materiScene3D) return;
+    if (materiDioramaGroup) materiScene3D.remove(materiDioramaGroup);
+
+    materiDioramaGroup = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.75, 0.18, 24), mat(0x785338));
+    base.position.y = -0.09;
+
+    const grass = new THREE.Mesh(new THREE.CylinderGeometry(1.58, 1.58, 0.06, 24), mat(0x567d46));
+    grass.position.y = 0.03;
+    materiDioramaGroup.add(base, grass);
+
+    if (currentTopicIdx === 0) {
+      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.32, 1.5, 8), mat(0xd6c2a5));
+      pillar.position.y = 0.78;
+      const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.35, 0), mat(0xd4a13c, { metalness: 0.5, roughness: 0.2 }));
+      star.position.y = 1.7;
+      materiDioramaGroup.add(pillar, star);
+    } else if (currentTopicIdx === 1) {
+      const desk = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.65, 0.6), mat(0x8a532d));
+      desk.position.y = 0.35;
+      const doc = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.38), mat(0xd9b35b));
+      doc.position.y = 0.72;
+      materiDioramaGroup.add(desk, doc);
+    } else if (currentTopicIdx === 2) {
+      const postL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.4, 0.18), mat(0x9e4234));
+      postL.position.set(-0.6, 0.7, 0);
+      const postR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.4, 0.18), mat(0x9e4234));
+      postR.position.set(0.6, 0.7, 0);
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 0.22), mat(0xc98a2e));
+      beam.position.set(0, 1.35, 0);
+      materiDioramaGroup.add(postL, postR, beam);
+    } else {
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.45), mat(0x734928));
+      hull.position.y = 0.2;
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.2, 6), mat(0x422a18));
+      mast.position.set(0, 0.8, 0);
+      const sail = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.8, 4), mat(0xa63d2f));
+      sail.rotation.z = Math.PI;
+      sail.position.set(0.18, 0.8, 0);
+      materiDioramaGroup.add(hull, mast, sail);
+    }
+
+    materiScene3D.add(materiDioramaGroup);
+  }
+
+  function renderMateriTopicBar() {
+    const bar = document.getElementById('materi-topic-bar');
+    if (!bar) return;
+    bar.innerHTML = '';
+    MATERI_TOPICS.forEach((t, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'materi-topic-btn' + (idx === currentTopicIdx ? ' active' : '');
+      btn.textContent = t.title.split(':')[0];
+      btn.onclick = () => selectMateriTopic(idx);
+      bar.appendChild(btn);
+    });
+  }
+
+  function selectMateriTopic(idx) {
+    currentTopicIdx = idx;
+    currentSceneIdx = 0;
+    renderMateriTopicBar();
+    renderMateriScene();
+    rebuildMateriDiorama();
+    SFX.tap();
+  }
+
+  function renderMateriScene() {
+    const topic = MATERI_TOPICS[currentTopicIdx];
+    const sceneData = topic.scenes[currentSceneIdx];
+
+    const kEl = document.getElementById('materi-element-kicker');
+    if (kEl) kEl.textContent = topic.kicker;
+
+    const tEl = document.getElementById('materi-scene-title');
+    if (tEl) tEl.textContent = sceneData.title;
+
+    const spkEl = document.getElementById('materi-speaker');
+    if (spkEl) spkEl.textContent = sceneData.speaker;
+
+    const spcEl = document.getElementById('materi-speech');
+    if (spcEl) spcEl.textContent = sceneData.speech;
+
+    const indEl = document.getElementById('materi-step-indicator');
+    if (indEl) indEl.textContent = (currentSceneIdx + 1) + ' / ' + topic.scenes.length;
+
+    const bEl = document.getElementById('materi-scene-badge');
+    if (bEl) bEl.textContent = 'Adegan ' + (currentSceneIdx + 1) + ' / ' + topic.scenes.length;
+
+    const pts = document.getElementById('materi-points');
+    if (pts) {
+      pts.innerHTML = '';
+      sceneData.points.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'materi-point-item';
+        div.innerHTML = '<span style="color:var(--terracotta);font-weight:800;margin-right:6px;">✓</span> ' + p;
+        pts.appendChild(div);
+      });
+    }
+
+    const prBtn = document.getElementById('btn-materi-practice');
+    if (prBtn) {
+      const zoneNames = { balai: 'Balai Desa', pasar: 'Pasar', adat: 'Kampung Adat', dermaga: 'Dermaga', sekolah: 'Sekolah SMP', posronda: 'Pos Ronda' };
+      prBtn.textContent = 'Praktik di ' + (zoneNames[sceneData.zone] || 'Desa 3D');
+    }
+  }
+
+  function stepMateriScene(dir) {
+    const topic = MATERI_TOPICS[currentTopicIdx];
+    currentSceneIdx = (currentSceneIdx + dir + topic.scenes.length) % topic.scenes.length;
+    renderMateriScene();
+    SFX.tap();
+  }
+
+  function triggerMateriAction() {
+    if (materiDioramaGroup) {
+      materiDioramaGroup.rotation.y += 0.9;
+    }
+    SFX.success();
+    showToast('Animasi diorama materi diperagakan!');
+  }
+
+  function practiceMateriIn3D() {
+    const topic = MATERI_TOPICS[currentTopicIdx];
+    const sceneData = topic.scenes[currentSceneIdx];
+    closeMainMenu();
+    guideToZone(sceneData.zone);
+    showToast('Menuju ke lokasi praktik: ' + sceneData.title);
+  }
+
+  /* =========================================================
+     13. KUIS PANCASILA (10 STUDI KASUS FASE D KELAS VII-IX)
+  ========================================================= */
+  const QUIZ_QUESTIONS = [
+    {
+      q: 'Warga Desa Bhinneka sedang bergotong royong menegakkan Gapura Persatuan yang miring. Sikap ini paling mencerminkan pengamalan Pancasila sila ke-...',
+      options: ['Sila ke-1', 'Sila ke-2', 'Sila ke-3', 'Sila ke-4'],
+      correct: 2,
+      exp: 'Gotong royong dan kebersamaan merawat fasilitas desa adalah wujud nyata persatuan bangsa yang diamanatkan dalam Sila ke-3: Persatuan Indonesia.'
+    },
+    {
+      q: 'Saat musyawarah pemilihan ketua kelompok kelas, terdapat dua pendapat yang berbeda tajam. Tindakan yang paling sesuai dengan prinsip musyawarah mufakat adalah...',
+      options: [
+        'Meninggalkan rapat karena pendapat pribadi tidak disetujui',
+        'Mendengarkan argumentasi dan mencari solusi terbaik demi kebaikan bersama',
+        'Memaksa teman-teman memilih pendapat yang diajukan oleh kelompok mayoritas',
+        'Mengabaikan perbedaan dan langsung memutuskan secara sepihak'
+      ],
+      correct: 1,
+      exp: 'Sila ke-4 mengajarkan musyawarah untuk mufakat dengan dilandasi akal sehat dan iktikad baik tanpa memaksakan kehendak.'
+    },
+    {
+      q: 'Ibu Sari dan para pedagang di Pasar Nusantara selalu menata gerobak dengan rapi pada tempatnya agar jalan umum tidak terhalang. Hal ini merupakan wujud ketaatan terhadap...',
+      options: ['Norma kesusilaan dan norma hukum di ruang publik', 'Keinginan pribadi agar terlihat bagus', 'Kewajiban membayar denda pasar', 'Tradisi nenek moyang semata'],
+      correct: 0,
+      exp: 'Menata tempat dagang dengan tertib demi kenyamanan bersama adalah ketaatan terhadap norma kesopanan dan regulasi hukum ketertiban umum.'
+    },
+    {
+      q: 'Berdasarkan Pasal 31 ayat (1) UUD NRI Tahun 1945, hak asasi yang dijamin secara tegas bagi setiap warga negara Indonesia adalah...',
+      options: ['Hak memiliki kendaraan pribadi', 'Hak mendapatkan pendidikan yang layak', 'Hak mendirikan usaha perdagangan', 'Hak bepergian ke luar negeri bebas visa'],
+      correct: 1,
+      exp: 'Pasal 31 ayat (1) menegaskan bahwa "Setiap warga negara berhak mendapat pendidikan" guna mencerdaskan kehidupan bangsa.'
+    },
+    {
+      q: 'Pak Bahri bersama siswa relawan membersihkan sampah yang mengapung di Sungai Dermaga. Tindakan ini merupakan contoh nyata kesadaran...',
+      options: [
+        'Wawasan Nusantara dalam menjaga kelestarian lingkungan perairan NKRI',
+        'Sekadar mengisi waktu luang di sore hari',
+        'Mencari ikan dengan cara yang merusak ekosistem',
+        'Menambah tumpukan sampah di tempat penampungan'
+      ],
+      correct: 0,
+      exp: 'Menjaga kebersihan wilayah air dan sungai mencerminkan Wawasan Nusantara bahwa perairan Indonesia adalah satu kesatuan ekologis yang wajib dijaga.'
+    },
+    {
+      q: 'Di sekolah, Raka mengenakan Udeng Bali saat festival budaya, sementara Tara memakai Songket Minang. Sikap yang harus kita tunjukkan terhadap keragaman ini adalah...',
+      options: [
+        'Membandingkan dan menganggap busana daerah sendiri yang paling hebat',
+        'Menghargai dan bangga akan kekayaan wastra tradisional nusantara',
+        'Menolak mengenakan pakaian adat karena dianggap kuno',
+        'Mewajibkan semua orang hanya memakai satu jenis pakaian saja'
+      ],
+      correct: 1,
+      exp: 'Semboyan Bhinneka Tunggal Ika mengajarkan kebanggaan dan penghargaan terhadap keragaman budaya, bahasa, dan pakaian adat se-Indonesia.'
+    },
+    {
+      q: 'Ketika melihat teman sekelas diejek atau dirundung (bullying) karena logat bahasanya yang berbeda, sikap seorang pelajar Pancasila adalah...',
+      options: [
+        'Ikut menertawakan agar disukai teman sekelompok',
+        'Membela teman tersebut, menghentikan perundungan, dan mengingatkan pentingnya saling menghargai',
+        'Membiarkan saja karena merasa bukan urusan pribadi',
+        'Merekam kejadian tersebut untuk disebarkan di media sosial'
+      ],
+      correct: 1,
+      exp: 'Nilai Kemanusiaan yang Adil dan Beradab (Sila ke-2) menuntut keberanian membela sesama dan menolak segala bentuk perundungan.'
+    },
+    {
+      q: 'Pembagian jadwal piket kebersihan kelas dilakukan secara adil sehingga seluruh siswa memperoleh giliran yang sama rata. Hal ini mencerminkan sila...',
+      options: ['Sila ke-1', 'Sila ke-2', 'Sila ke-4', 'Sila ke-5: Keadilan Sosial bagi Seluruh Rakyat Indonesia'],
+      correct: 3,
+      exp: 'Sila ke-5 menjamin keadilan sosial, perlakuan yang seimbang antara hak dan kewajiban tanpa membeda-bedakan.'
+    },
+    {
+      q: 'Mengapa partisipasi dalam kegiatan Pos Ronda (Siskamling) dan menjaga keamanan lingkungan sekolah termasuk bentuk bela negara bagi warga?',
+      options: [
+        'Karena membela negara dimulai dari kepedulian menjaga ketertiban lingkungan terdekat',
+        'Karena warga diwajibkan berperang setiap hari',
+        'Hanya untuk menggantikan tugas kepolisian',
+        'Agar mendapatkan pujian dari kepala desa'
+      ],
+      correct: 0,
+      exp: 'Bela negara sebagaimana Pasal 27 ayat (3) UUD 1945 berakar dari kesadaran aktif menjaga ketertiban, kedamaian, dan keselamatan lingkungan bersama.'
+    },
+    {
+      q: 'Konsep Wawasan Nusantara memandang seluruh wilayah kepulauan dari Sabang sampai Merauke sebagai satu kesatuan yang meliputi...',
+      options: [
+        'Kesatuan politik, ekonomi, sosial budaya, dan pertahanan keamanan',
+        'Hanya kesatuan pulau-pulau besar saja',
+        'Kumpulan daerah yang terpisah-pisah tanpa ikatan hukum',
+        'Wilayah daratan saja tanpa memperhitungkan laut nusantara'
+      ],
+      correct: 0,
+      exp: 'Wawasan Nusantara memandang kepulauan Indonesia sebagai satu kesatuan utuh dalam bidang politik, ekonomi, sosial budaya, serta pertahanan dan keamanan (IPOLEKSOSBUDHANKAM).'
+    }
+  ];
+
+  let currentQuizIdx = 0;
+  let quizScore = 0;
+  let quizAnswered = false;
+
+  function initQuizView() {
+    currentQuizIdx = 0;
+    quizScore = 0;
+    quizAnswered = false;
+    renderQuizQuestion();
+  }
+
+  function renderQuizQuestion() {
+    quizAnswered = false;
+    const qData = QUIZ_QUESTIONS[currentQuizIdx];
+
+    const numBadge = document.getElementById('quiz-num-badge');
+    if (numBadge) numBadge.textContent = 'Soal ' + (currentQuizIdx + 1) + ' / ' + QUIZ_QUESTIONS.length;
+
+    const scoreVal = document.getElementById('quiz-score-val');
+    if (scoreVal) scoreVal.textContent = quizScore;
+
+    const fill = document.getElementById('quiz-progress-fill');
+    if (fill) fill.style.width = (((currentQuizIdx + 1) / QUIZ_QUESTIONS.length) * 100) + '%';
+
+    const qText = document.getElementById('quiz-question');
+    if (qText) qText.textContent = qData.q;
+
+    const optGrid = document.getElementById('quiz-options');
+    if (optGrid) {
+      optGrid.innerHTML = '';
+      const letters = ['A', 'B', 'C', 'D'];
+      qData.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'quiz-opt-btn';
+        btn.innerHTML = '<span class="opt-prefix">' + letters[idx] + '</span> <span>' + opt + '</span>';
+        btn.onclick = () => selectQuizOption(idx, btn);
+        optGrid.appendChild(btn);
+      });
+    }
+
+    const fb = document.getElementById('quiz-feedback');
+    if (fb) fb.textContent = 'Pilih salah satu jawaban A, B, C, atau D di atas untuk melihat pembahasan konsep Pancasilanya.';
+
+    const nxtBtn = document.getElementById('btn-quiz-next');
+    if (nxtBtn) nxtBtn.style.display = 'none';
+  }
+
+  function selectQuizOption(choiceIdx, btnEl) {
+    if (quizAnswered) return;
+    quizAnswered = true;
+
+    const qData = QUIZ_QUESTIONS[currentQuizIdx];
+    const isCorrect = choiceIdx === qData.correct;
+    const allBtns = document.querySelectorAll('.quiz-opt-btn');
+
+    allBtns.forEach((b, idx) => {
+      b.disabled = true;
+      if (idx === qData.correct) b.classList.add('correct');
+      else if (idx === choiceIdx && !isCorrect) b.classList.add('wrong');
+    });
+
+    if (isCorrect) {
+      quizScore += 10;
+      SFX.success();
+    } else {
+      SFX.warn();
+    }
+
+    const scoreVal = document.getElementById('quiz-score-val');
+    if (scoreVal) scoreVal.textContent = quizScore;
+
+    const fb = document.getElementById('quiz-feedback');
+    if (fb) {
+      fb.innerHTML = '<strong>' + (isCorrect ? 'Benar Sekali!' : 'Perlu Dicermati:') + '</strong> ' + qData.exp;
+    }
+
+    const nxtBtn = document.getElementById('btn-quiz-next');
+    if (nxtBtn) {
+      nxtBtn.style.display = 'inline-block';
+      nxtBtn.textContent = currentQuizIdx + 1 < QUIZ_QUESTIONS.length ? 'Soal Berikutnya' : 'Lihat Hasil Akhir';
+    }
+  }
+
+  function nextQuizQuestion() {
+    if (currentQuizIdx + 1 < QUIZ_QUESTIONS.length) {
+      currentQuizIdx++;
+      renderQuizQuestion();
+      SFX.tap();
+    } else {
+      const qText = document.getElementById('quiz-question');
+      if (qText) qText.textContent = 'Kuis Selesai! Skor Akhir Kamu: ' + quizScore + ' / 100';
+
+      const optGrid = document.getElementById('quiz-options');
+      if (optGrid) {
+        optGrid.innerHTML = '<div style="grid-column: 1 / -1; padding: 24px; text-align: center; background: var(--paper-warm); border-radius: 12px; border: 1.5px solid var(--paper-muted);">' +
+          '<div style="font-size: 32px; font-weight: 800; color: var(--terracotta); margin-bottom: 8px;">' + (quizScore >= 80 ? 'Hebat! Profil Pelajar Pancasila Sejati' : 'Bagus! Terus Perdalam Nilai-Nilai Bangsa') + '</div>' +
+          '<p style="font-size: 14px; color: var(--ink-soft); max-width: 520px; margin: 0 auto 16px;">' +
+            'Pemahaman konsep Pancasila, UUD 1945, Bhinneka Tunggal Ika, dan NKRI telah kamu selesaikan. Yuk amalkan langsung di Desa Bhinneka 3D!' +
+          '</p>' +
+          '<div style="display:flex; justify-content:center; gap:12px;">' +
+            '<button class="btn-primary-large" onclick="initQuizView()">Ulangi Kuis</button>' +
+            '<button class="btn-secondary-large" onclick="quickStartAdventure()">Lanjut 3D</button>' +
+          '</div>' +
+        '</div>';
+      }
+
+      const fb = document.getElementById('quiz-feedback');
+      if (fb) fb.textContent = 'Seluruh 10 studi kasus Kurikulum Merdeka Fase D telah tuntas dikerjakan.';
+
+      const nxtBtn = document.getElementById('btn-quiz-next');
+      if (nxtBtn) nxtBtn.style.display = 'none';
+
+      SFX.success();
+    }
+  }
+
+  /* =========================================================
+     14. PENGATURAN GIM & KENDALI PID
+  ========================================================= */
+  function setSoundSetting(bool) {
+    settings.sound = bool;
+    document.querySelectorAll('#set-sound .seg-btn').forEach((b, idx) => {
+      b.classList.toggle('active', (idx === 0) === bool);
+    });
+    if (bool) ensureAudio();
+    SFX.tap();
+  }
+
+  function setQualitySetting(val) {
+    settings.quality = val;
+    document.querySelectorAll('#set-quality .seg-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent.toLowerCase().includes(val));
+    });
+    if (renderer) {
+      const pr = val === 'ringan' ? 1.0 : (val === 'tinggi' ? Math.min(window.devicePixelRatio || 1, 2) : 1.25);
+      renderer.setPixelRatio(pr);
+    }
+    SFX.tap();
+    showToast('Kualitas grafis diatur ke mode ' + val.toUpperCase() + '.');
+  }
+
+  function setCameraSetting(val) {
+    settings.cameraMode = val;
+    document.querySelectorAll('#set-camera .seg-btn').forEach(b => {
+      b.classList.toggle('active', (val === 'ikuti' && b.textContent.includes('Ikuti')) || (val === 'atas' && b.textContent.includes('Pantau')));
+    });
+    SFX.tap();
+  }
+
+  function setSpeedSetting(val) {
+    settings.speed = val;
+    document.querySelectorAll('#set-speed .seg-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent.toLowerCase().includes(val));
+    });
+    player.speedMultiplier = val === 'santai' ? 0.75 : (val === 'cepat' ? 1.4 : 1.0);
+    SFX.tap();
+  }
+
+  function setLabelSetting(bool) {
+    settings.showLabels = bool;
+    document.querySelectorAll('#set-labels .seg-btn').forEach((b, idx) => {
+      b.classList.toggle('active', (idx === 0) === bool);
+    });
+    const layer = document.getElementById('labels-layer');
+    if (layer) layer.style.display = bool ? 'block' : 'none';
+    SFX.tap();
+  }
+
+  function handleResetAdventure() {
+    state.energy = 100;
+    state.harmony = 20;
+    state.missions = { pasar: false, sungai: false, gapura: false, buku: false, musyawarah: false };
+    state.counts = { cartsFixed: 0, trashCleaned: 0, bambooPicked: 0 };
+    state.carrying = null;
+    player.x = 0;
+    player.z = 2;
+    player.moveTarget = null;
+
+    marketCarts.forEach(c => { c.fixed = false; });
+    riverTrash.forEach(t => { t.cleaned = false; if (t.mesh) t.mesh.visible = true; });
+    bambooItems.forEach(b => { b.picked = false; if (b.mesh) b.mesh.visible = true; });
+    if (gapuraGroup) gapuraGroup.rotation.z = 0.28;
+    if (textbookPickup) textbookPickup.visible = true;
+    if (player.carryProp) player.carryProp.visible = false;
+
+    updateHUD();
+    updateActionButton();
+    SFX.pickup();
+    showToast('Progres petualangan 3D telah diatur ulang.');
+  }
+
+  /* =========================================================
+     15. KOMPAS, KAMERA & PANDUAN ZONA
+  ========================================================= */
+  const ZONE_COORDS = {
+    balai: { x: -26, z: -16, name: 'Balai Desa Bhinneka' },
+    pasar: { x: -16, z: 22, name: 'Pasar Nusantara' },
+    adat: { x: 38, z: -10, name: 'Kampung Adat' },
+    dermaga: { x: 26, z: 24, name: 'Dermaga & Sungai' },
+    sekolah: { x: -36, z: 4, name: 'SMP Nusantara' },
+    posronda: { x: 17.5, z: 15.1, name: 'Pos Ronda' }
+  };
+
+  let targetZoneId = 'balai';
+  let cameraAngleOffset = 0;
+
+  function guideToZone(zoneId) {
+    targetZoneId = zoneId;
+    const z = ZONE_COORDS[zoneId];
+    if (!z) return;
+
+    document.querySelectorAll('.zone-chip').forEach(c => {
+      c.classList.toggle('active', c.dataset.zone === zoneId);
+    });
+
+    const pill = document.getElementById('zone-pill');
+    if (pill) pill.textContent = z.name;
+
+    showToast('Petunjuk arah menuju ' + z.name);
+    SFX.tap();
+  }
+
+  function rotateCameraStep(val) {
+    cameraAngleOffset += val;
+    SFX.tap();
+  }
+
+  function toggleCameraMode() {
+    setCameraSetting(settings.cameraMode === 'ikuti' ? 'atas' : 'ikuti');
+  }
+
+  /* =========================================================
+     16. INPUT CONTROLS (TAP-TO-MOVE, JOYSTICK & KEYBOARD)
+  ========================================================= */
+  const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
+  let joystickVector = { x: 0, y: 0 };
+  let joystickActive = false;
+
+  window.addEventListener('keydown', (e) => {
+    if (keys[e.key] !== undefined) keys[e.key] = true;
+  });
+  window.addEventListener('keyup', (e) => {
+    if (keys[e.key] !== undefined) keys[e.key] = false;
+  });
+
+  function setupJoystick() {
+    const zone = document.getElementById('joystick-zone');
+    const knob = document.getElementById('joystick-knob');
+    if (!zone || !knob) return;
+
+    let touchId = null;
+    let centerX = 0, centerY = 0;
+
+    function handleStart(cx, cy, id) {
+      touchId = id;
+      joystickActive = true;
+      const rect = zone.getBoundingClientRect();
+      centerX = rect.left + rect.width / 2;
+      centerY = rect.top + rect.height / 2;
+      handleMove(cx, cy);
+    }
+
+    function handleMove(cx, cy) {
+      if (!joystickActive) return;
+      const dx = cx - centerX;
+      const dy = cy - centerY;
+      const dist = Math.hypot(dx, dy);
+      const maxR = 42;
+      const angle = Math.atan2(dy, dx);
+      const r = Math.min(dist, maxR);
+
+      knob.style.transform = 'translate(' + (Math.cos(angle) * r) + 'px, ' + (Math.sin(angle) * r) + 'px)';
+      joystickVector.x = (Math.cos(angle) * r) / maxR;
+      joystickVector.y = (Math.sin(angle) * r) / maxR;
+      player.moveTarget = null;
+      if (tapRing) tapRing.visible = false;
+    }
+
+    function handleEnd() {
+      touchId = null;
+      joystickActive = false;
+      knob.style.transform = 'translate(0px, 0px)';
+      joystickVector.x = 0;
+      joystickVector.y = 0;
+    }
+
+    zone.addEventListener('touchstart', (e) => {
+      const t = e.changedTouches[0];
+      handleStart(t.clientX, t.clientY, t.identifier);
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!joystickActive) return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === touchId) {
+          handleMove(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+          break;
+        }
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === touchId) {
+          handleEnd();
+          break;
+        }
+      }
+    });
+  }
+
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+
+  window.addEventListener('pointerdown', (e) => {
+    if (menuOpen || gamePausedForDialogue) return;
+    if (e.target.closest('#hud') || e.target.closest('#menu-overlay') || e.target.closest('#dialogue-modal') || e.target.closest('#mission-modal')) return;
+
+    pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+    pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(pointer, camera);
+    const intersects = raycaster.intersectObjects(walkableMeshes, true);
+    if (intersects.length > 0) {
+      const pt = intersects[0].point;
+      player.moveTarget = { x: pt.x, z: pt.z };
+      if (tapRing) {
+        tapRing.position.set(pt.x, getTerrainHeight(pt.x, pt.z) + 0.08, pt.z);
+        tapRing.visible = true;
+      }
+      SFX.tap();
+    }
+  });
+
+  function updateMinimap() {
+    const cvs = document.getElementById('minimap');
+    if (!cvs) return;
+    const ctx = cvs.getContext('2d');
+    const w = cvs.width, h = cvs.height;
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.fillStyle = '#decbb7';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = '#5b8a99';
+    ctx.lineWidth = 14;
+    ctx.beginPath();
+    ctx.moveTo(w * 0.1, h * 0.7);
+    ctx.bezierCurveTo(w * 0.35, h * 0.75, w * 0.65, h * 0.6, w * 0.9, h * 0.65);
+    ctx.stroke();
+
+    const toMapX = (wx) => ((wx + 55) / 110) * w;
+    const toMapY = (wz) => ((wz + 55) / 110) * h;
+
+    Object.values(ZONE_COORDS).forEach(z => {
+      ctx.fillStyle = '#8f4f3c';
+      ctx.beginPath();
+      ctx.arc(toMapX(z.x), toMapY(z.z), 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    npcs.forEach(n => {
+      ctx.fillStyle = '#2d5a3f';
+      ctx.beginPath();
+      ctx.arc(toMapX(n.x), toMapY(n.z), 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.fillStyle = '#c93b2b';
+    ctx.beginPath();
+    ctx.arc(toMapX(player.x), toMapY(player.z), 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function updateFloatingLabels() {
+    if (!settings.showLabels) return;
+    const halfW = window.innerWidth / 2;
+    const halfH = window.innerHeight / 2;
+    const tempV = new THREE.Vector3();
+
+    floatingLabels.forEach(lbl => {
+      const pos = lbl.posFn();
+      tempV.copy(pos);
+
+      const dist = Math.hypot(player.x - pos.x, player.z - pos.z);
+      if (dist > 14) {
+        lbl.el.style.opacity = '0';
+        lbl.el.style.display = 'none';
+        return;
+      }
+
+      tempV.project(camera);
+      if (tempV.z > 1) {
+        lbl.el.style.display = 'none';
+        return;
+      }
+
+      const x = (tempV.x * halfW) + halfW;
+      const y = -(tempV.y * halfH) + halfH;
+      lbl.el.style.display = 'block';
+      lbl.el.style.left = x + 'px';
+      lbl.el.style.top = y + 'px';
+
+      const opacity = dist < 8 ? 1.0 : Math.max(0, 1.0 - (dist - 8) / 6);
+      lbl.el.style.opacity = opacity.toFixed(2);
+    });
+  }
+
+  /* =========================================================
+     17. MAIN ANIMATION LOOP & INIT
+  ========================================================= */
+  let lastTime = performance.now();
+
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const delta = Math.min((now - lastTime) / 1000, 0.1);
+    lastTime = now;
+
+    if (!menuOpen && !gamePausedForDialogue) {
+      let moveX = 0, moveZ = 0;
+      if (keys.w || keys.ArrowUp) moveZ -= 1;
+      if (keys.s || keys.ArrowDown) moveZ += 1;
+      if (keys.a || keys.ArrowLeft) moveX -= 1;
+      if (keys.d || keys.ArrowRight) moveX += 1;
+
+      if (joystickActive) {
+        moveX += joystickVector.x;
+        moveZ += joystickVector.y;
+      }
+
+      const isKeyOrJoy = Math.hypot(moveX, moveZ) > 0.05;
+
+      let speed = 7.2 * (player.speedMultiplier || 1.0);
+      let isMoving = false;
+
+      if (isKeyOrJoy) {
+        player.moveTarget = null;
+        if (tapRing) tapRing.visible = false;
+
+        const ang = Math.atan2(moveX, moveZ) + cameraAngleOffset;
+        player.x += Math.sin(ang) * speed * delta;
+        player.z += Math.cos(ang) * speed * delta;
+        player.rotY = ang;
+        isMoving = true;
+      } else if (player.moveTarget) {
+        const dx = player.moveTarget.x - player.x;
+        const dz = player.moveTarget.z - player.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 0.3) {
+          const ang = Math.atan2(dx, dz);
+          player.x += Math.sin(ang) * speed * delta;
+          player.z += Math.cos(ang) * speed * delta;
+          player.rotY = ang;
+          isMoving = true;
+        } else {
+          player.moveTarget = null;
+          if (tapRing) tapRing.visible = false;
+        }
+      }
+
+      player.y = getTerrainHeight(player.x, player.z);
+
+      if (player.human && player.human.root) {
+        player.human.root.position.set(player.x, player.y, player.z);
+        player.human.root.rotation.y = player.rotY;
+        if (isMoving) {
+          player.walkPhase += delta * 8;
+          animateHumanWalk(player.human, player.walkPhase, true);
+        } else {
+          animateHumanWalk(player.human, 0, false);
+        }
+      }
+
+      if (state.gotongTimer > 0) {
+        state.gotongTimer = Math.max(0, state.gotongTimer - delta);
+        updateHUD();
+      }
+
+      if (fishingState.active) {
+        fishingState.timer -= delta;
+        if (fishingState.phase === 'waiting' && fishingState.timer <= 0) {
+          fishingState.phase = 'biting';
+          SFX.warn();
+          showToast('Pelampung ditarik ikan! Tekan TARIK JORAN sekarang!');
+          updateActionButton();
+        }
+        if (fishingState.ripple) {
+          fishingState.ripple.rotation.z += delta * 2;
+          const s = 1.0 + Math.sin(now * 0.006) * 0.25;
+          fishingState.ripple.scale.set(s, s, s);
+        }
+      }
+
+      if (guideArrowGroup && ZONE_COORDS[targetZoneId]) {
+        const tz = ZONE_COORDS[targetZoneId];
+        guideArrowGroup.position.set(player.x, player.y + 2.5, player.z);
+        const targetAng = Math.atan2(tz.x - player.x, tz.z - player.z);
+        guideArrowGroup.rotation.y = targetAng;
+        guideArrowGroup.position.y += Math.sin(now * 0.005) * 0.12;
+      }
+
+      if (settings.cameraMode === 'atas') {
+        camera.position.set(player.x, 24, player.z + 14);
+        camera.lookAt(player.x, player.y, player.z);
+      } else {
+        const camDist = 9.2;
+        const camH = 5.2;
+        const camAng = player.rotY + Math.PI + cameraAngleOffset;
+        const cx = player.x + Math.sin(camAng) * camDist;
+        const cz = player.z + Math.cos(camAng) * camDist;
+        camera.position.set(cx, player.y + camH, cz);
+        camera.lookAt(player.x, player.y + 1.2, player.z);
+      }
+
+      updateActionButton();
+      updateMinimap();
+      updateFloatingLabels();
+    }
+
+    if (renderer && scene && camera) {
+      renderer.render(scene, camera);
+    }
+  }
+
+  function init() {
+    buildLabels();
+    buildPlayer();
+    updateHUD();
+    setupJoystick();
+    updateMinimap();
+    requestAnimationFrame(animate);
+  }
+
+  window.addEventListener('resize', () => {
+    if (camera && renderer) {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+  });
+
+  window.addEventListener('DOMContentLoaded', init);
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    init();
+  }
+  </script>
+</body>
+</html>
