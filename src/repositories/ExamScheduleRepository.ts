@@ -206,6 +206,123 @@ export const CANONICAL_SMP_SLOTS: CanonicalSmpSlot[] = [
   { dayIndex: 4, date: '2026-10-02', dayName: 'Jumat', sessionNumber: 2, subject: 'BTQ', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 5', className: '9A, 9B', proctorId: 'usr_guru_010', proctorName: 'Mawar Andinia, S.Pd., G.r', proctorCode: '05' },
 ];
 
+/**
+ * Matriks Pengawas Resmi ASAS Ganjil 2026/2027 (Ruang 1 s.d. Ruang 7)
+ * Sumber Berkas: JADWAL NGAWAS ASAS.xlsx (Senin-Jumat, 07 - 11 Desember 2026)
+ * Total: 84 slot pengawas terbagi ke dalam 12 sesi ujian (Bebas Bentrok 100%).
+ */
+export const CANONICAL_ASAS_SLOTS: CanonicalSmpSlot[] = [
+  // ── SENIN, 2026-12-07 ──
+  // Sesi 1 (08:00 - 09:30): PAI
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 1, subject: 'PAI', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 1', className: '7A', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi', proctorCode: '13' },
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 1, subject: 'PAI', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 2', className: '7B', proctorId: 'usr_guru_002', proctorName: 'M. Iqbal Gustiawan, S.Pd., G.r.', proctorCode: '07' },
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 1, subject: 'PAI', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 3', className: '8A', proctorId: 'usr_guru_005', proctorName: 'Fitri Ani Rahayu, S.Mat', proctorCode: '04' },
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 1, subject: 'PAI', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 4', className: '8B', proctorId: 'usr_guru_009', proctorName: 'Widianingsih, S.Si., G.r', proctorCode: '10' },
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 1, subject: 'PAI', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 5', className: '9A', proctorId: 'usr_guru_007', proctorName: 'Septi Nur Aeni, S.E', proctorCode: '09' },
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 1, subject: 'PAI', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 6', className: '9B', proctorId: 'usr_guru_006', proctorName: 'Nurul Farhiya, S.Pd., G.r', proctorCode: '03' },
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 1, subject: 'PAI', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 7', className: 'SMA', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r', proctorCode: '02' },
+  // ── SENIN, 2026-12-07 ──
+  // Sesi 2 (10:00 - 11:00): IPA
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 2, subject: 'IPA', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 1', className: '7A', proctorId: 'usr_guru_010', proctorName: 'Mawar Andinia, S.Pd., G.r', proctorCode: '12' },
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 2, subject: 'IPA', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 2', className: '7B', proctorId: 'usr_guru_005', proctorName: 'Fitri Ani Rahayu, S.Mat', proctorCode: '04' },
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 2, subject: 'IPA', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 3', className: '8A', proctorId: 'usr_guru_002', proctorName: 'M. Iqbal Gustiawan, S.Pd., G.r.', proctorCode: '07' },
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 2, subject: 'IPA', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 4', className: '8B', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r', proctorCode: '02' },
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 2, subject: 'IPA', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 5', className: '9A', proctorId: 'usr_guru_006', proctorName: 'Nurul Farhiya, S.Pd., G.r', proctorCode: '03' },
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 2, subject: 'IPA', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 6', className: '9B', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi', proctorCode: '13' },
+  { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 2, subject: 'IPA', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 7', className: 'SMA', proctorId: 'usr_guru_009', proctorName: 'Widianingsih, S.Si., G.r', proctorCode: '10' },
+  // ── SELASA, 2026-12-08 ──
+  // Sesi 1 (08:00 - 09:30): Matematika
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 1, subject: 'Matematika', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 1', className: '7A', proctorId: 'usr_guru_004', proctorName: 'Mira Nurdianti, S.Pd', proctorCode: '06' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 1, subject: 'Matematika', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 2', className: '7B', proctorId: 'usr_guru_007', proctorName: 'Septi Nur Aeni, S.E', proctorCode: '09' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 1, subject: 'Matematika', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 3', className: '8A', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r', proctorCode: '02' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 1, subject: 'Matematika', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 4', className: '8B', proctorId: 'usr_admin_001', proctorName: 'Dafa Maulana, S.Pd', proctorCode: '11' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 1, subject: 'Matematika', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 5', className: '9A', proctorId: 'usr_guru_005', proctorName: 'Fitri Ani Rahayu, S.Mat', proctorCode: '04' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 1, subject: 'Matematika', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 6', className: '9B', proctorId: 'usr_guru_003', proctorName: 'Adi Prasetyo, S.Pd., G.r', proctorCode: '08' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 1, subject: 'Matematika', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 7', className: 'SMA', proctorId: 'usr_guru_006', proctorName: 'Nurul Farhiya, S.Pd., G.r', proctorCode: '03' },
+  // ── SELASA, 2026-12-08 ──
+  // Sesi 2 (10:00 - 11:00): Pendidikan Pancasila
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 2, subject: 'Pendidikan Pancasila', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 1', className: '7A', proctorId: 'usr_guru_003', proctorName: 'Adi Prasetyo, S.Pd., G.r', proctorCode: '08' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 2, subject: 'Pendidikan Pancasila', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 2', className: '7B', proctorId: 'usr_guru_005', proctorName: 'Fitri Ani Rahayu, S.Mat', proctorCode: '04' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 2, subject: 'Pendidikan Pancasila', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 3', className: '8A', proctorId: 'usr_guru_009', proctorName: 'Widianingsih, S.Si., G.r', proctorCode: '10' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 2, subject: 'Pendidikan Pancasila', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 4', className: '8B', proctorId: 'usr_guru_007', proctorName: 'Septi Nur Aeni, S.E', proctorCode: '09' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 2, subject: 'Pendidikan Pancasila', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 5', className: '9A', proctorId: 'usr_guru_004', proctorName: 'Mira Nurdianti, S.Pd', proctorCode: '06' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 2, subject: 'Pendidikan Pancasila', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 6', className: '9B', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r', proctorCode: '02' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 2, subject: 'Pendidikan Pancasila', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 7', className: 'SMA', proctorId: 'usr_admin_001', proctorName: 'Dafa Maulana, S.Pd', proctorCode: '11' },
+  // ── SELASA, 2026-12-08 ──
+  // Sesi 3 (11:00 - 12:00): PJOK / Prakarya
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 3, subject: 'PJOK / Prakarya', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 1', className: '7A', proctorId: 'usr_guru_003', proctorName: 'Adi Prasetyo, S.Pd., G.r', proctorCode: '08' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 3, subject: 'PJOK / Prakarya', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 2', className: '7B', proctorId: 'usr_guru_005', proctorName: 'Fitri Ani Rahayu, S.Mat', proctorCode: '04' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 3, subject: 'PJOK / Prakarya', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 3', className: '8A', proctorId: 'usr_guru_009', proctorName: 'Widianingsih, S.Si., G.r', proctorCode: '10' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 3, subject: 'PJOK / Prakarya', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 4', className: '8B', proctorId: 'usr_guru_007', proctorName: 'Septi Nur Aeni, S.E', proctorCode: '09' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 3, subject: 'PJOK / Prakarya', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 5', className: '9A', proctorId: 'usr_guru_004', proctorName: 'Mira Nurdianti, S.Pd', proctorCode: '06' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 3, subject: 'PJOK / Prakarya', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 6', className: '9B', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r', proctorCode: '02' },
+  { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 3, subject: 'PJOK / Prakarya', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 7', className: 'SMA', proctorId: 'usr_admin_001', proctorName: 'Dafa Maulana, S.Pd', proctorCode: '11' },
+  // ── RABU, 2026-12-09 ──
+  // Sesi 1 (08:00 - 09:30): B. Indonesia
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 1, subject: 'B. Indonesia', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 1', className: '7A', proctorId: 'usr_admin_001', proctorName: 'Dafa Maulana, S.Pd', proctorCode: '11' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 1, subject: 'B. Indonesia', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 2', className: '7B', proctorId: 'usr_guru_003', proctorName: 'Adi Prasetyo, S.Pd., G.r', proctorCode: '08' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 1, subject: 'B. Indonesia', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 3', className: '8A', proctorId: 'usr_guru_005', proctorName: 'Fitri Ani Rahayu, S.Mat', proctorCode: '04' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 1, subject: 'B. Indonesia', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 4', className: '8B', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi', proctorCode: '13' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 1, subject: 'B. Indonesia', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 5', className: '9A', proctorId: 'usr_guru_002', proctorName: 'M. Iqbal Gustiawan, S.Pd., G.r.', proctorCode: '07' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 1, subject: 'B. Indonesia', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 6', className: '9B', proctorId: 'usr_guru_010', proctorName: 'Mawar Andinia, S.Pd., G.r', proctorCode: '12' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 1, subject: 'B. Indonesia', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 7', className: 'SMA', proctorId: 'usr_guru_009', proctorName: 'Widianingsih, S.Si., G.r', proctorCode: '10' },
+  // ── RABU, 2026-12-09 ──
+  // Sesi 2 (10:00 - 11:00): IPS
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 2, subject: 'IPS', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 1', className: '7A', proctorId: 'usr_guru_009', proctorName: 'Widianingsih, S.Si., G.r', proctorCode: '10' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 2, subject: 'IPS', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 2', className: '7B', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi', proctorCode: '13' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 2, subject: 'IPS', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 3', className: '8A', proctorId: 'usr_guru_002', proctorName: 'M. Iqbal Gustiawan, S.Pd., G.r.', proctorCode: '07' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 2, subject: 'IPS', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 4', className: '8B', proctorId: 'usr_guru_005', proctorName: 'Fitri Ani Rahayu, S.Mat', proctorCode: '04' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 2, subject: 'IPS', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 5', className: '9A', proctorId: 'usr_guru_010', proctorName: 'Mawar Andinia, S.Pd., G.r', proctorCode: '12' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 2, subject: 'IPS', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 6', className: '9B', proctorId: 'usr_guru_003', proctorName: 'Adi Prasetyo, S.Pd., G.r', proctorCode: '08' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 2, subject: 'IPS', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 7', className: 'SMA', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r', proctorCode: '02' },
+  // ── RABU, 2026-12-09 ──
+  // Sesi 3 (11:00 - 12:00): B. Arab
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 3, subject: 'B. Arab', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 1', className: '7A', proctorId: 'usr_guru_009', proctorName: 'Widianingsih, S.Si., G.r', proctorCode: '10' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 3, subject: 'B. Arab', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 2', className: '7B', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi', proctorCode: '13' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 3, subject: 'B. Arab', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 3', className: '8A', proctorId: 'usr_guru_002', proctorName: 'M. Iqbal Gustiawan, S.Pd., G.r.', proctorCode: '07' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 3, subject: 'B. Arab', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 4', className: '8B', proctorId: 'usr_guru_005', proctorName: 'Fitri Ani Rahayu, S.Mat', proctorCode: '04' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 3, subject: 'B. Arab', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 5', className: '9A', proctorId: 'usr_guru_010', proctorName: 'Mawar Andinia, S.Pd., G.r', proctorCode: '12' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 3, subject: 'B. Arab', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 6', className: '9B', proctorId: 'usr_guru_003', proctorName: 'Adi Prasetyo, S.Pd., G.r', proctorCode: '08' },
+  { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 3, subject: 'B. Arab', startTime: '11:00', endTime: '12:00', roomName: 'Ruang 7', className: 'SMA', proctorId: 'usr_guru_006', proctorName: 'Nurul Farhiya, S.Pd., G.r', proctorCode: '03' },
+  // ── KAMIS, 2026-12-10 ──
+  // Sesi 1 (08:00 - 09:30): B. Inggris
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 1, subject: 'B. Inggris', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 1', className: '7A', proctorId: 'usr_guru_006', proctorName: 'Nurul Farhiya, S.Pd., G.r', proctorCode: '03' },
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 1, subject: 'B. Inggris', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 2', className: '7B', proctorId: 'usr_guru_010', proctorName: 'Mawar Andinia, S.Pd., G.r', proctorCode: '12' },
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 1, subject: 'B. Inggris', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 3', className: '8A', proctorId: 'usr_guru_004', proctorName: 'Mira Nurdianti, S.Pd', proctorCode: '06' },
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 1, subject: 'B. Inggris', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 4', className: '8B', proctorId: 'usr_guru_007', proctorName: 'Septi Nur Aeni, S.E', proctorCode: '09' },
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 1, subject: 'B. Inggris', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 5', className: '9A', proctorId: 'usr_guru_003', proctorName: 'Adi Prasetyo, S.Pd., G.r', proctorCode: '08' },
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 1, subject: 'B. Inggris', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 6', className: '9B', proctorId: 'usr_guru_002', proctorName: 'M. Iqbal Gustiawan, S.Pd., G.r.', proctorCode: '07' },
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 1, subject: 'B. Inggris', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 7', className: 'SMA', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi', proctorCode: '13' },
+  // ── KAMIS, 2026-12-10 ──
+  // Sesi 2 (10:00 - 11:00): Seni Budaya
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 2, subject: 'Seni Budaya', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 1', className: '7A', proctorId: 'usr_admin_001', proctorName: 'Dafa Maulana, S.Pd', proctorCode: '11' },
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 2, subject: 'Seni Budaya', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 2', className: '7B', proctorId: 'usr_guru_002', proctorName: 'M. Iqbal Gustiawan, S.Pd., G.r.', proctorCode: '07' },
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 2, subject: 'Seni Budaya', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 3', className: '8A', proctorId: 'usr_guru_003', proctorName: 'Adi Prasetyo, S.Pd., G.r', proctorCode: '08' },
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 2, subject: 'Seni Budaya', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 4', className: '8B', proctorId: 'usr_guru_006', proctorName: 'Nurul Farhiya, S.Pd., G.r', proctorCode: '03' },
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 2, subject: 'Seni Budaya', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 5', className: '9A', proctorId: 'usr_guru_009', proctorName: 'Widianingsih, S.Si., G.r', proctorCode: '10' },
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 2, subject: 'Seni Budaya', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 6', className: '9B', proctorId: 'usr_guru_004', proctorName: 'Mira Nurdianti, S.Pd', proctorCode: '06' },
+  { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 2, subject: 'Seni Budaya', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 7', className: 'SMA', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r', proctorCode: '02' },
+  // ── JUMAT, 2026-12-11 ──
+  // Sesi 1 (08:00 - 09:30): Hadits
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 1, subject: 'Hadits', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 1', className: '7A', proctorId: 'usr_admin_001', proctorName: 'Dafa Maulana, S.Pd', proctorCode: '11' },
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 1, subject: 'Hadits', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 2', className: '7B', proctorId: 'usr_guru_004', proctorName: 'Mira Nurdianti, S.Pd', proctorCode: '06' },
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 1, subject: 'Hadits', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 3', className: '8A', proctorId: 'usr_guru_010', proctorName: 'Mawar Andinia, S.Pd., G.r', proctorCode: '12' },
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 1, subject: 'Hadits', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 4', className: '8B', proctorId: 'usr_guru_007', proctorName: 'Septi Nur Aeni, S.E', proctorCode: '09' },
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 1, subject: 'Hadits', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 5', className: '9A', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi', proctorCode: '13' },
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 1, subject: 'Hadits', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 6', className: '9B', proctorId: 'usr_guru_005', proctorName: 'Fitri Ani Rahayu, S.Mat', proctorCode: '04' },
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 1, subject: 'Hadits', startTime: '08:00', endTime: '09:30', roomName: 'Ruang 7', className: 'SMA', proctorId: 'usr_guru_006', proctorName: 'Nurul Farhiya, S.Pd., G.r', proctorCode: '03' },
+  // ── JUMAT, 2026-12-11 ──
+  // Sesi 2 (10:00 - 11:00): BTQ / Informatika
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 2, subject: 'BTQ / Informatika', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 1', className: '7A', proctorId: 'usr_guru_007', proctorName: 'Septi Nur Aeni, S.E', proctorCode: '09' },
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 2, subject: 'BTQ / Informatika', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 2', className: '7B', proctorId: 'usr_guru_002', proctorName: 'M. Iqbal Gustiawan, S.Pd., G.r.', proctorCode: '07' },
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 2, subject: 'BTQ / Informatika', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 3', className: '8A', proctorId: 'usr_guru_010', proctorName: 'Mawar Andinia, S.Pd., G.r', proctorCode: '12' },
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 2, subject: 'BTQ / Informatika', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 4', className: '8B', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi', proctorCode: '13' },
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 2, subject: 'BTQ / Informatika', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 5', className: '9A', proctorId: 'usr_guru_006', proctorName: 'Nurul Farhiya, S.Pd., G.r', proctorCode: '03' },
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 2, subject: 'BTQ / Informatika', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 6', className: '9B', proctorId: 'usr_admin_001', proctorName: 'Dafa Maulana, S.Pd', proctorCode: '11' },
+  { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 2, subject: 'BTQ / Informatika', startTime: '10:00', endTime: '11:00', roomName: 'Ruang 7', className: 'SMA', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r', proctorCode: '02' },
+];
+
+
 const memoryScheduleStore = new Map<string, string>();
 
 const safeGetStorage = (key: string): string | null => {
@@ -473,6 +590,301 @@ export class ExamScheduleRepository {
       isPublished: true,
       publishedAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Generates a fully populated, 100% conflict-free canonical ASAS schedule for Ruang 1 s.d. Ruang 7 (7A, 7B, 8A, 8B, 9A, 9B, SMA)
+   * based on official JADWAL NGAWAS ASAS.xlsx (7-11 Desember 2026).
+   */
+  public static createCanonicalAsasSchedule(academicYear: string = '2026/2027'): ExamScheduleData {
+    const classes = ['7A', '7B', '8A', '8B', '9A', '9B', 'SMA'];
+    const classToRoom: Record<string, string> = {
+      '7A': 'Ruang 1',
+      '7B': 'Ruang 2',
+      '8A': 'Ruang 3',
+      '8B': 'Ruang 4',
+      '9A': 'Ruang 5',
+      '9B': 'Ruang 6',
+      'SMA': 'Ruang 7',
+    };
+
+    const uniqueSessions = [
+      { date: '2026-12-07', dayName: 'Senin', sessionNumber: 1, subject: 'PAI', startTime: '08:00', endTime: '09:30' },
+      { date: '2026-12-07', dayName: 'Senin', sessionNumber: 2, subject: 'IPA', startTime: '10:00', endTime: '11:00' },
+      { date: '2026-12-08', dayName: 'Selasa', sessionNumber: 1, subject: 'Matematika', startTime: '08:00', endTime: '09:30' },
+      { date: '2026-12-08', dayName: 'Selasa', sessionNumber: 2, subject: 'Pendidikan Pancasila', startTime: '10:00', endTime: '11:00' },
+      { date: '2026-12-08', dayName: 'Selasa', sessionNumber: 3, subject: 'PJOK / Prakarya', startTime: '11:00', endTime: '12:00' },
+      { date: '2026-12-09', dayName: 'Rabu', sessionNumber: 1, subject: 'B. Indonesia', startTime: '08:00', endTime: '09:30' },
+      { date: '2026-12-09', dayName: 'Rabu', sessionNumber: 2, subject: 'IPS', startTime: '10:00', endTime: '11:00' },
+      { date: '2026-12-09', dayName: 'Rabu', sessionNumber: 3, subject: 'B. Arab', startTime: '11:00', endTime: '12:00' },
+      { date: '2026-12-10', dayName: 'Kamis', sessionNumber: 1, subject: 'B. Inggris', startTime: '08:00', endTime: '09:30' },
+      { date: '2026-12-10', dayName: 'Kamis', sessionNumber: 2, subject: 'Seni Budaya', startTime: '10:00', endTime: '11:00' },
+      { date: '2026-12-11', dayName: 'Jumat', sessionNumber: 1, subject: 'Hadits', startTime: '08:00', endTime: '09:30' },
+      { date: '2026-12-11', dayName: 'Jumat', sessionNumber: 2, subject: 'BTQ / Informatika', startTime: '10:00', endTime: '11:00' },
+    ];
+
+    const subjectSchedules: ExamSubjectScheduleItem[] = [];
+    classes.forEach((cls) => {
+      const room = classToRoom[cls] || 'Ruang 1';
+      uniqueSessions.forEach((sess, idx) => {
+        subjectSchedules.push({
+          id: `subj_asas_${cls}_${sess.date}_s${sess.sessionNumber}_${idx}`,
+          date: sess.date,
+          dayName: sess.dayName,
+          sessionNumber: sess.sessionNumber,
+          startTime: sess.startTime,
+          endTime: sess.endTime,
+          className: cls,
+          subject: sess.subject,
+          roomName: room,
+          isLabRequired: false,
+        });
+      });
+    });
+
+    const proctorSchedules: ExamProctorItem[] = CANONICAL_ASAS_SLOTS.map((slot) => ({
+      id: `proc_asas_${slot.date}_s${slot.sessionNumber}_r${slot.roomName.replace(/[^\d]/g, '')}`,
+      date: slot.date,
+      dayName: slot.dayName,
+      sessionNumber: slot.sessionNumber,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      roomName: slot.roomName,
+      className: slot.className,
+      subject: slot.subject,
+      mainProctorId: slot.proctorId,
+      mainProctorName: slot.proctorName,
+      educationLevel: slot.className === 'SMA' ? 'SMA' : 'SMP',
+    }));
+
+    const canonicalSubjectNames = Array.from(new Set(uniqueSessions.map((c) => c.subject)));
+
+    return {
+      id: `exam_sched_asas_${academicYear.replace(/[^\w]/g, '_')}_asas`,
+      educationLevel: 'SMP',
+      isPublished: true,
+      publishedAt: '2026-11-23T11:20:00.000Z',
+      config: {
+        academicYear,
+        examType: 'ASAS',
+        examTitle: 'Asesmen Sumatif Akhir Semester (ASAS) Semester Ganjil',
+        semester: '1',
+        startDate: '2026-12-07',
+        endDate: '2026-12-11',
+        sessionsPerDay: 3,
+        sessionSlots: [
+          { sessionNumber: 1, sessionName: 'ASAS 1', startTime: '08:00', endTime: '09:30' },
+          { sessionNumber: 2, sessionName: 'ASAS 2', startTime: '10:00', endTime: '11:00' },
+          { sessionNumber: 3, sessionName: 'ASAS 3', startTime: '11:00', endTime: '12:00' },
+        ],
+        selectedClasses: classes,
+        selectedSubjects: canonicalSubjectNames,
+        selectedTeacherIds: Array.from(new Set(CANONICAL_ASAS_SLOTS.map((s) => s.proctorId))),
+        proctorsPerRoom: 1,
+        excludeOwnSubject: false,
+        excludeCommitteeProctor: false,
+        assignBackupProctor: false,
+        totalRooms: 7,
+        roomFormat: 'NUMERIC',
+        classRoomMapping: classToRoom,
+        educationLevel: 'SMP',
+        dayOverrides: [
+          { date: '2026-12-07', dayName: 'Senin', sessionsCount: 2 },
+          { date: '2026-12-08', dayName: 'Selasa', sessionsCount: 3 },
+          { date: '2026-12-09', dayName: 'Rabu', sessionsCount: 3 },
+          { date: '2026-12-10', dayName: 'Kamis', sessionsCount: 2 },
+          { date: '2026-12-11', dayName: 'Jumat', sessionsCount: 2 },
+        ],
+      },
+      subjectSchedules,
+      proctorSchedules,
+      summary: {
+        totalDays: 5,
+        totalSessions: uniqueSessions.length,
+        totalClasses: classes.length,
+        totalSubjects: canonicalSubjectNames.length,
+        totalProctorsAssigned: proctorSchedules.length,
+        averageSessionsPerTeacher: Math.round(proctorSchedules.length / 11),
+        aiOptimizationNote: 'Matriks resmi jadwal mengawas ASAS 2026 (7-11 Desember 2026) Ruang 1 s.d. Ruang 7 bebas bentrok (100% konsisten file Excel).',
+      },
+      createdAt: '2026-11-23T11:20:00.000Z',
+      updatedAt: '2026-11-23T11:20:00.000Z',
+    };
+  }
+
+  /**
+   * Synchronizes an ASAS exam schedule so all 84 proctor assignments across Ruang 1 s.d. Ruang 7
+   * match the official schedule from JADWAL NGAWAS ASAS.xlsx.
+   */
+  public static syncAsasSchedule(schedule: ExamScheduleData): ExamScheduleData {
+    if (schedule.config?.examType !== 'ASAS') {
+      return schedule;
+    }
+
+    if (
+      schedule.config?.customSubjectProctors ||
+      schedule.config?.aiCustomPrompt ||
+      schedule.config?.isCustomSchedule ||
+      schedule.isCustomSchedule
+    ) {
+      return schedule;
+    }
+
+    const updatedProctors: ExamProctorItem[] = CANONICAL_ASAS_SLOTS.map((slot) => {
+      const existing = (schedule.proctorSchedules || []).find(
+        (p) =>
+          p.date === slot.date &&
+          p.sessionNumber === slot.sessionNumber &&
+          (p.roomName === slot.roomName || p.roomName.replace(/[^\d]/g, '') === slot.roomName.replace(/[^\d]/g, ''))
+      );
+      if (existing) {
+        return {
+          ...existing,
+          mainProctorId: slot.proctorId,
+          mainProctorName: slot.proctorName,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          subject: slot.subject,
+          className: slot.className,
+        };
+      }
+      return {
+        id: `proc_asas_${slot.date}_s${slot.sessionNumber}_r${slot.roomName.replace(/[^\d]/g, '')}`,
+        date: slot.date,
+        dayName: slot.dayName,
+        sessionNumber: slot.sessionNumber,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        roomName: slot.roomName,
+        className: slot.className,
+        subject: slot.subject,
+        mainProctorId: slot.proctorId,
+        mainProctorName: slot.proctorName,
+        educationLevel: slot.className === 'SMA' ? 'SMA' : 'SMP',
+      };
+    });
+
+    return {
+      ...schedule,
+      proctorSchedules: updatedProctors,
+      config: {
+        ...schedule.config,
+        totalRooms: 7,
+        startDate: '2026-12-07',
+        endDate: '2026-12-11',
+      },
+      summary: {
+        ...schedule.summary,
+        totalProctorsAssigned: updatedProctors.length,
+      },
+    };
+  }
+
+  /**
+   * Parses an Excel workbook conforming to JADWAL NGAWAS ASAS.xlsx
+   * and converts it into a complete ExamScheduleData object.
+   */
+  public static parseAsasExcelWorkbook(
+    workbook: XLSX.WorkBook,
+    academicYear: string = '2026/2027'
+  ): ExamScheduleData {
+    const sheetName = workbook.SheetNames[0] || 'Lembar1';
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) {
+      throw new Error(`Lembar kerja "${sheetName}" tidak ditemukan di file Excel.`);
+    }
+
+    const teacherMap: Record<number, { id: string; name: string; code: string }> = {
+      1: { id: 'usr_kepsek_001', name: 'Usfar', code: '01' },
+      2: { id: 'usr_op_002', name: 'Qodiatul Asrof Ramadhoni, S.E., G.r', code: '02' },
+      3: { id: 'usr_guru_006', name: 'Nurul Farhiya, S.Pd., G.r', code: '03' },
+      4: { id: 'usr_guru_005', name: 'Fitri Ani Rahayu, S.Mat', code: '04' },
+      5: { id: 'usr_guru_008', name: 'Windiani, S.E., G.r', code: '05' },
+      6: { id: 'usr_guru_004', name: 'Mira Nurdianti, S.Pd', code: '06' },
+      7: { id: 'usr_guru_002', name: 'M. Iqbal Gustiawan, S.Pd., G.r.', code: '07' },
+      8: { id: 'usr_guru_003', name: 'Adi Prasetyo, S.Pd., G.r', code: '08' },
+      9: { id: 'usr_guru_007', name: 'Septi Nur Aeni, S.E', code: '09' },
+      10: { id: 'usr_guru_009', name: 'Widianingsih, S.Si., G.r', code: '10' },
+      11: { id: 'usr_admin_001', name: 'Dafa Maulana, S.Pd', code: '11' },
+      12: { id: 'usr_guru_010', name: 'Mawar Andinia, S.Pd., G.r', code: '12' },
+      13: { id: 'usr_1786512137742', name: 'Ridho Maulana Al Farizi', code: '13' },
+    };
+
+    for (let r = 16; r <= 35; r++) {
+      const codeCell = sheet[`A${r}`];
+      const nameCell = sheet[`B${r}`];
+      if (codeCell && codeCell.v !== undefined && nameCell && nameCell.v) {
+        const num = Number(codeCell.v);
+        const rawName = String(nameCell.v).trim();
+        if (num > 0 && rawName) {
+          const existing = teacherMap[num];
+          if (existing) {
+            teacherMap[num] = { ...existing, name: existing.name || rawName };
+          } else {
+            teacherMap[num] = {
+              id: `usr_guru_${String(num).padStart(3, '0')}`,
+              name: rawName,
+              code: String(num).padStart(2, '0'),
+            };
+          }
+        }
+      }
+    }
+
+    const sessionDefs = [
+      { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 1, startTime: '08:00', endTime: '09:30', defaultSubject: 'PAI', row: 4 },
+      { dayIndex: 0, date: '2026-12-07', dayName: 'Senin', sessionNumber: 2, startTime: '10:00', endTime: '11:00', defaultSubject: 'IPA', row: 5 },
+      { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 1, startTime: '08:00', endTime: '09:30', defaultSubject: 'Matematika', row: 6 },
+      { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 2, startTime: '10:00', endTime: '11:00', defaultSubject: 'Pendidikan Pancasila', row: 7 },
+      { dayIndex: 1, date: '2026-12-08', dayName: 'Selasa', sessionNumber: 3, startTime: '11:00', endTime: '12:00', defaultSubject: 'PJOK / Prakarya', row: 8 },
+      { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 1, startTime: '08:00', endTime: '09:30', defaultSubject: 'B. Indonesia', row: 9 },
+      { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 2, startTime: '10:00', endTime: '11:00', defaultSubject: 'IPS', row: 10 },
+      { dayIndex: 2, date: '2026-12-09', dayName: 'Rabu', sessionNumber: 3, startTime: '11:00', endTime: '12:00', defaultSubject: 'B. Arab', row: 11 },
+      { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 1, startTime: '08:00', endTime: '09:30', defaultSubject: 'B. Inggris', row: 12 },
+      { dayIndex: 3, date: '2026-12-10', dayName: 'Kamis', sessionNumber: 2, startTime: '10:00', endTime: '11:00', defaultSubject: 'Seni Budaya', row: 13 },
+      { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 1, startTime: '08:00', endTime: '09:30', defaultSubject: 'Hadits', row: 14 },
+      { dayIndex: 4, date: '2026-12-11', dayName: 'Jumat', sessionNumber: 2, startTime: '10:00', endTime: '11:00', defaultSubject: 'BTQ / Informatika', row: 15 },
+    ];
+
+    const roomCols = [
+      { name: 'Ruang 1', col: 'B', className: '7A' },
+      { name: 'Ruang 2', col: 'C', className: '7B' },
+      { name: 'Ruang 3', col: 'D', className: '8A' },
+      { name: 'Ruang 4', col: 'E', className: '8B' },
+      { name: 'Ruang 5', col: 'F', className: '9A' },
+      { name: 'Ruang 6', col: 'G', className: '9B' },
+      { name: 'Ruang 7', col: 'H', className: 'SMA' },
+    ];
+
+    const proctorSchedules: ExamProctorItem[] = [];
+    sessionDefs.forEach((s) => {
+      roomCols.forEach((r) => {
+        const cell = sheet[r.col + s.row];
+        const val = cell ? Number(cell.v) : null;
+        const teacher = (val && teacherMap[val]) || teacherMap[1];
+        proctorSchedules.push({
+          id: `proc_asas_${s.date}_s${s.sessionNumber}_r${r.name.replace(/[^\d]/g, '')}`,
+          date: s.date,
+          dayName: s.dayName,
+          sessionNumber: s.sessionNumber,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          roomName: r.name,
+          className: r.className,
+          subject: s.defaultSubject,
+          mainProctorId: teacher.id,
+          mainProctorName: teacher.name,
+          educationLevel: r.className === 'SMA' ? 'SMA' : 'SMP',
+        });
+      });
+    });
+
+    const canonical = this.createCanonicalAsasSchedule(academicYear);
+    return {
+      ...canonical,
+      proctorSchedules,
       updatedAt: new Date().toISOString(),
     };
   }
@@ -868,7 +1280,22 @@ export class ExamScheduleRepository {
       schedule?.isCustomSchedule
     );
 
-    // 3. For SMA: Synchronize subjects when schedule exists
+    // 3. For ASAS: Return canonical/synced ASAS schedule across all 7 rooms
+    if (examType.toUpperCase() === 'ASAS') {
+      if (schedule) {
+        if (isCustomSchedule) return schedule;
+        const synced = this.normalizeScheduleSessionTimes(this.syncAsasSchedule(schedule));
+        const key = this.getStorageKey(academicYear, examType, level);
+        safeSetStorage(key, JSON.stringify(synced));
+        return synced;
+      }
+      const canonical = this.createCanonicalAsasSchedule(academicYear);
+      const key = this.getStorageKey(academicYear, examType, level);
+      safeSetStorage(key, JSON.stringify(canonical));
+      return canonical;
+    }
+
+    // 4. For SMA: Synchronize subjects when schedule exists
     if (level === 'SMA') {
       if (schedule) {
         if (isCustomSchedule) {
@@ -922,7 +1349,9 @@ export class ExamScheduleRepository {
       const finalSchedule = isCustomSchedule
         ? schedule
         : this.normalizeScheduleSessionTimes(
-            effectiveLevel === 'SMA'
+            schedule.config?.examType === 'ASAS'
+              ? this.syncAsasSchedule(schedule)
+              : effectiveLevel === 'SMA'
               ? this.syncSmaScheduleSubjects(schedule)
               : effectiveLevel === 'SMP'
               ? this.syncSmpScheduleSubjects(schedule)
@@ -997,7 +1426,7 @@ export class ExamScheduleRepository {
     duties: ExamScheduleData['proctorSchedules'];
     teacherCode?: string;
   } | null> {
-    const examTypes = ['ASTS', 'ASAS'];
+    const examTypes = ['ASAS', 'ASTS'];
     const targetKey = (teacherIdOrName || '').toLowerCase().trim();
     const targetName = (teacherFullName || '').toLowerCase().trim();
     const cleanTargetName = this.normalizeTeacherName(teacherFullName || (!teacherIdOrName.startsWith('usr_') ? teacherIdOrName : ''));

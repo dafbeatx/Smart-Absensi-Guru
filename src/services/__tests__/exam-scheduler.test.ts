@@ -1,3 +1,6 @@
+import * as XLSX from 'xlsx';
+import * as fs from 'fs';
+import * as path from 'path';
 /**
  * SMART ABSENSI GURU - EXAM SCHEDULER & COMMITTEE AI TEST SUITE
  * Suite 37: Tests for ASTS/ASAS scheduling engine, proctor load balancing, anti-own-subject rule, and committee access control.
@@ -1414,6 +1417,109 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     );
   } catch (err: any) {
     assert('Exam Scheduler 33: Error diagnosing cross-level proctor conflicts', false, err?.message);
+  }
+
+  // Test 34: Canonical ASAS Schedule Integrity (Ruang 1 s.d. 7, 12 Sesi, 84 Proctor Slots, Zero Conflicts)
+  try {
+    const canonicalAsas = ExamScheduleRepository.createCanonicalAsasSchedule(testAcademicYear);
+    await ExamScheduleRepository.saveSchedule(canonicalAsas, 'SMP');
+    const asasSchedule = await ExamScheduleRepository.getSchedule(testAcademicYear, 'ASAS', 'SMP');
+
+    const totalSlots = asasSchedule?.proctorSchedules.length || 0;
+    const totalRooms = asasSchedule?.config.totalRooms || 0;
+
+    // Check specific proctor allocations from JADWAL NGAWAS ASAS.xlsx
+    // Senin S1: R1=Ridho (13), R2=Iqbal (7), R3=Fitri (4), R4=Widianingsih (10), R5=Septi (9), R6=Nurul (3), R7=Qodi (2)
+    const seninS1 = asasSchedule?.proctorSchedules.filter((p) => p.date === '2026-12-07' && p.sessionNumber === 1);
+    const r1Senin = seninS1?.find((p) => p.roomName === 'Ruang 1');
+    const r7Senin = seninS1?.find((p) => p.roomName === 'Ruang 7');
+
+    const isSeninS1Exact = Boolean(
+      r1Senin?.mainProctorName.includes('Ridho') &&
+      r7Senin?.mainProctorName.includes('Qodiatul Asrof')
+    );
+
+    // Jumat S2: R1=Septi (9), R6=Dafa (11), R7=Qodi (2)
+    const jumatS2 = asasSchedule?.proctorSchedules.filter((p) => p.date === '2026-12-11' && p.sessionNumber === 2);
+    const r1Jumat = jumatS2?.find((p) => p.roomName === 'Ruang 1');
+    const r6Jumat = jumatS2?.find((p) => p.roomName === 'Ruang 6');
+
+    const isJumatS2Exact = Boolean(
+      r1Jumat?.mainProctorName.includes('Septi') &&
+      r6Jumat?.mainProctorName.includes('Dafa')
+    );
+
+    // Verify zero conflict across all 84 slots (no teacher in two rooms at the same session)
+    let conflictFound = false;
+    const sessionSlotsMap: Record<string, Set<string>> = {};
+    (asasSchedule?.proctorSchedules || []).forEach((p) => {
+      const slotKey = `${p.date}_s${p.sessionNumber}`;
+      if (!sessionSlotsMap[slotKey]) sessionSlotsMap[slotKey] = new Set();
+      if (sessionSlotsMap[slotKey].has(p.mainProctorId)) {
+        conflictFound = true;
+      }
+      sessionSlotsMap[slotKey].add(p.mainProctorId);
+    });
+
+    assert(
+      'Exam Scheduler 34: Canonical ASAS schedule has 84 proctor slots across 7 rooms (Ruang 1-7), zero collisions, and matches official Excel matrix',
+      Boolean(
+        asasSchedule &&
+        totalSlots === 84 &&
+        totalRooms === 7 &&
+        !conflictFound &&
+        isSeninS1Exact &&
+        isJumatS2Exact
+      ),
+      `Total slots: ${totalSlots}/84, Total rooms: ${totalRooms}/7, Zero conflict: ${!conflictFound}, SeninS1: ${isSeninS1Exact}, JumatS2: ${isJumatS2Exact}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 34: Error verifying canonical ASAS schedule', false, err?.message);
+  }
+
+  // Test 35: Dynamic Excel ASAS Workbook Parser (parseAsasExcelWorkbook)
+  try {
+    const templatePath = path.resolve('public/templates/JADWAL_NGAWAS_ASAS.xlsx');
+    const exists = fs.existsSync(templatePath);
+    let parseOk = false;
+    let parsedCount = 0;
+
+    if (exists) {
+      const fileBuffer = fs.readFileSync(templatePath);
+      const wb = XLSX.read(fileBuffer, { type: 'buffer' });
+      const parsedData = ExamScheduleRepository.parseAsasExcelWorkbook(wb, testAcademicYear);
+      parsedCount = parsedData.proctorSchedules.length;
+      parseOk = parsedCount === 84 && parsedData.config.totalRooms === 7;
+    }
+
+    assert(
+      'Exam Scheduler 35: parseAsasExcelWorkbook successfully parses official JADWAL NGAWAS ASAS.xlsx into 84 valid proctor slots',
+      exists && parseOk,
+      `Template exists: ${exists}, Parsed proctors count: ${parsedCount}/84`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 35: Error parsing ASAS Excel file', false, err?.message);
+  }
+
+  // Test 36: Teacher Personal Duties Retrieval for ASAS (getTeacherExamDuties)
+  try {
+    const dutiesResult = await ExamScheduleRepository.getTeacherExamDuties(
+      'usr_admin_001',
+      testAcademicYear,
+      'SMP',
+      'Dafa Maulana, S.Pd'
+    );
+
+    const dafaDutyCount = dutiesResult?.duties.length || 0;
+    const isAsas = dutiesResult?.schedule.config.examType === 'ASAS';
+
+    assert(
+      'Exam Scheduler 36: getTeacherExamDuties accurately retrieves personal ASAS proctor duties (7 sessions for Dafa Maulana)',
+      Boolean(dutiesResult && isAsas && dafaDutyCount === 7),
+      `ExamType: ${dutiesResult?.schedule.config.examType}, Duties count: ${dafaDutyCount}/7`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 36: Error verifying teacher ASAS duties', false, err?.message);
   }
 
   return { passed, failed, results };

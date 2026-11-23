@@ -38,7 +38,10 @@ import {
   ChevronDown,
   GraduationCap,
   SlidersHorizontal,
+  Upload,
+  FileSpreadsheet,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { formatTimeForInput } from '../../../utils/time.utils';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -244,6 +247,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [subjectSwapInitialSlot, setSubjectSwapInitialSlot] = useState<{ date: string; sessionNumber: number } | undefined>(undefined);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState<boolean>(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
 
   // ── EXAM PERIOD ACTIVE / AUTO-EXPIRE STATE ──
   const [periodStatus, setPeriodStatus] = useState<ExamPeriodStatus | null>(null);
@@ -292,6 +296,39 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   // ── FORM QUESTIONNAIRE STATE (Parameters filled by Committee) ──────────────
   const [formAcademicYear, setFormAcademicYear] = useState<string>(() => AdministrationRepository.getActiveAcademicYear());
   const [formExamType, setFormExamType] = useState<ExamType>('ASTS');
+
+// Handle uploading and parsing JADWAL NGAWAS ASAS.xlsx
+  const handleImportExcel = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const parsedSchedule = ExamScheduleRepository.parseAsasExcelWorkbook(workbook, formAcademicYear);
+      await ExamScheduleRepository.saveSchedule(parsedSchedule, selectedLevel);
+      setScheduleData(parsedSchedule);
+      if (selectedLevel === 'SMA') {
+        setSmaScheduleData(parsedSchedule);
+      } else {
+        setSmpScheduleData(parsedSchedule);
+      }
+      setSelectedExamType('ASAS');
+      setFormExamType('ASAS');
+      setActiveTab('proctors');
+      setToast({
+        text: `✨ Berhasil mengimpor ${parsedSchedule.proctorSchedules.length} slot jadwal mengawas ASAS dari "${file.name}"!`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      logger.error('ExamScheduleAndProctorModal', 'Gagal memproses file Excel jadwal:', err);
+      setToast({
+        text: `Gagal membaca file Excel: ${err?.message || 'Format tidak valid'}`,
+        type: 'error',
+      });
+    } finally {
+      if (e.target) e.target.value = '';
+    }
+  }, [formAcademicYear, selectedLevel]);
 
   // Helper to compute smart default exam dates (Standard 5-day school week: Senin s/d Jumat)
   const getSmartDefaultExamStartDate = (): string => {
@@ -634,7 +671,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
         saved = ExamScheduleRepository.createCanonicalSmaSchedule(targetYear, targetType);
         await ExamScheduleRepository.saveSchedule(saved, 'SMA');
       } else if (newLevel === 'SMP') {
-        saved = ExamScheduleRepository.createCanonicalSmpSchedule(targetYear, targetType);
+        saved = targetType === 'ASAS'
+          ? ExamScheduleRepository.createCanonicalAsasSchedule(targetYear)
+          : ExamScheduleRepository.createCanonicalSmpSchedule(targetYear, targetType);
         await ExamScheduleRepository.saveSchedule(saved, 'SMP');
       }
     }
@@ -683,7 +722,11 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const handleExamTypeChange = useCallback(async (newType: ExamType) => {
     setFormExamType(newType);
     setSelectedExamType(newType);
-    const saved = await ExamScheduleRepository.getSchedule(formAcademicYear, newType, selectedLevel);
+    let saved = await ExamScheduleRepository.getSchedule(formAcademicYear, newType, selectedLevel);
+    if (!saved && newType === 'ASAS') {
+      saved = ExamScheduleRepository.createCanonicalAsasSchedule(formAcademicYear);
+      await ExamScheduleRepository.saveSchedule(saved, selectedLevel);
+    }
     setScheduleData(saved);
   }, [formAcademicYear, selectedLevel]);
 
@@ -974,11 +1017,16 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
         (async () => {
           let s = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType, 'SMP');
           if (!s) {
-            const altType = selectedExamType === 'ASTS' ? 'ASAS' : 'ASTS';
-            s = await ExamScheduleRepository.getSchedule(activeAcademicYear, altType, 'SMP');
-            if (!s) {
-              s = ExamScheduleRepository.createCanonicalSmpSchedule(activeAcademicYear, selectedExamType);
+            if (selectedExamType === 'ASAS') {
+              s = ExamScheduleRepository.createCanonicalAsasSchedule(activeAcademicYear);
               await ExamScheduleRepository.saveSchedule(s, 'SMP');
+            } else {
+              const altType = selectedExamType === 'ASTS' ? 'ASAS' : 'ASTS';
+              s = await ExamScheduleRepository.getSchedule(activeAcademicYear, altType, 'SMP');
+              if (!s) {
+                s = ExamScheduleRepository.createCanonicalSmpSchedule(activeAcademicYear, selectedExamType);
+                await ExamScheduleRepository.saveSchedule(s, 'SMP');
+              }
             }
           }
           return s;
@@ -1699,6 +1747,24 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
         <div className="flex items-center gap-2 shrink-0 ml-2">
           {scheduleData && (
             <>
+              {/* Tombol Impor Excel Jadwal Ngawas */}
+              <input
+                type="file"
+                ref={excelInputRef}
+                onChange={handleImportExcel}
+                accept=".xlsx,.xls"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => excelInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                title="Unggah berkas Excel Jadwal Ngawas (seperti JADWAL NGAWAS ASAS.xlsx)"
+              >
+                <Upload className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Impor Excel</span>
+              </button>
+
               {/* Dropdown Menu Ekspor & Cetak Terpadu */}
               <div className="relative" ref={exportDropdownRef}>
                 <button
@@ -1846,6 +1912,21 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                         <div className="text-[10px] text-teal-700">Daftar hadir pengawas, serah terima, berita acara</div>
                       </div>
                     </button>
+
+                    {/* 7. Unduh Format Template Excel Jadwal Ngawas */}
+                    <a
+                      href="/templates/JADWAL_NGAWAS_ASAS.xlsx"
+                      download="JADWAL_NGAWAS_ASAS.xlsx"
+                      className="w-full text-left px-3.5 py-2.5 hover:bg-slate-50 flex items-center gap-3 transition-colors cursor-pointer border-t border-slate-100"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100">
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">Format Excel Jadwal Ngawas</div>
+                        <div className="text-[10px] text-slate-500">Berkas template resmi JADWAL NGAWAS ASAS.xlsx</div>
+                      </div>
+                    </a>
                   </div>
                 )}
               </div>
