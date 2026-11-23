@@ -164,7 +164,7 @@ function normalizeSubjectToCanonical(name: string): string {
 
 const DEFAULT_SUBJECTS = CANONICAL_SCHOOL_SUBJECTS;
 
-const DEFAULT_CLASSES = ['7A', '7B', '8A', '8B', '9A', '9B', 'SMA'];
+const DEFAULT_CLASSES = ['7A', '7B', '8A', '8B', '9A', '9B', 'Ruang 7'];
 
 export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalProps> = ({
   isOpen,
@@ -654,10 +654,18 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
 
   // Handle switching education level (SMP vs SMA)
   const handleLevelChange = useCallback(async (newLevel: EducationLevel) => {
+    const targetType = formExamType || selectedExamType;
+    if (newLevel === 'SMA' && targetType === 'ASAS') {
+      setToast({
+        text: 'Jadwal pengawas ASAS terpusat di jenjang SMP (Ruang 1 s.d. 7). Jadwal mengawas di SMA ditiadakan.',
+        type: 'success',
+      });
+      setSelectedLevel('SMP');
+      return;
+    }
     setSelectedLevel(newLevel);
     // Reload schedule for this level
     const targetYear = formAcademicYear || activeAcademicYear;
-    const targetType = formExamType || selectedExamType;
     let saved = await ExamScheduleRepository.getSchedule(targetYear, targetType, newLevel);
     // Fallback if not found under targetType: check alternative type (ASTS / ASAS)
     if (!saved) {
@@ -667,7 +675,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
         saved = altSaved;
         setSelectedExamType(altType);
         setFormExamType(altType);
-      } else if (newLevel === 'SMA') {
+      } else if (newLevel === 'SMA' && targetType !== 'ASAS') {
         saved = ExamScheduleRepository.createCanonicalSmaSchedule(targetYear, targetType);
         await ExamScheduleRepository.saveSchedule(saved, 'SMA');
       } else if (newLevel === 'SMP') {
@@ -696,7 +704,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     const levelFiltered = allYearClasses.filter((c) => resolveSchoolLevel(c) === newLevel);
     const classesToSet = levelFiltered.length > 0
       ? levelFiltered
-      : (newLevel === 'SMA' ? ['10', '11', '12'] : ['7A', '7B', '8A', '8B', '9A', '9B']);
+      : (newLevel === 'SMA' ? ['10', '11', '12'] : ['7A', '7B', '8A', '8B', '9A', '9B', 'Ruang 7']);
     setAvailableClasses(classesToSet);
     setSelectedClasses(classesToSet);
     setTotalRooms(classesToSet.length);
@@ -1032,6 +1040,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
           return s;
         })(),
         (async () => {
+          if (selectedExamType === 'ASAS') {
+            return null;
+          }
           let s = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType, 'SMA');
           if (!s) {
             const altType = selectedExamType === 'ASTS' ? 'ASAS' : 'ASTS';
@@ -2019,35 +2030,42 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
       {/* Tab Navigation Bar */}
       <div className="px-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between gap-3 overflow-x-auto shrink-0 shadow-2xs">
         <div className="flex items-center gap-1.5 sm:gap-2 py-2">
-          {/* Level Switcher (SMP vs SMA) */}
-          <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 mr-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => handleLevelChange('SMP')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedLevel === 'SMP'
-                  ? 'bg-teal-700 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
-              title="Pilih Jenjang SMP Terpadu Al-Ittihadiyah"
-            >
+          {/* Level Switcher (SMP vs SMA): Jika ASAS, kunci ke SMP Ruang 1-7 */}
+          {selectedExamType === 'ASAS' ? (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-200 text-teal-900 text-xs font-black mr-2 shrink-0 shadow-2xs">
               <span className="text-xs">🏫</span>
-              <span>SMP</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleLevelChange('SMA')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedLevel === 'SMA'
-                  ? 'bg-blue-700 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
-              title="Pilih Jenjang SMA Terpadu As Salaam"
-            >
-              <span className="text-xs">🎓</span>
-              <span>SMA</span>
-            </button>
-          </div>
+              <span>SMP (Ruang 1 s.d. 7)</span>
+            </div>
+          ) : (
+            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 mr-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleLevelChange('SMP')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  selectedLevel === 'SMP'
+                    ? 'bg-teal-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+                title="Pilih Jenjang SMP Terpadu Al-Ittihadiyah"
+              >
+                <span className="text-xs">🏫</span>
+                <span>SMP</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleLevelChange('SMA')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  selectedLevel === 'SMA'
+                    ? 'bg-blue-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+                title="Pilih Jenjang SMA Terpadu As Salaam"
+              >
+                <span className="text-xs">🎓</span>
+                <span>SMA</span>
+              </button>
+            </div>
+          )}
 
           <div className="h-5 w-px bg-slate-200 shrink-0 mx-0.5" />
 
@@ -4863,57 +4881,59 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
               )}
             </div>
 
-            {/* Level Filter Switcher Pills (Semua / SMP / SMA) */}
-            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setMyScheduleLevelFilter('ALL')}
-                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  myScheduleLevelFilter === 'ALL'
-                    ? 'bg-[#023246] text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                }`}
-              >
-                <span>Semua Jenjang</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                  myScheduleLevelFilter === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                }`}>
-                  {myCombinedDuties.length}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMyScheduleLevelFilter('SMP')}
-                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  myScheduleLevelFilter === 'SMP'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                }`}
-              >
-                <span>🏫 SMP</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                  myScheduleLevelFilter === 'SMP' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                }`}>
-                  {mySmpDuties.length}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMyScheduleLevelFilter('SMA')}
-                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  myScheduleLevelFilter === 'SMA'
-                    ? 'bg-blue-700 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                }`}
-              >
-                <span>🎓 SMA</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                  myScheduleLevelFilter === 'SMA' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                }`}>
-                  {mySmaDuties.length}
-                </span>
-              </button>
-            </div>
+            {/* Level Filter Switcher Pills (Hanya ditampilkan jika terdapat tugas lintas jenjang SMP & SMA) */}
+            {mySmaDuties.length > 0 && (
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setMyScheduleLevelFilter('ALL')}
+                  className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    myScheduleLevelFilter === 'ALL'
+                      ? 'bg-[#023246] text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <span>Semua Jenjang</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    myScheduleLevelFilter === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {myCombinedDuties.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMyScheduleLevelFilter('SMP')}
+                  className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    myScheduleLevelFilter === 'SMP'
+                      ? 'bg-teal-700 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <span>🏫 SMP</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    myScheduleLevelFilter === 'SMP' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {mySmpDuties.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMyScheduleLevelFilter('SMA')}
+                  className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    myScheduleLevelFilter === 'SMA'
+                      ? 'bg-blue-700 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <span>🎓 SMA</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    myScheduleLevelFilter === 'SMA' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {mySmaDuties.length}
+                  </span>
+                </button>
+              </div>
+            )}
 
             {displayedMyDuties.length === 0 ? (
               <div className="bg-white rounded-2xl p-10 text-center border border-slate-200/90 shadow-xs space-y-2">

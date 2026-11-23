@@ -1452,6 +1452,8 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     // Verify zero conflict across all 84 slots (no teacher in two rooms at the same session)
     let conflictFound = false;
     const sessionSlotsMap: Record<string, Set<string>> = {};
+    const allSlotsSmp = (asasSchedule?.proctorSchedules || []).every((p) => p.educationLevel === 'SMP');
+    const r7HasRuang7Class = r7Senin?.className === 'Ruang 7';
     (asasSchedule?.proctorSchedules || []).forEach((p) => {
       const slotKey = `${p.date}_s${p.sessionNumber}`;
       if (!sessionSlotsMap[slotKey]) sessionSlotsMap[slotKey] = new Set();
@@ -1462,16 +1464,18 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     });
 
     assert(
-      'Exam Scheduler 34: Canonical ASAS schedule has 84 proctor slots across 7 rooms (Ruang 1-7), zero collisions, and matches official Excel matrix',
+      'Exam Scheduler 34: Canonical ASAS schedule has 84 proctor slots across 7 rooms (Ruang 1-7), zero collisions, 100% SMP, and matches official Excel matrix',
       Boolean(
         asasSchedule &&
         totalSlots === 84 &&
         totalRooms === 7 &&
         !conflictFound &&
         isSeninS1Exact &&
-        isJumatS2Exact
+        isJumatS2Exact &&
+        allSlotsSmp &&
+        r7HasRuang7Class
       ),
-      `Total slots: ${totalSlots}/84, Total rooms: ${totalRooms}/7, Zero conflict: ${!conflictFound}, SeninS1: ${isSeninS1Exact}, JumatS2: ${isJumatS2Exact}`
+      `Total slots: ${totalSlots}/84, Total rooms: ${totalRooms}/7, Zero conflict: ${!conflictFound}, All SMP: ${allSlotsSmp}, R7 class: ${r7Senin?.className}`
     );
   } catch (err: any) {
     assert('Exam Scheduler 34: Error verifying canonical ASAS schedule', false, err?.message);
@@ -1483,19 +1487,24 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     const exists = fs.existsSync(templatePath);
     let parseOk = false;
     let parsedCount = 0;
+    let parsedAllSmp = false;
+    let parsedR7ClassOk = false;
 
     if (exists) {
       const fileBuffer = fs.readFileSync(templatePath);
       const wb = XLSX.read(fileBuffer, { type: 'buffer' });
       const parsedData = ExamScheduleRepository.parseAsasExcelWorkbook(wb, testAcademicYear);
       parsedCount = parsedData.proctorSchedules.length;
-      parseOk = parsedCount === 84 && parsedData.config.totalRooms === 7;
+      parsedAllSmp = parsedData.proctorSchedules.every((p) => p.educationLevel === 'SMP');
+      const r7Sample = parsedData.proctorSchedules.find((p) => p.roomName === 'Ruang 7');
+      parsedR7ClassOk = r7Sample?.className === 'Ruang 7';
+      parseOk = parsedCount === 84 && parsedData.config.totalRooms === 7 && parsedAllSmp && parsedR7ClassOk;
     }
 
     assert(
-      'Exam Scheduler 35: parseAsasExcelWorkbook successfully parses official JADWAL NGAWAS ASAS.xlsx into 84 valid proctor slots',
+      'Exam Scheduler 35: parseAsasExcelWorkbook successfully parses official JADWAL NGAWAS ASAS.xlsx into 84 valid proctor slots (Ruang 1-7 SMP only)',
       exists && parseOk,
-      `Template exists: ${exists}, Parsed proctors count: ${parsedCount}/84`
+      `Template exists: ${exists}, Parsed count: ${parsedCount}/84, All SMP: ${parsedAllSmp}, R7 class: ${parsedR7ClassOk}`
     );
   } catch (err: any) {
     assert('Exam Scheduler 35: Error parsing ASAS Excel file', false, err?.message);
@@ -1512,14 +1521,27 @@ export const runExamSchedulerTestSuite = async (): Promise<{
 
     const dafaDutyCount = dutiesResult?.duties.length || 0;
     const isAsas = dutiesResult?.schedule.config.examType === 'ASAS';
+    const allDafaDutiesSmp = (dutiesResult?.duties || []).every((d) => d.educationLevel === 'SMP');
 
     assert(
-      'Exam Scheduler 36: getTeacherExamDuties accurately retrieves personal ASAS proctor duties (7 sessions for Dafa Maulana)',
-      Boolean(dutiesResult && isAsas && dafaDutyCount === 7),
-      `ExamType: ${dutiesResult?.schedule.config.examType}, Duties count: ${dafaDutyCount}/7`
+      'Exam Scheduler 36: getTeacherExamDuties accurately retrieves personal ASAS proctor duties (7 sessions for Dafa Maulana, all SMP)',
+      Boolean(dutiesResult && isAsas && dafaDutyCount === 7 && allDafaDutiesSmp),
+      `ExamType: ${dutiesResult?.schedule.config.examType}, Duties count: ${dafaDutyCount}/7, All SMP: ${allDafaDutiesSmp}`
     );
   } catch (err: any) {
     assert('Exam Scheduler 36: Error verifying teacher ASAS duties', false, err?.message);
+  }
+
+  // Test 37: ASAS Proctor Schedule is Exclusively SMP (Zero SMA Schedule)
+  try {
+    const smaAsas = await ExamScheduleRepository.getSchedule(testAcademicYear, 'ASAS', 'SMA');
+    assert(
+      'Exam Scheduler 37: ASAS proctor schedule is exclusively SMP (Ruang 1 s.d. 7) and returns null for SMA level',
+      smaAsas === null,
+      `SMA ASAS result: ${smaAsas === null ? 'null (correct)' : 'not null'}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 37: Error verifying absence of SMA ASAS schedule', false, err?.message);
   }
 
   return { passed, failed, results };
