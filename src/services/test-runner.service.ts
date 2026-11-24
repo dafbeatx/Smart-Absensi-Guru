@@ -65,6 +65,7 @@ import { runBimtekTestSuite } from './__tests__/bimtek-engine.test';
 import { runCounselingBkTestSuite } from './__tests__/counseling-bk.test';
 import { runBackNavigationTestSuite } from './__tests__/back-navigation.test';
 import { runGamePidTestSuite } from './__tests__/game-pid.test';
+import { runAutoAttendanceRuleTestSuite } from './__tests__/auto-attendance-rule.test';
 export interface TestResultItem {
   testName: string;
   status: 'PASS' | 'FAIL';
@@ -173,6 +174,7 @@ export class MasterTestRunner {
       { name: 'Attendance Correction & Leave Notification Exclusion Engine', fn: runAttendanceCorrectionNotificationExclusionTestSuite },
       { name: 'Mobile Hardware & Gesture Back Navigation Engine (Phase 5.7)', fn: runBackNavigationTestSuite },
       { name: 'Game PID & School Slice 3D Integration Engine (Phase 5.8)', fn: runGamePidTestSuite },
+      { name: 'Auto Attendance Unabsented Rule Engine (Terlambat - 0 Poin)', fn: runAutoAttendanceRuleTestSuite },
     ];
 
     let totalPassed = 0;

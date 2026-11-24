@@ -23,7 +23,24 @@ export function calculateTeacherAppreciationScore(
   const rawHadirTepatWaktuCount = attendanceHistory.filter(
     (r) => r.status === 'HADIR' || (r.status as string) === 'HADIR_TEPAT_WAKTU'
   ).length;
-  const rawTerlambatCount = attendanceHistory.filter((r) => r.status === 'TERLAMBAT').length;
+  const rawTerlambatCount = attendanceHistory.filter((r) => {
+    if (r.status !== 'TERLAMBAT') return false;
+    const isAuto =
+      r.attendance_source === 'SYSTEM_AUTO' ||
+      r.verification_method === 'SYSTEM_AUTO' ||
+      Boolean((r as any).is_auto_attendance) ||
+      Boolean(r.notes && r.notes.includes('0 Poin'));
+    return !isAuto;
+  }).length;
+  const rawAutoTerlambatCount = attendanceHistory.filter((r) => {
+    if (r.status !== 'TERLAMBAT') return false;
+    const isAuto =
+      r.attendance_source === 'SYSTEM_AUTO' ||
+      r.verification_method === 'SYSTEM_AUTO' ||
+      Boolean((r as any).is_auto_attendance) ||
+      Boolean(r.notes && r.notes.includes('0 Poin'));
+    return isAuto;
+  }).length;
   const alfaCount = attendanceHistory.filter((r) => r.status === 'ALFA').length;
 
   // Cek apakah guru bertugas piket dan hadir di sekolah
@@ -69,7 +86,8 @@ export function calculateTeacherAppreciationScore(
 
   // Sinkronkan hitungan dengan monthlyPointLogs ledger jika tersedia
   const historyOnTimeCount = monthlyPointLogs.filter((p) => p.activity_type === 'CHECK_IN_ON_TIME').length;
-  const historyLateCount = monthlyPointLogs.filter((p) => p.activity_type === 'CHECK_IN_LATE').length;
+  const historyLateCount = monthlyPointLogs.filter((p) => p.activity_type === 'CHECK_IN_LATE' && (p.points || 0) > 0).length;
+  const historyAutoLateCount = monthlyPointLogs.filter((p) => p.activity_type === 'CHECK_IN_LATE' && (p.points || 0) === 0).length;
   const historyPiketCount = monthlyPointLogs.filter((p) => p.activity_type === 'DUTY_PIKET').length;
   const historyEarlyBirdCount = monthlyPointLogs.filter((p) => p.activity_type === 'EARLY_BIRD_BONUS').length;
   const historyStreakCount = monthlyPointLogs.filter((p) => p.activity_type === 'STREAK_MILESTONE').length;
@@ -86,10 +104,11 @@ export function calculateTeacherAppreciationScore(
 
   const hadirTepatWaktuCount = Math.max(rawHadirTepatWaktuCount, historyOnTimeCount);
   const terlambatCount = Math.max(rawTerlambatCount, historyLateCount);
+  const autoTerlambatCount = Math.max(rawAutoTerlambatCount, historyAutoLateCount);
   const piketCount = Math.max(rawPiketCount, historyPiketCount);
   const earlyBirdCount = Math.max(rawEarlyBirdCount, historyEarlyBirdCount);
   const streakCount = historyStreakCount;
-  const totalMasukFisik = hadirTepatWaktuCount + terlambatCount;
+  const totalMasukFisik = hadirTepatWaktuCount + terlambatCount + autoTerlambatCount;
 
   // Points Formula: Murni kehadiran fisik nyata + presensi pulang + tugas piket + bonus kedisiplinan
   // - Hadir Tepat Waktu: +15 Poin
@@ -138,7 +157,7 @@ export function calculateTeacherAppreciationScore(
   const onTimePercentage = totalMasukFisik > 0 ? (hadirTepatWaktuCount / totalMasukFisik) * 100 : 0;
   const isDisciplineUnlocked = hadirTepatWaktuCount >= 1 && onTimePercentage >= 70;
   const isDutyUnlocked = piketCount > 0;
-  const isPerfectMonthUnlocked = totalMasukFisik > 0 && terlambatCount === 0 && hadirTepatWaktuCount >= 3;
+  const isPerfectMonthUnlocked = totalMasukFisik > 0 && terlambatCount === 0 && autoTerlambatCount === 0 && hadirTepatWaktuCount >= 3;
   const isResilienceUnlocked = totalMasukFisik >= 3;
 
   const badges: TeacherBadge[] = [

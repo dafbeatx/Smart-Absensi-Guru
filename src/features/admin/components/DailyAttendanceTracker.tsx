@@ -18,6 +18,7 @@ import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { evaluateAttendanceStatus, isDateOffDay } from '../../../utils/time.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { ProviderFactory } from '../../../providers/provider-factory';
+import { AttendancePolicyService } from '../../../services/attendance-policy.service';
 import { AttendanceResetModal } from './AttendanceResetModal';
 import { LocationAddressBadge } from '../../../components/ui/LocationAddressBadge';
 
@@ -434,7 +435,8 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
   const getStatusBadge = (
     status: AttendanceStatus | 'BELUM_ABSEN',
     leave?: LeaveRequest,
-    leaveApprovalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED'
+    leaveApprovalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED',
+    record?: AttendanceRecord
   ) => {
     // 1. Pending Leave Application (Menunggu Approval)
     if (leaveApprovalStatus === 'PENDING' && leave) {
@@ -480,8 +482,18 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     switch (status) {
       case 'HADIR':
         return <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full border border-emerald-200">✅ Hadir Tepat Waktu</span>;
-      case 'TERLAMBAT':
-        return <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-full border border-amber-200">⚠️ Terlambat</span>;
+      case 'TERLAMBAT': {
+        const isAuto =
+          record?.attendance_source === 'SYSTEM_AUTO' ||
+          record?.verification_method === 'SYSTEM_AUTO' ||
+          Boolean((record as any)?.is_auto_attendance) ||
+          Boolean(record?.notes && record?.notes.includes('0 Poin'));
+        return (
+          <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-full border border-amber-200">
+            {isAuto ? '⚡ Terlambat (Auto Sistem - 0 Poin)' : '⚠️ Terlambat'}
+          </span>
+        );
+      }
       case 'IZIN':
       case 'SAKIT':
       case 'DINAS_LUAR':
@@ -601,15 +613,56 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
             <h2 className="text-lg font-black text-slate-900 mt-1">Status Kehadiran Guru & Staf Pimpinan</h2>
           </div>
 
-          {/* Date Selector */}
-          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
-            <span className="text-xs font-bold text-slate-600 pl-1">📅 Tanggal:</span>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-white border border-slate-200 text-slate-800 text-xs font-bold rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          {/* Date Selector & Auto Absen Action */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {summary.totalUnabsented > 0 && !isOffDayCheck.isOff && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const results = await AttendancePolicyService.autoAttendUnabsentedTeachers(
+                      selectedDate,
+                      teachers,
+                      effectiveAttendanceRecords,
+                      effectiveLeaves,
+                      systemSettings,
+                      holidays
+                    );
+                    useToastStore.getState().showToast(
+                      'success',
+                      'Auto Absen Massal Berhasil',
+                      `${results.length} guru yang belum absen berhasil dicatat sebagai Terlambat (0 Poin).`
+                    );
+                    if (onRefreshAttendance) {
+                      await onRefreshAttendance();
+                    }
+                    window.dispatchEvent(new Event('smart_absensi_scanned'));
+                    window.dispatchEvent(new Event('smart_absensi_records_updated'));
+                  } catch {
+                    useToastStore.getState().showToast(
+                      'error',
+                      'Gagal Auto Absen Massal',
+                      'Terjadi kendala saat memproses auto absen massal.'
+                    );
+                  }
+                }}
+                className="px-3 py-1.5 bg-linear-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-xs font-black rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1.5"
+                title="Auto Absen Seluruh Guru yang Belum Absen pada Hari Ini (Terlambat - 0 Poin)"
+              >
+                <span>⚡</span>
+                <span>Auto Absen ({summary.totalUnabsented} Guru)</span>
+              </button>
+            )}
+
+            <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
+              <span className="text-xs font-bold text-slate-600 pl-1">📅 Tanggal:</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-white border border-slate-200 text-slate-800 text-xs font-bold rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
         </div>
 
@@ -856,7 +909,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
 
                   <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                     <div className="text-right">
-                      {getStatusBadge(status, leave, leaveApprovalStatus)}
+                      {getStatusBadge(status, leave, leaveApprovalStatus, record)}
                       {item?.checkInTime && (
                         <p className="text-[11px] font-mono font-bold text-slate-700 mt-1">
                           Masuk: {item.checkInTime} {item.checkOutTime ? `• Pulang: ${item.checkOutTime}` : ''}
@@ -945,6 +998,42 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                             <span>💬</span> Remind WA
                           </a>
                         </FeatureGate>
+                      )}
+
+                      {/* Auto Absen Shortcut for Unabsented Personnel */}
+                      {status === 'BELUM_ABSEN' && !isOffDayCheck.isOff && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await ProviderFactory.getProvider().autoAttendTeacher({
+                                user_id: teacher.id,
+                                date: selectedDate,
+                                teacher_name: teacher.full_name,
+                              });
+                              useToastStore.getState().showToast(
+                                'success',
+                                'Auto Absen Berhasil',
+                                `${teacher.full_name} tercatat sebagai Terlambat (0 Poin).`
+                              );
+                              if (onRefreshAttendance) {
+                                await onRefreshAttendance();
+                              }
+                              window.dispatchEvent(new Event('smart_absensi_scanned'));
+                              window.dispatchEvent(new Event('smart_absensi_records_updated'));
+                            } catch {
+                              useToastStore.getState().showToast(
+                                'error',
+                                'Gagal Auto Absen',
+                                `Tidak dapat memproses auto absen untuk ${teacher.full_name}.`
+                              );
+                            }
+                          }}
+                          className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-xs"
+                          title="Auto Absen Personel Ini (Terlambat - 0 Poin)"
+                        >
+                          <span>⚡</span> Auto Absen
+                        </button>
                       )}
 
                       {/* Manual Correction Shortcut for Admin */}

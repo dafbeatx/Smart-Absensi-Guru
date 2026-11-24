@@ -12,7 +12,7 @@ import type {
 } from '../types/counseling.types';
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { IDataProvider } from './data-provider.interface';
+import type { IDataProvider, AutoAttendTeacherDTO } from './data-provider.interface';
 import type {
   UserProfile,
   AttendanceRecord,
@@ -1009,7 +1009,15 @@ export class SupabaseProvider implements IDataProvider {
         let attendanceDesc = `Tercatat hadir pada pukul ${timeStr} via ${vMethod || 'QR'}`;
 
         if (isLate) {
-          if (checkInTimeClean && checkInTimeClean <= '07:45') {
+          const isAuto =
+            vMethod === 'SYSTEM_AUTO' ||
+            aSource === 'SYSTEM_AUTO';
+
+          if (isAuto) {
+            attendancePts = 0;
+            attendanceTitle = 'Presensi Otomatis Sistem (Terlambat - 0 Poin)';
+            attendanceDesc = 'Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (0 Poin)';
+          } else if (checkInTimeClean && checkInTimeClean <= '07:45') {
             attendancePts = 7;
             attendanceTitle = 'Presensi Masuk Toleransi (> 07:30 WIB)';
             attendanceDesc = `Tercatat hadir pada pukul ${timeStr} via ${vMethod || 'QR'} (Toleransi keterlambatan tipis)`;
@@ -1271,6 +1279,99 @@ export class SupabaseProvider implements IDataProvider {
     this.cachedTodayAttendance.clear();
     this.cachedMonthlyAttendance.clear();
     return true;
+  }
+
+  public async autoAttendTeacher(dto: AutoAttendTeacherDTO, token?: string): Promise<AttendanceRecord> {
+    let checkinEnd: string = CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
+    let settings: SystemSettings | null = null;
+    try {
+      settings = await this.getSettings();
+      if (settings?.work_checkin_end) {
+        checkinEnd = settings.work_checkin_end.slice(0, 5);
+      }
+    } catch {
+      // fallback
+    }
+
+    const timeFormatted = dto.check_in_time || `${checkinEnd}:00`;
+    const autoRecordId = `att_${dto.user_id}_${dto.date}`;
+
+    // Check if existing record is already recorded
+    try {
+      const { data: existing } = await this.client
+        .from('attendance')
+        .select('*')
+        .eq('user_id', dto.user_id)
+        .eq('date', dto.date)
+        .maybeSingle();
+
+      if (existing && existing.status && existing.status !== 'BELUM_ABSEN') {
+        return existing as AttendanceRecord;
+      }
+    } catch {
+      // continue to upsert
+    }
+
+    const payload = {
+      id: autoRecordId,
+      user_id: dto.user_id,
+      date: dto.date,
+      status: 'TERLAMBAT' as AttendanceStatus,
+      check_in_time: timeFormatted,
+      check_out_time: null,
+      check_in_lat: settings?.geofence_lat || -6.613144,
+      check_in_lng: settings?.geofence_lng || 106.684975,
+      check_in_distance_meters: 0,
+      verification_method: 'SYSTEM_AUTO' as VerificationMethod,
+      attendance_source: 'SYSTEM_AUTO' as AttendanceSource,
+      is_offline: false,
+      notes: dto.notes || 'Presensi otomatis sistem (Terlambat - 0 Poin)',
+    };
+
+    let { error } = await this.client.from('attendance').upsert(payload, { onConflict: 'id' });
+    if (error && (error.message.includes("'notes'") || error.message.includes('"notes"'))) {
+      const { notes: _, ...cleanPayload } = payload;
+      const retry = await this.client.from('attendance').upsert(cleanPayload, { onConflict: 'id' });
+      error = retry.error;
+    }
+
+    if (error) {
+      logger.error('SupabaseProvider', 'Failed to auto-attend teacher in Supabase:', error);
+      throw new Error('Gagal melakukan auto absen: ' + error.message);
+    }
+
+    // Record 0 points ledger non-blocking
+    try {
+      await this.recordTeacherPoint(
+        {
+          user_id: dto.user_id,
+          teacher_name: dto.teacher_name,
+          date: dto.date,
+          points: 0,
+          activity_type: 'CHECK_IN_LATE',
+          title: 'Presensi Otomatis Sistem (Terlambat - 0 Poin)',
+          description: 'Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (0 Poin)',
+        },
+        token
+      );
+    } catch (ePoint) {
+      logger.warn('SupabaseProvider', 'Failed to record 0 points for auto attendance:', ePoint);
+    }
+
+    this.cachedTodayAttendance.clear();
+    this.cachedMonthlyAttendance.clear();
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('smart_absensi_scanned'));
+      window.dispatchEvent(new Event('smart_absensi_records_updated'));
+    }
+
+    return {
+      ...payload,
+      is_auto_attendance: true,
+      points_awarded: 0,
+      created_at: new Date().toISOString(),
+    } as AttendanceRecord;
   }
 
   public async resetAttendance(targetUserId: string, date: string, adminPasswordInput: string, _token: string): Promise<boolean> {

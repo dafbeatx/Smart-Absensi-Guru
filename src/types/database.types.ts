@@ -19,7 +19,7 @@ export type ApprovalStatus = 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'PENDING' 
 
 export type VerificationMethod = 'QR_GPS' | 'MANUAL_OPERATOR' | 'SYSTEM_AUTO' | 'BIOMETRIC_GPS';
 
-export type AttendanceSource = 'QR' | 'MANUAL' | 'OFFLINE_SYNC' | 'BIOMETRIC';
+export type AttendanceSource = 'QR' | 'MANUAL' | 'OFFLINE_SYNC' | 'BIOMETRIC' | 'SYSTEM_AUTO';
 
 export type NotificationType = 'IN_APP' | 'WHATSAPP' | 'SYSTEM' | 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR' | 'ANNOUNCEMENT';
 
@@ -161,6 +161,8 @@ export interface AttendanceRecord {
   attendance_source: AttendanceSource;
   is_offline: boolean;
   notes?: string;
+  points_awarded?: number;
+  is_auto_attendance?: boolean;
   created_at: string;
 }
 

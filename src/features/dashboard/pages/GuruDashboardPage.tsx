@@ -1777,7 +1777,23 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             continue;
           }
 
-          // Missing attendance identified!
+          // Sesuai aturan baru: Guru yang belum absen otomatis di-absenkan oleh sistem sebagai TERLAMBAT (0 Poin)
+          try {
+            const autoRec = await ProviderFactory.getProvider().autoAttendTeacher({
+              user_id: effectiveUser.id,
+              date: dateStr,
+              teacher_name: effectiveUser.full_name,
+            });
+            if (autoRec) {
+              loadedHistory.push(autoRec);
+              NotificationService.dismissMissingAttendanceNotification(effectiveUser.id, dateStr);
+              continue;
+            }
+          } catch (eAuto) {
+            console.warn('Auto attendance failed for guru:', eAuto);
+          }
+
+          // Missing attendance identified fallback (jika offline/gagal)
           const notifId = `notif_missing_att_${effectiveUser.id}_${dateStr}`;
           const isRead = NotificationService.isNotificationRead(effectiveUser.id, notifId);
 

@@ -81,6 +81,14 @@ import type {
   CounselingFilter,
 } from '../types/counseling.types';
 
+export interface AutoAttendTeacherDTO {
+  user_id: string;
+  date: string;
+  teacher_name?: string;
+  check_in_time?: string;
+  notes?: string;
+}
+
 export interface IDataProvider {
   // Auth API
   login(dto: LoginDTO): Promise<LoginResponseDTO>;
@@ -98,6 +106,7 @@ export interface IDataProvider {
   resetAttendance(targetUserId: string, date: string, adminPasswordInput: string, token: string): Promise<boolean>;
   getDailyAttendance(date: string, token: string): Promise<AttendanceRecord[]>;
   updateAttendanceNote(userId: string, date: string, note: string, token: string): Promise<boolean>;
+  autoAttendTeacher(dto: AutoAttendTeacherDTO, token?: string): Promise<AttendanceRecord>;
   subscribeToAttendanceUpdates?(callback: (event: { table: string; eventType: string }) => void): () => void;
 
   // Leave & Approval API

@@ -10,7 +10,7 @@ import type {
   UpdateCounselingDTO,
   CounselingFilter,
 } from '../types/counseling.types';
-import type { IDataProvider } from './data-provider.interface';
+import type { IDataProvider, AutoAttendTeacherDTO } from './data-provider.interface';
 import type {
   UserProfile,
   AttendanceRecord,
@@ -564,7 +564,17 @@ export class MockProvider implements IDataProvider {
         let attendanceDesc = `Tercatat hadir pada pukul ${timeStr} via ${record.verification_method || 'QR'}`;
 
         if (isLate) {
-          if (checkInTimeClean && checkInTimeClean <= '07:45') {
+          const isAuto =
+            record.attendance_source === 'SYSTEM_AUTO' ||
+            record.verification_method === 'SYSTEM_AUTO' ||
+            Boolean((record as any).is_auto_attendance) ||
+            Boolean(record.notes && record.notes.includes('0 Poin'));
+
+          if (isAuto) {
+            attendancePts = 0;
+            attendanceTitle = 'Presensi Otomatis Sistem (Terlambat - 0 Poin)';
+            attendanceDesc = `Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (0 Poin)`;
+          } else if (checkInTimeClean && checkInTimeClean <= '07:45') {
             attendancePts = 7;
             attendanceTitle = 'Presensi Masuk Toleransi (> 07:30 WIB)';
             attendanceDesc = `Tercatat hadir pada pukul ${timeStr} via ${record.verification_method || 'QR'} (Toleransi keterlambatan tipis)`;
@@ -817,6 +827,92 @@ export class MockProvider implements IDataProvider {
     }
 
     return true;
+  }
+
+  public async autoAttendTeacher(dto: AutoAttendTeacherDTO, _token?: string): Promise<AttendanceRecord> {
+    let checkinEnd: string = CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
+    let settings: SystemSettings | null = null;
+    try {
+      settings = await this.getSettings();
+      if (settings?.work_checkin_end) {
+        checkinEnd = settings.work_checkin_end.slice(0, 5);
+      }
+    } catch {
+      // fallback to default
+    }
+
+    const ALL_KEY = 'smart_absensi_all_attendance_history';
+    let allRecords: AttendanceRecord[] = [];
+    try {
+      const savedAll = safeGetStorage(ALL_KEY);
+      if (savedAll) allRecords = JSON.parse(savedAll);
+      if (!Array.isArray(allRecords)) allRecords = [];
+    } catch {
+      allRecords = [];
+    }
+
+    // If record already exists with valid status, return it
+    const existing = allRecords.find((r) => r.user_id === dto.user_id && r.date === dto.date);
+    if (existing && existing.status && existing.status !== 'BELUM_ABSEN') {
+      return existing;
+    }
+
+    const timeFormatted = dto.check_in_time || `${checkinEnd}:00`;
+    const autoRecord: AttendanceRecord = {
+      id: existing?.id || `att_${dto.user_id}_${dto.date}`,
+      user_id: dto.user_id,
+      date: dto.date,
+      status: 'TERLAMBAT',
+      check_in_time: timeFormatted,
+      check_out_time: null,
+      check_in_lat: settings?.geofence_lat || -6.613144,
+      check_in_lng: settings?.geofence_lng || 106.684975,
+      check_in_distance_meters: 0,
+      verification_method: 'SYSTEM_AUTO',
+      attendance_source: 'SYSTEM_AUTO',
+      is_offline: false,
+      is_auto_attendance: true,
+      notes: dto.notes || 'Presensi otomatis sistem (Terlambat - 0 Poin)',
+      points_awarded: 0,
+      created_at: new Date().toISOString(),
+    };
+
+    if (existing) {
+      const idx = allRecords.findIndex((r) => r.id === existing.id);
+      if (idx >= 0) allRecords[idx] = autoRecord;
+      else allRecords.push(autoRecord);
+    } else {
+      allRecords.push(autoRecord);
+    }
+    safeSetStorage(ALL_KEY, JSON.stringify(allRecords));
+
+    const todayStr = getTodayDateInJakarta();
+    if (dto.date === todayStr) {
+      safeSetStorage(`smart_absensi_today_attendance_${dto.user_id}_${todayStr}`, JSON.stringify(autoRecord));
+      safeSetStorage('smart_absensi_today_attendance', JSON.stringify(autoRecord));
+    }
+
+    // Record 0 points ledger
+    try {
+      await this.recordTeacherPoint({
+        user_id: dto.user_id,
+        teacher_name: dto.teacher_name,
+        date: dto.date,
+        points: 0,
+        activity_type: 'CHECK_IN_LATE',
+        title: 'Presensi Otomatis Sistem (Terlambat - 0 Poin)',
+        description: 'Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (0 Poin)',
+      });
+    } catch (errPoint) {
+      console.warn('Failed to record 0 points for auto attendance:', errPoint);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('smart_absensi_scanned'));
+      window.dispatchEvent(new Event('smart_absensi_records_updated'));
+    }
+
+    return autoRecord;
   }
 
   public async resetAttendance(targetUserId: string, date: string, adminPasswordInput: string, _token: string): Promise<boolean> {

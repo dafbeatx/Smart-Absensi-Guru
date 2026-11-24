@@ -6,7 +6,9 @@
 import { ProviderFactory } from '../providers/provider-factory';
 import { logger } from '../utils/logger.utils';
 import { NotificationService } from './notification-permission.service';
-import type { AttendanceRecord, HolidayRecord, TeacherPointLog } from '../types/database.types';
+import type { AttendanceRecord, HolidayRecord, TeacherPointLog, UserProfile, LeaveRequest, SystemSettings } from '../types/database.types';
+import { AnalyticsService } from './analytics.service';
+import { isDateOffDay } from '../utils/time.utils';
 
 export interface AttendancePolicyAgreement {
   agreed: boolean;
@@ -313,5 +315,77 @@ export class AttendancePolicyService {
   ): Promise<void> {
     await this.evaluateUncheckedOutPenalties(userId, teacherName, attendanceHistory, existingPointLogs, token);
     await this.evaluateAlpaPenalties(userId, teacherName, attendanceHistory, holidays, existingPointLogs, token, userCreatedAt);
+  }
+
+  /**
+   * Aturan Baru: Auto Absen bagi Guru yang tidak melakukan absensi mandiri pada hari kerja aktif.
+   * Status kehadiran otomatis dijadikan 'TERLAMBAT' dengan perolehan '0 Poin' (tanpa penalti ALFA dan tanpa poin kedisiplinan).
+   */
+  public static async autoAttendTeacher(
+    userId: string,
+    teacherName: string,
+    dateStr: string,
+    _systemSettings?: SystemSettings | null,
+    token?: string
+  ): Promise<AttendanceRecord | null> {
+    if (!userId || !dateStr) return null;
+    const provider = ProviderFactory.getProvider();
+    try {
+      const rec = await provider.autoAttendTeacher(
+        {
+          user_id: userId,
+          teacher_name: teacherName,
+          date: dateStr,
+        },
+        token
+      );
+      return rec;
+    } catch (err) {
+      logger.error('AttendancePolicyService', `Failed to auto-attend teacher ${userId} on ${dateStr}:`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Eksekusi Otomatis Presensi bagi seluruh guru yang belum absen pada tanggal tertentu.
+   * Menghasilkan record presensi berstatus 'TERLAMBAT' dengan perolehan '0 Poin'.
+   */
+  public static async autoAttendUnabsentedTeachers(
+    dateStr: string,
+    allTeachers: UserProfile[],
+    attendanceHistory: AttendanceRecord[],
+    leaveRequests: LeaveRequest[],
+    systemSettings?: SystemSettings | null,
+    holidays?: HolidayRecord[] | null,
+    token?: string
+  ): Promise<AttendanceRecord[]> {
+    const offCheck = isDateOffDay(dateStr, systemSettings, holidays);
+    if (offCheck.isOff) return [];
+
+    const unabsented = AnalyticsService.getUnabsentedTeachers(
+      dateStr,
+      allTeachers,
+      attendanceHistory,
+      leaveRequests,
+      systemSettings,
+      holidays
+    );
+
+    const results: AttendanceRecord[] = [];
+    for (const teacher of unabsented) {
+      try {
+        const rec = await this.autoAttendTeacher(
+          teacher.id,
+          teacher.full_name,
+          dateStr,
+          systemSettings,
+          token
+        );
+        if (rec) results.push(rec);
+      } catch (err) {
+        logger.warn('AttendancePolicyService', `Failed auto-attend for teacher ${teacher.id}:`, err);
+      }
+    }
+    return results;
   }
 }

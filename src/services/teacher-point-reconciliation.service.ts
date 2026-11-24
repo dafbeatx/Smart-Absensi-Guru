@@ -82,13 +82,23 @@ export class TeacherPointReconciliationService {
       // 1. Rekonsiliasi CHECK_IN (Tepat Waktu atau Terlambat)
       if (att.status === 'HADIR' || att.status === 'TERLAMBAT') {
         const isLate = att.status === 'TERLAMBAT';
+        const isAuto =
+          att.attendance_source === 'SYSTEM_AUTO' ||
+          att.verification_method === 'SYSTEM_AUTO' ||
+          Boolean((att as any).is_auto_attendance) ||
+          Boolean(att.notes && att.notes.includes('0 Poin'));
+
         const expectedType: TeacherPointActivityType = isLate ? 'CHECK_IN_LATE' : 'CHECK_IN_ON_TIME';
-        const expectedPoints = isLate ? 5 : 15;
+        const expectedPoints = isLate ? (isAuto ? 0 : 5) : 15;
         const expectedTitle = isLate
-          ? 'Presensi Masuk Sekolah (> 07:30 WIB)'
+          ? (isAuto
+              ? 'Presensi Otomatis Sistem (Terlambat - 0 Poin)'
+              : 'Presensi Masuk Sekolah (> 07:30 WIB)')
           : 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)';
         const checkInTimeStr = att.check_in_time || (isLate ? '07:35 WIB' : '07:15 WIB');
-        const expectedDesc = `Tercatat hadir pada pukul ${checkInTimeStr} via ${att.verification_method || 'QR'}`;
+        const expectedDesc = isAuto
+          ? 'Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (0 Poin)'
+          : `Tercatat hadir pada pukul ${checkInTimeStr} via ${att.verification_method || 'QR'}`;
 
         const hasCheckInPoint = updatedLogs.some(
           (l) => l.user_id === userId && l.date === dateStr && (l.activity_type === 'CHECK_IN_ON_TIME' || l.activity_type === 'CHECK_IN_LATE')
