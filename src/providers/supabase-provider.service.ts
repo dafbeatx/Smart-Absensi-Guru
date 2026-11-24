@@ -84,6 +84,7 @@ import {
   getCurrentTimeInJakarta,
   getJakartaDayOfWeek,
   validateAttendanceTimeWindow,
+  generateRandomLateCheckInTime,
 } from '../utils/time.utils';
 import { NotificationService } from '../services/notification-permission.service';
 import { hashPin } from '../utils/hash.utils';
@@ -1282,13 +1283,11 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async autoAttendTeacher(dto: AutoAttendTeacherDTO, token?: string): Promise<AttendanceRecord> {
-    let checkinEnd: string = CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
     let fridayCheckout: string = CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START;
     let normalCheckout: string = CONSTANTS.DEFAULTS.WORK_CHECKOUT_START;
     let settings: SystemSettings | null = null;
     try {
       settings = await this.getSettings();
-      if (settings?.work_checkin_end) checkinEnd = settings.work_checkin_end.slice(0, 5);
       if (settings?.friday_checkout_start) fridayCheckout = settings.friday_checkout_start.slice(0, 5);
       if (settings?.work_checkout_start) normalCheckout = settings.work_checkout_start.slice(0, 5);
     } catch {
@@ -1316,19 +1315,21 @@ export class SupabaseProvider implements IDataProvider {
       // ignore
     }
 
+    const randomLateCheckIn = generateRandomLateCheckInTime(`${dto.user_id}_${dto.date}`);
+
     let finalStatus: AttendanceStatus = 'TERLAMBAT';
-    let finalCheckInTime: string | null = dto.check_in_time || `${checkinEnd}:00`;
+    let finalCheckInTime: string | null = dto.check_in_time || existing?.check_in_time || randomLateCheckIn;
     let finalCheckOutTime: string | null = null;
     let defaultNotes = 'Presensi otomatis sistem (Terlambat - 0 Poin)';
 
     if (mode === 'CHECK_IN') {
       finalStatus = 'TERLAMBAT';
-      finalCheckInTime = dto.check_in_time || `${checkinEnd}:00`;
+      finalCheckInTime = dto.check_in_time || existing?.check_in_time || randomLateCheckIn;
       finalCheckOutTime = existing?.check_out_time || null;
       defaultNotes = 'Presensi otomatis sistem (Masuk Terlambat - 0 Poin)';
     } else if (mode === 'CHECK_OUT') {
       finalStatus = existing?.status || 'HADIR';
-      finalCheckInTime = existing?.check_in_time || (existing ? null : `${checkinEnd}:00`);
+      finalCheckInTime = existing?.check_in_time || dto.check_in_time || (existing ? null : randomLateCheckIn);
       finalCheckOutTime = dto.check_out_time || `${checkoutStart}:00`;
       defaultNotes = existing?.notes
         ? `${existing.notes} • Auto Pulang (${finalCheckOutTime})`
@@ -1336,7 +1337,7 @@ export class SupabaseProvider implements IDataProvider {
     } else {
       // 'BOTH'
       finalStatus = 'TERLAMBAT';
-      finalCheckInTime = dto.check_in_time || `${checkinEnd}:00`;
+      finalCheckInTime = dto.check_in_time || existing?.check_in_time || randomLateCheckIn;
       finalCheckOutTime = dto.check_out_time || `${checkoutStart}:00`;
       defaultNotes = 'Presensi otomatis sistem (Masuk Terlambat 0 Poin & Pulang Tuntas)';
     }

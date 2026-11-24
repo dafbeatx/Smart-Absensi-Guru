@@ -52,6 +52,40 @@ export function evaluateAttendanceStatus(
 }
 
 /**
+ * Menghasilkan jam presensi masuk terlambat secara acak (random)
+ * di atas batas jam 07:30 WIB sampai maksimal 08:00 WIB (rentang 07:31:00 s/d 08:00:00).
+ * Menjamin jam presensi masuk tidak serentak/sama antar-guru dan tetap terklasifikasi sebagai 'TERLAMBAT' (0 Poin).
+ *
+ * @param seed Optional string seed (misal `${userId}_${date}`) untuk konsistensi/idempotency jika dihitung ulang
+ * @returns string waktu "HH:mm:ss" di rentang > 07:30:00 dan <= 08:00:00 (contoh: "07:34:18", "07:49:22", "07:58:05")
+ */
+export function generateRandomLateCheckInTime(seed?: string): string {
+  let rand = Math.random();
+  if (seed) {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = (hash << 5) - hash + seed.charCodeAt(i);
+      hash |= 0;
+    }
+    const x = Math.sin(hash) * 10000;
+    rand = x - Math.floor(x);
+  }
+
+  // Rentang detik: 07:31:00 (27060s) s/d 08:00:00 (28800s)
+  const minSec = 7 * 3600 + 31 * 60; // 27060s (07:31:00)
+  const maxSec = 8 * 3600;           // 28800s (08:00:00)
+  const chosenSec = Math.floor(minSec + rand * (maxSec - minSec + 1));
+  const clampedSec = Math.min(Math.max(chosenSec, minSec), maxSec);
+
+  const hours = Math.floor(clampedSec / 3600);
+  const minutes = Math.floor((clampedSec % 3600) / 60);
+  const seconds = clampedSec % 60;
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+/**
  * Normalizes any time or date-time value (ISO string, HH:mm:ss, HH:mm)
  * into standard 24-hour "HH:mm" format required by HTML5 <input type="time">.
  */

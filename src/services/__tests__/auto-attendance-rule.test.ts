@@ -74,7 +74,7 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
 
   const activeDate = '2026-11-25'; // Rabu (hari kerja)
 
-  // ── Test 1: autoAttendTeacher with mode: CHECK_IN creates record with status TERLAMBAT, check_in_time set, check_out_time null, 0 points
+  // ── Test 1: autoAttendTeacher with mode: CHECK_IN creates record with status TERLAMBAT, random check_in_time (> 07:30 and <= 08:00), check_out_time null, 0 points
   const autoRecord = await mockProvider.autoAttendTeacher({
     user_id: testTeacher1.id,
     date: activeDate,
@@ -82,16 +82,42 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
     mode: 'CHECK_IN',
   });
 
+  const checkInMin = autoRecord.check_in_time
+    ? parseInt(autoRecord.check_in_time.split(':')[0], 10) * 60 + parseInt(autoRecord.check_in_time.split(':')[1], 10)
+    : 0;
+
   assert(
-    'AutoAttendance 1: autoAttendTeacher with CHECK_IN creates record with status TERLAMBAT, SYSTEM_AUTO source, check_in_time set, check_out null',
+    'AutoAttendance 1: autoAttendTeacher with CHECK_IN creates record with status TERLAMBAT, SYSTEM_AUTO source, check_in_time randomized > 07:30 and <= 08:00, check_out null',
     autoRecord.status === 'TERLAMBAT' &&
       autoRecord.verification_method === 'SYSTEM_AUTO' &&
       autoRecord.attendance_source === 'SYSTEM_AUTO' &&
       autoRecord.is_auto_attendance === true &&
       Boolean(autoRecord.check_in_time) &&
+      checkInMin >= 7 * 60 + 31 &&
+      checkInMin <= 8 * 60 &&
       !autoRecord.check_out_time &&
       autoRecord.notes?.includes('0 Poin') === true,
     `Status: ${autoRecord.status}, In: ${autoRecord.check_in_time}, Out: ${autoRecord.check_out_time}, Notes: ${autoRecord.notes}`
+  );
+
+  // ── Test 1b: Verify check-in time across different teachers is randomized and NOT serentak 07:30
+  const autoRecordT2 = await mockProvider.autoAttendTeacher({
+    user_id: 'usr_auto_guru_rnd',
+    date: activeDate,
+    teacher_name: 'Guru Random Test',
+    mode: 'CHECK_IN',
+  });
+
+  assert(
+    'AutoAttendance 1b: Auto attendance check-in times are non-serentak (randomized > 07:30:00 and <= 08:00:00)',
+    autoRecord.check_in_time !== '07:30:00' &&
+      autoRecordT2.check_in_time !== '07:30:00' &&
+      autoRecord.check_in_time !== autoRecordT2.check_in_time &&
+      autoRecord.check_in_time! > '07:30:00' &&
+      autoRecord.check_in_time! <= '08:00:00' &&
+      autoRecordT2.check_in_time! > '07:30:00' &&
+      autoRecordT2.check_in_time! <= '08:00:00',
+    `Teacher 1: ${autoRecord.check_in_time}, Teacher 2: ${autoRecordT2.check_in_time}`
   );
 
   // ── Test 2: Point ledger records 0 points for auto-late attendance

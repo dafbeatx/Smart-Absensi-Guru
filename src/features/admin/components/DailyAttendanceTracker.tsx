@@ -1493,7 +1493,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                   Mencatat presensi masuk otomatis berstatus <strong>Terlambat</strong> dengan <strong>0 Poin</strong> (jam pulang dibiarkan kosong/tidak diubah).
                 </p>
                 <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-amber-900 bg-amber-100/60 px-2 py-0.5 rounded-lg w-fit">
-                  <span>Jam Masuk: {checkinEnd} WIB</span>
+                  <span>Jam Masuk: Acak 07:31 - 08:00 WIB</span>
                   <span>•</span>
                   <span>Poin: 0 PTS</span>
                 </div>
@@ -1553,7 +1553,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                   Mencatat lengkap presensi masuk (Terlambat - 0 Poin) dan kepulangan dinas sekolah tuntas sekaligus.
                 </p>
                 <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-emerald-900 bg-emerald-100/60 px-2 py-0.5 rounded-lg w-fit">
-                  <span>Masuk: {checkinEnd} WIB (0 PTS)</span>
+                  <span>Masuk: Acak 07:31 - 08:00 WIB (0 PTS)</span>
                   <span>•</span>
                   <span>Pulang: {officialCheckoutDisplay} WIB</span>
                 </div>
