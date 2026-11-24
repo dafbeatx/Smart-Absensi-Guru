@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { UserProfile, AttendanceRecord, LeaveRequest, AttendanceStatus, SystemSettings, RoleCode, HolidayRecord } from '../../../types/database.types';
+import type { UserProfile, AttendanceRecord, LeaveRequest, AttendanceStatus, SystemSettings, RoleCode, HolidayRecord, AutoAttendMode } from '../../../types/database.types';
 import {
   AnalyticsService,
   isTeacherLeaveMatch,
@@ -67,6 +67,143 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     url: string;
     title: string;
   } | null>(null);
+
+  // Local optimistic attendance records state for 0ms immediate UI reactivity
+  const [localAttendanceRecords, setLocalAttendanceRecords] = useState<AttendanceRecord[]>(attendanceRecords);
+
+  useEffect(() => {
+    setLocalAttendanceRecords(attendanceRecords);
+  }, [attendanceRecords]);
+
+  // Listen to same-device / window attendance events
+  useEffect(() => {
+    const handleRecordSync = () => {
+      try {
+        const savedAll = localStorage.getItem('smart_absensi_all_attendance_history');
+        if (savedAll) {
+          const parsed = JSON.parse(savedAll);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setLocalAttendanceRecords(parsed);
+          }
+        }
+      } catch {}
+    };
+    window.addEventListener('smart_absensi_records_updated', handleRecordSync);
+    window.addEventListener('smart_absensi_scanned', handleRecordSync);
+    return () => {
+      window.removeEventListener('smart_absensi_records_updated', handleRecordSync);
+      window.removeEventListener('smart_absensi_scanned', handleRecordSync);
+    };
+  }, []);
+
+  const applyOptimisticRecord = (rec: AttendanceRecord) => {
+    setLocalAttendanceRecords((prev) => {
+      const idx = prev.findIndex((r) => r.user_id === rec.user_id && r.date === rec.date);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = rec;
+        return next;
+      }
+      return [...prev, rec];
+    });
+  };
+
+  const applyOptimisticBatch = (recs: AttendanceRecord[]) => {
+    setLocalAttendanceRecords((prev) => {
+      const map = new Map<string, AttendanceRecord>();
+      prev.forEach((r) => map.set(`${r.user_id}_${r.date}`, r));
+      recs.forEach((r) => map.set(`${r.user_id}_${r.date}`, r));
+      return Array.from(map.values());
+    });
+  };
+
+  // Auto Attendance 3-Choice Modal State
+  const [isAutoAttendModalOpen, setIsAutoAttendModalOpen] = useState(false);
+  const [autoAttendTargetTeacher, setAutoAttendTargetTeacher] = useState<UserProfile | null>(null);
+  const [selectedAutoMode, setSelectedAutoMode] = useState<AutoAttendMode>('BOTH');
+  const [isAutoAttendSubmitting, setIsAutoAttendSubmitting] = useState(false);
+
+  const isFriday = useMemo(() => {
+    if (!selectedDate) return false;
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1).getDay() === 5;
+  }, [selectedDate]);
+
+  const officialCheckoutDisplay = useMemo(() => {
+    if (isFriday) {
+      return systemSettings?.friday_checkout_start?.slice(0, 5) || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START;
+    }
+    return systemSettings?.work_checkout_start?.slice(0, 5) || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START;
+  }, [isFriday, systemSettings]);
+
+  const handleExecuteAutoAttend = async () => {
+    setIsAutoAttendSubmitting(true);
+    try {
+      if (autoAttendTargetTeacher) {
+        // Individual teacher
+        const rec = await ProviderFactory.getProvider().autoAttendTeacher({
+          user_id: autoAttendTargetTeacher.id,
+          date: selectedDate,
+          teacher_name: autoAttendTargetTeacher.full_name,
+          mode: selectedAutoMode,
+        });
+        if (rec) {
+          applyOptimisticRecord(rec);
+        }
+        showToast(
+          'success',
+          'Auto Absen Berhasil',
+          `${autoAttendTargetTeacher.full_name} berhasil dicatat presensi (${
+            selectedAutoMode === 'CHECK_IN'
+              ? 'Masuk Terlambat 0 Poin'
+              : selectedAutoMode === 'CHECK_OUT'
+              ? 'Pulang Tuntas'
+              : 'Masuk 0 Poin & Pulang'
+          }).`
+        );
+      } else {
+        // Batch
+        const results = await AttendancePolicyService.autoAttendUnabsentedTeachers(
+          selectedDate,
+          teachers,
+          effectiveAttendanceRecords,
+          effectiveLeaves,
+          selectedAutoMode,
+          systemSettings,
+          holidays
+        );
+        if (results && results.length > 0) {
+          applyOptimisticBatch(results);
+        }
+        showToast(
+          'success',
+          'Auto Absen Massal Berhasil',
+          `${results.length} guru berhasil dicatat presensi (${
+            selectedAutoMode === 'CHECK_IN'
+              ? 'Masuk Terlambat 0 Poin'
+              : selectedAutoMode === 'CHECK_OUT'
+              ? 'Pulang Tuntas'
+              : 'Masuk 0 Poin & Pulang'
+          }).`
+        );
+      }
+
+      setIsAutoAttendModalOpen(false);
+      if (onRefreshAttendance) {
+        await onRefreshAttendance();
+      }
+      window.dispatchEvent(new Event('smart_absensi_scanned'));
+      window.dispatchEvent(new Event('smart_absensi_records_updated'));
+    } catch (err: any) {
+      showToast(
+        'error',
+        'Gagal Auto Absen',
+        err?.message || 'Terjadi kendala saat memproses auto absen.'
+      );
+    } finally {
+      setIsAutoAttendSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     const fetchSettings = () => {
@@ -185,15 +322,15 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
 
   // Optimistically filtered attendance records excluding reset targets
   const effectiveAttendanceRecords = useMemo(() => {
-    if (resetKeys.size === 0) return attendanceRecords;
-    return attendanceRecords.filter((r) => {
+    if (resetKeys.size === 0) return localAttendanceRecords;
+    return localAttendanceRecords.filter((r) => {
       const recDate = r.date;
       const isReset =
         resetKeys.has(`${r.user_id}_${recDate}`) ||
         teachers.some((t) => isTeacherRecordMatch(t, r) && isTeacherReset(t, recDate));
       return !isReset;
     });
-  }, [attendanceRecords, resetKeys, teachers]);
+  }, [localAttendanceRecords, resetKeys, teachers]);
 
   // 1. Calculate Daily Analytics Stats (100% Synchronized with holidays)
   const summary = useMemo(() => {
@@ -618,36 +755,13 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
             {summary.totalUnabsented > 0 && !isOffDayCheck.isOff && (
               <button
                 type="button"
-                onClick={async () => {
-                  try {
-                    const results = await AttendancePolicyService.autoAttendUnabsentedTeachers(
-                      selectedDate,
-                      teachers,
-                      effectiveAttendanceRecords,
-                      effectiveLeaves,
-                      systemSettings,
-                      holidays
-                    );
-                    useToastStore.getState().showToast(
-                      'success',
-                      'Auto Absen Massal Berhasil',
-                      `${results.length} guru yang belum absen berhasil dicatat sebagai Terlambat (0 Poin).`
-                    );
-                    if (onRefreshAttendance) {
-                      await onRefreshAttendance();
-                    }
-                    window.dispatchEvent(new Event('smart_absensi_scanned'));
-                    window.dispatchEvent(new Event('smart_absensi_records_updated'));
-                  } catch {
-                    useToastStore.getState().showToast(
-                      'error',
-                      'Gagal Auto Absen Massal',
-                      'Terjadi kendala saat memproses auto absen massal.'
-                    );
-                  }
+                onClick={() => {
+                  setAutoAttendTargetTeacher(null);
+                  setSelectedAutoMode('BOTH');
+                  setIsAutoAttendModalOpen(true);
                 }}
                 className="px-3 py-1.5 bg-linear-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-xs font-black rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1.5"
-                title="Auto Absen Seluruh Guru yang Belum Absen pada Hari Ini (Terlambat - 0 Poin)"
+                title="Pilih Mode Auto Absen untuk Seluruh Guru yang Belum Absen (Masuk / Pulang / Keduanya)"
               >
                 <span>⚡</span>
                 <span>Auto Absen ({summary.totalUnabsented} Guru)</span>
@@ -1000,37 +1114,23 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                         </FeatureGate>
                       )}
 
-                      {/* Auto Absen Shortcut for Unabsented Personnel */}
-                      {status === 'BELUM_ABSEN' && !isOffDayCheck.isOff && (
+                      {/* Auto Absen Shortcut for Personnel who hasn't fully completed attendance */}
+                      {(!item?.record?.check_in_time || !item?.record?.check_out_time || status === 'BELUM_ABSEN') && !isOffDayCheck.isOff && (
                         <button
-                          onClick={async (e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
-                            try {
-                              await ProviderFactory.getProvider().autoAttendTeacher({
-                                user_id: teacher.id,
-                                date: selectedDate,
-                                teacher_name: teacher.full_name,
-                              });
-                              useToastStore.getState().showToast(
-                                'success',
-                                'Auto Absen Berhasil',
-                                `${teacher.full_name} tercatat sebagai Terlambat (0 Poin).`
-                              );
-                              if (onRefreshAttendance) {
-                                await onRefreshAttendance();
-                              }
-                              window.dispatchEvent(new Event('smart_absensi_scanned'));
-                              window.dispatchEvent(new Event('smart_absensi_records_updated'));
-                            } catch {
-                              useToastStore.getState().showToast(
-                                'error',
-                                'Gagal Auto Absen',
-                                `Tidak dapat memproses auto absen untuk ${teacher.full_name}.`
-                              );
+                            setAutoAttendTargetTeacher(teacher);
+                            if (item?.record?.check_in_time && !item?.record?.check_out_time) {
+                              setSelectedAutoMode('CHECK_OUT');
+                            } else if (!item?.record?.check_in_time && item?.record?.check_out_time) {
+                              setSelectedAutoMode('CHECK_IN');
+                            } else {
+                              setSelectedAutoMode('BOTH');
                             }
+                            setIsAutoAttendModalOpen(true);
                           }}
                           className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-xs"
-                          title="Auto Absen Personel Ini (Terlambat - 0 Poin)"
+                          title="Auto Absen Personel Ini (Pilih Masuk / Pulang / Keduanya)"
                         >
                           <span>⚡</span> Auto Absen
                         </button>
@@ -1334,6 +1434,161 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
             <Button variant="secondary" onClick={() => setSelectedPreviewAttachment(null)}>
               Tutup
             </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── MODAL PILIH 3 MODE AUTO ABSEN ───────────────────────────────────── */}
+      <Modal
+        isOpen={isAutoAttendModalOpen}
+        onClose={() => {
+          if (!isAutoAttendSubmitting) setIsAutoAttendModalOpen(false);
+        }}
+        title="⚡ Pilih Mode Auto Absen"
+        maxWidth="lg"
+      >
+        <div className="space-y-4 p-1">
+          {/* Info Target */}
+          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs">
+            <p className="text-slate-500 font-medium">Target Presensi:</p>
+            <p className="text-slate-900 font-extrabold text-sm mt-0.5">
+              {autoAttendTargetTeacher
+                ? `${autoAttendTargetTeacher.full_name} (${autoAttendTargetTeacher.position || 'Guru'})`
+                : `Seluruh Guru Belum Absen (${summary.totalUnabsented} Guru)`}
+            </p>
+            <div className="text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+              <span>📅 Tanggal: <strong className="text-slate-800">{selectedDate}</strong></span>
+              <span>•</span>
+              <span>Batas Masuk: <strong className="text-slate-800">{checkinEnd} WIB</strong></span>
+              <span>•</span>
+              <span>Pulang Resmi: <strong className="text-slate-800">{officialCheckoutDisplay} WIB</strong></span>
+            </div>
+          </div>
+
+          <p className="text-xs font-bold text-slate-700">Pilih salah satu dari 3 opsi berikut:</p>
+
+          {/* 3 Opsi Pilihan */}
+          <div className="space-y-2.5">
+            {/* Opsi 1: Auto Absen Masuk Saja */}
+            <button
+              type="button"
+              onClick={() => setSelectedAutoMode('CHECK_IN')}
+              className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-3.5 ${
+                selectedAutoMode === 'CHECK_IN'
+                  ? 'border-amber-500 bg-amber-50/70 shadow-xs ring-2 ring-amber-400/30'
+                  : 'border-slate-200 hover:border-slate-300 bg-white'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-xl shrink-0">
+                🌅
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-sm text-slate-900">1. Auto Absen Masuk Saja</h4>
+                  {selectedAutoMode === 'CHECK_IN' && (
+                    <span className="text-amber-600 font-extrabold text-xs">● Dipilih</span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Mencatat presensi masuk otomatis berstatus <strong>Terlambat</strong> dengan <strong>0 Poin</strong> (jam pulang dibiarkan kosong/tidak diubah).
+                </p>
+                <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-amber-900 bg-amber-100/60 px-2 py-0.5 rounded-lg w-fit">
+                  <span>Jam Masuk: {checkinEnd} WIB</span>
+                  <span>•</span>
+                  <span>Poin: 0 PTS</span>
+                </div>
+              </div>
+            </button>
+
+            {/* Opsi 2: Auto Absen Pulang Saja */}
+            <button
+              type="button"
+              onClick={() => setSelectedAutoMode('CHECK_OUT')}
+              className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-3.5 ${
+                selectedAutoMode === 'CHECK_OUT'
+                  ? 'border-blue-500 bg-blue-50/70 shadow-xs ring-2 ring-blue-400/30'
+                  : 'border-slate-200 hover:border-slate-300 bg-white'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center text-xl shrink-0">
+                🌇
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-sm text-slate-900">2. Auto Absen Pulang Saja</h4>
+                  {selectedAutoMode === 'CHECK_OUT' && (
+                    <span className="text-blue-600 font-extrabold text-xs">● Dipilih</span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Mencatat presensi kepulangan dinas sekolah secara tuntas (jam masuk yang telah ada tidak diubah).
+                </p>
+                <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-blue-900 bg-blue-100/60 px-2 py-0.5 rounded-lg w-fit">
+                  <span>Jam Pulang: {officialCheckoutDisplay} WIB</span>
+                </div>
+              </div>
+            </button>
+
+            {/* Opsi 3: Keduanya (Masuk & Pulang Sekaligus) */}
+            <button
+              type="button"
+              onClick={() => setSelectedAutoMode('BOTH')}
+              className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-3.5 ${
+                selectedAutoMode === 'BOTH'
+                  ? 'border-emerald-600 bg-emerald-50/70 shadow-xs ring-2 ring-emerald-500/30'
+                  : 'border-slate-200 hover:border-slate-300 bg-white'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center text-xl shrink-0">
+                🔄
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-sm text-slate-900">3. Keduanya (Masuk &amp; Pulang)</h4>
+                  {selectedAutoMode === 'BOTH' && (
+                    <span className="text-emerald-700 font-extrabold text-xs">● Dipilih</span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Mencatat lengkap presensi masuk (Terlambat - 0 Poin) dan kepulangan dinas sekolah tuntas sekaligus.
+                </p>
+                <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-emerald-900 bg-emerald-100/60 px-2 py-0.5 rounded-lg w-fit">
+                  <span>Masuk: {checkinEnd} WIB (0 PTS)</span>
+                  <span>•</span>
+                  <span>Pulang: {officialCheckoutDisplay} WIB</span>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              disabled={isAutoAttendSubmitting}
+              onClick={() => setIsAutoAttendModalOpen(false)}
+              className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              disabled={isAutoAttendSubmitting}
+              onClick={handleExecuteAutoAttend}
+              className="px-5 py-2.5 bg-[#023246] hover:bg-[#023246]/90 text-white text-xs font-extrabold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-2"
+            >
+              {isAutoAttendSubmitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Memproses...</span>
+                </>
+              ) : (
+                <>
+                  <span>⚡</span>
+                  <span>Eksekusi Auto Absen</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </Modal>

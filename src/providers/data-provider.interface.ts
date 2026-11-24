@@ -81,11 +81,15 @@ import type {
   CounselingFilter,
 } from '../types/counseling.types';
 
+export type AutoAttendMode = 'CHECK_IN' | 'CHECK_OUT' | 'BOTH';
+
 export interface AutoAttendTeacherDTO {
   user_id: string;
   date: string;
   teacher_name?: string;
+  mode?: AutoAttendMode;
   check_in_time?: string;
+  check_out_time?: string;
   notes?: string;
 }
 

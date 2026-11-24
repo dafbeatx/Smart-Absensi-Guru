@@ -6,7 +6,7 @@
 import { ProviderFactory } from '../providers/provider-factory';
 import { logger } from '../utils/logger.utils';
 import { NotificationService } from './notification-permission.service';
-import type { AttendanceRecord, HolidayRecord, TeacherPointLog, UserProfile, LeaveRequest, SystemSettings } from '../types/database.types';
+import type { AttendanceRecord, HolidayRecord, TeacherPointLog, UserProfile, LeaveRequest, SystemSettings, AutoAttendMode } from '../types/database.types';
 import { AnalyticsService } from './analytics.service';
 import { isDateOffDay } from '../utils/time.utils';
 
@@ -325,6 +325,7 @@ export class AttendancePolicyService {
     userId: string,
     teacherName: string,
     dateStr: string,
+    mode: AutoAttendMode = 'BOTH',
     _systemSettings?: SystemSettings | null,
     token?: string
   ): Promise<AttendanceRecord | null> {
@@ -336,6 +337,7 @@ export class AttendancePolicyService {
           user_id: userId,
           teacher_name: teacherName,
           date: dateStr,
+          mode,
         },
         token
       );
@@ -348,13 +350,14 @@ export class AttendancePolicyService {
 
   /**
    * Eksekusi Otomatis Presensi bagi seluruh guru yang belum absen pada tanggal tertentu.
-   * Menghasilkan record presensi berstatus 'TERLAMBAT' dengan perolehan '0 Poin'.
+   * Mendukung 3 pilihan: CHECK_IN (Masuk saja), CHECK_OUT (Pulang saja), atau BOTH (Keduanya).
    */
   public static async autoAttendUnabsentedTeachers(
     dateStr: string,
     allTeachers: UserProfile[],
     attendanceHistory: AttendanceRecord[],
     leaveRequests: LeaveRequest[],
+    mode: AutoAttendMode = 'BOTH',
     systemSettings?: SystemSettings | null,
     holidays?: HolidayRecord[] | null,
     token?: string
@@ -362,22 +365,38 @@ export class AttendancePolicyService {
     const offCheck = isDateOffDay(dateStr, systemSettings, holidays);
     if (offCheck.isOff) return [];
 
-    const unabsented = AnalyticsService.getUnabsentedTeachers(
-      dateStr,
-      allTeachers,
-      attendanceHistory,
-      leaveRequests,
-      systemSettings,
-      holidays
-    );
+    let targetTeachers: UserProfile[] = [];
+    if (mode === 'CHECK_OUT') {
+      targetTeachers = allTeachers.filter((t) => {
+        const hasLeave = leaveRequests.some(
+          (l) =>
+            l.start_date <= dateStr &&
+            dateStr <= l.end_date &&
+            (l.approval_status === 'APPROVED' || (l as any).status === 'APPROVED')
+        );
+        if (hasLeave) return false;
+        const rec = attendanceHistory.find((r) => r.date === dateStr && r.user_id === t.id);
+        return !rec || !rec.check_out_time;
+      });
+    } else {
+      targetTeachers = AnalyticsService.getUnabsentedTeachers(
+        dateStr,
+        allTeachers,
+        attendanceHistory,
+        leaveRequests,
+        systemSettings,
+        holidays
+      );
+    }
 
     const results: AttendanceRecord[] = [];
-    for (const teacher of unabsented) {
+    for (const teacher of targetTeachers) {
       try {
         const rec = await this.autoAttendTeacher(
           teacher.id,
           teacher.full_name,
           dateStr,
+          mode,
           systemSettings,
           token
         );

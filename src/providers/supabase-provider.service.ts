@@ -12,7 +12,7 @@ import type {
 } from '../types/counseling.types';
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { IDataProvider, AutoAttendTeacherDTO } from './data-provider.interface';
+import type { IDataProvider, AutoAttendTeacherDTO, AutoAttendMode } from './data-provider.interface';
 import type {
   UserProfile,
   AttendanceRecord,
@@ -1283,49 +1283,79 @@ export class SupabaseProvider implements IDataProvider {
 
   public async autoAttendTeacher(dto: AutoAttendTeacherDTO, token?: string): Promise<AttendanceRecord> {
     let checkinEnd: string = CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
+    let fridayCheckout: string = CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START;
+    let normalCheckout: string = CONSTANTS.DEFAULTS.WORK_CHECKOUT_START;
     let settings: SystemSettings | null = null;
     try {
       settings = await this.getSettings();
-      if (settings?.work_checkin_end) {
-        checkinEnd = settings.work_checkin_end.slice(0, 5);
-      }
+      if (settings?.work_checkin_end) checkinEnd = settings.work_checkin_end.slice(0, 5);
+      if (settings?.friday_checkout_start) fridayCheckout = settings.friday_checkout_start.slice(0, 5);
+      if (settings?.work_checkout_start) normalCheckout = settings.work_checkout_start.slice(0, 5);
     } catch {
       // fallback
     }
 
-    const timeFormatted = dto.check_in_time || `${checkinEnd}:00`;
-    const autoRecordId = `att_${dto.user_id}_${dto.date}`;
+    const [y, m, d] = dto.date.split('-').map(Number);
+    const dayOfWeek = new Date(y, (m || 1) - 1, d || 1).getDay();
+    const isFriday = dayOfWeek === 5;
+    const checkoutStart = isFriday ? fridayCheckout : normalCheckout;
 
-    // Check if existing record is already recorded
+    const mode: AutoAttendMode = dto.mode || 'BOTH';
+
+    // Check existing record
+    let existing: any = null;
     try {
-      const { data: existing } = await this.client
+      const { data } = await this.client
         .from('attendance')
         .select('*')
         .eq('user_id', dto.user_id)
         .eq('date', dto.date)
         .maybeSingle();
-
-      if (existing && existing.status && existing.status !== 'BELUM_ABSEN') {
-        return existing as AttendanceRecord;
-      }
+      existing = data;
     } catch {
-      // continue to upsert
+      // ignore
     }
 
+    let finalStatus: AttendanceStatus = 'TERLAMBAT';
+    let finalCheckInTime: string | null = dto.check_in_time || `${checkinEnd}:00`;
+    let finalCheckOutTime: string | null = null;
+    let defaultNotes = 'Presensi otomatis sistem (Terlambat - 0 Poin)';
+
+    if (mode === 'CHECK_IN') {
+      finalStatus = 'TERLAMBAT';
+      finalCheckInTime = dto.check_in_time || `${checkinEnd}:00`;
+      finalCheckOutTime = existing?.check_out_time || null;
+      defaultNotes = 'Presensi otomatis sistem (Masuk Terlambat - 0 Poin)';
+    } else if (mode === 'CHECK_OUT') {
+      finalStatus = existing?.status || 'HADIR';
+      finalCheckInTime = existing?.check_in_time || (existing ? null : `${checkinEnd}:00`);
+      finalCheckOutTime = dto.check_out_time || `${checkoutStart}:00`;
+      defaultNotes = existing?.notes
+        ? `${existing.notes} • Auto Pulang (${finalCheckOutTime})`
+        : 'Presensi otomatis sistem (Pulang Tuntas)';
+    } else {
+      // 'BOTH'
+      finalStatus = 'TERLAMBAT';
+      finalCheckInTime = dto.check_in_time || `${checkinEnd}:00`;
+      finalCheckOutTime = dto.check_out_time || `${checkoutStart}:00`;
+      defaultNotes = 'Presensi otomatis sistem (Masuk Terlambat 0 Poin & Pulang Tuntas)';
+    }
+
+    const autoRecordId = existing?.id || `att_${dto.user_id}_${dto.date}`;
     const payload = {
       id: autoRecordId,
       user_id: dto.user_id,
       date: dto.date,
-      status: 'TERLAMBAT' as AttendanceStatus,
-      check_in_time: timeFormatted,
-      check_out_time: null,
+      status: finalStatus,
+      check_in_time: finalCheckInTime,
+      check_out_time: finalCheckOutTime,
       check_in_lat: settings?.geofence_lat || -6.613144,
       check_in_lng: settings?.geofence_lng || 106.684975,
       check_in_distance_meters: 0,
       verification_method: 'SYSTEM_AUTO' as VerificationMethod,
       attendance_source: 'SYSTEM_AUTO' as AttendanceSource,
       is_offline: false,
-      notes: dto.notes || 'Presensi otomatis sistem (Terlambat - 0 Poin)',
+      notes: dto.notes || defaultNotes,
     };
 
     let { error } = await this.client.from('attendance').upsert(payload, { onConflict: 'id' });
@@ -1336,26 +1366,68 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     if (error) {
-      logger.error('SupabaseProvider', 'Failed to auto-attend teacher in Supabase:', error);
-      throw new Error('Gagal melakukan auto absen: ' + error.message);
+      logger.error('SupabaseProvider', 'Failed to auto-attend teacher in Supabase, trying fallback:', error);
+      try {
+        const cleanMinimal = {
+          id: autoRecordId,
+          user_id: dto.user_id,
+          date: dto.date,
+          status: finalStatus,
+          check_in_time: finalCheckInTime,
+          check_out_time: finalCheckOutTime,
+        };
+        const retryMin = await this.client.from('attendance').upsert(cleanMinimal, { onConflict: 'id' });
+        if (retryMin.error) {
+          throw retryMin.error;
+        }
+      } catch (eFallback) {
+        logger.warn('SupabaseProvider', 'Fallback also failed, storing locally:', eFallback);
+        try {
+          const mockProv = new (await import('./mock-provider.service')).MockProvider();
+          return mockProv.autoAttendTeacher(dto, token);
+        } catch {
+          throw new Error('Gagal melakukan auto absen: ' + error.message);
+        }
+      }
     }
 
-    // Record 0 points ledger non-blocking
-    try {
-      await this.recordTeacherPoint(
-        {
-          user_id: dto.user_id,
-          teacher_name: dto.teacher_name,
-          date: dto.date,
-          points: 0,
-          activity_type: 'CHECK_IN_LATE',
-          title: 'Presensi Otomatis Sistem (Terlambat - 0 Poin)',
-          description: 'Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (0 Poin)',
-        },
-        token
-      );
-    } catch (ePoint) {
-      logger.warn('SupabaseProvider', 'Failed to record 0 points for auto attendance:', ePoint);
+    // Points ledger
+    if (mode === 'CHECK_IN' || mode === 'BOTH') {
+      try {
+        await this.recordTeacherPoint(
+          {
+            user_id: dto.user_id,
+            teacher_name: dto.teacher_name,
+            date: dto.date,
+            points: 0,
+            activity_type: 'CHECK_IN_LATE',
+            title: 'Presensi Otomatis Sistem (Terlambat - 0 Poin)',
+            description: 'Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (0 Poin)',
+          },
+          token
+        );
+      } catch (ePoint) {
+        logger.warn('SupabaseProvider', 'Failed to record 0 points for auto attendance check-in:', ePoint);
+      }
+    }
+
+    if (mode === 'CHECK_OUT' || mode === 'BOTH') {
+      try {
+        await this.recordTeacherPoint(
+          {
+            user_id: dto.user_id,
+            teacher_name: dto.teacher_name,
+            date: dto.date,
+            points: 10,
+            activity_type: 'CHECK_OUT',
+            title: 'Presensi Pulang Tuntas Bertugas',
+            description: `Tercatat presensi pulang otomatis pada pukul ${finalCheckOutTime} WIB`,
+          },
+          token
+        );
+      } catch (ePoint) {
+        logger.warn('SupabaseProvider', 'Failed to record check-out point for auto attendance:', ePoint);
+      }
     }
 
     this.cachedTodayAttendance.clear();
@@ -1369,8 +1441,8 @@ export class SupabaseProvider implements IDataProvider {
     return {
       ...payload,
       is_auto_attendance: true,
-      points_awarded: 0,
-      created_at: new Date().toISOString(),
+      points_awarded: (mode === 'CHECK_IN' || mode === 'BOTH') ? 0 : 10,
+      created_at: existing?.created_at || new Date().toISOString(),
     } as AttendanceRecord;
   }
 

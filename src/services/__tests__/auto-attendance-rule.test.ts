@@ -74,21 +74,24 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
 
   const activeDate = '2026-11-25'; // Rabu (hari kerja)
 
-  // ── Test 1: autoAttendTeacher creates record with status TERLAMBAT and 0 points
+  // ── Test 1: autoAttendTeacher with mode: CHECK_IN creates record with status TERLAMBAT, check_in_time set, check_out_time null, 0 points
   const autoRecord = await mockProvider.autoAttendTeacher({
     user_id: testTeacher1.id,
     date: activeDate,
     teacher_name: testTeacher1.full_name,
+    mode: 'CHECK_IN',
   });
 
   assert(
-    'AutoAttendance 1: autoAttendTeacher creates record with status TERLAMBAT, SYSTEM_AUTO source, and notes',
+    'AutoAttendance 1: autoAttendTeacher with CHECK_IN creates record with status TERLAMBAT, SYSTEM_AUTO source, check_in_time set, check_out null',
     autoRecord.status === 'TERLAMBAT' &&
       autoRecord.verification_method === 'SYSTEM_AUTO' &&
       autoRecord.attendance_source === 'SYSTEM_AUTO' &&
       autoRecord.is_auto_attendance === true &&
+      Boolean(autoRecord.check_in_time) &&
+      !autoRecord.check_out_time &&
       autoRecord.notes?.includes('0 Poin') === true,
-    `Status: ${autoRecord.status}, Source: ${autoRecord.attendance_source}, Notes: ${autoRecord.notes}`
+    `Status: ${autoRecord.status}, In: ${autoRecord.check_in_time}, Out: ${autoRecord.check_out_time}, Notes: ${autoRecord.notes}`
   );
 
   // ── Test 2: Point ledger records 0 points for auto-late attendance
@@ -103,11 +106,12 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
     autoPointLog ? `Points: ${autoPointLog.points}, Title: ${autoPointLog.title}` : 'Point log not found'
   );
 
-  // ── Test 3: Idempotency protection (Re-running autoAttendTeacher does not duplicate records or points)
+  // ── Test 3: Idempotency protection (Re-running autoAttendTeacher with CHECK_IN does not duplicate records or points)
   const reRunRecord = await mockProvider.autoAttendTeacher({
     user_id: testTeacher1.id,
     date: activeDate,
     teacher_name: testTeacher1.full_name,
+    mode: 'CHECK_IN',
   });
 
   const pointLogsAfterReRun = await mockProvider.getTeacherPointHistory(testTeacher1.id);
@@ -121,7 +125,7 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
     `Record ID match: ${reRunRecord.id === autoRecord.id}, Logs count: ${matchingLogs.length}`
   );
 
-  // ── Test 4: calculateTeacherAppreciationScore awards 0 points for auto-late, while normal late gets 5 pts
+  // ── Test 4: calculateTeacherAppreciationScore awards 0 points for auto-late, while normal late gets 5 pts + 10 checkout
   // Regular late attendance record
   const normalLateRecord: AttendanceRecord = {
     id: 'att_normal_late_01',
@@ -146,7 +150,7 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
   const scoreNormal = calculateTeacherAppreciationScore(normalLateHistory, [], null, testTeacher2.id);
 
   assert(
-    'AutoAttendance 4: calculateTeacherAppreciationScore gives 0 pts for auto-late vs 15 pts (5 late + 10 checkout) for normal late',
+    'AutoAttendance 4: calculateTeacherAppreciationScore gives 0 pts for auto-late CHECK_IN vs 15 pts for normal late + checkout',
     scoreAuto.totalPoints === 0 && scoreNormal.totalPoints === 15,
     `Auto Points: ${scoreAuto.totalPoints}, Normal Points: ${scoreNormal.totalPoints}`
   );
@@ -170,7 +174,40 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
     reconciledCheckIn ? `Reconciled pts: ${reconciledCheckIn.points}` : 'No reconciled log found'
   );
 
-  // ── Test 6: autoAttendUnabsentedTeachers auto-attends unabsented and skips excused leave & holidays
+  // ── Test 6: autoAttendTeacher with mode: CHECK_OUT records checkout time and keeps existing check-in
+  const checkoutRecord = await mockProvider.autoAttendTeacher({
+    user_id: testTeacher1.id,
+    date: activeDate,
+    teacher_name: testTeacher1.full_name,
+    mode: 'CHECK_OUT',
+  });
+
+  assert(
+    'AutoAttendance 6: autoAttendTeacher with CHECK_OUT sets check_out_time and preserves existing check_in_time',
+    Boolean(checkoutRecord.check_out_time) &&
+      checkoutRecord.check_in_time === autoRecord.check_in_time &&
+      checkoutRecord.status === 'TERLAMBAT',
+    `Check In: ${checkoutRecord.check_in_time}, Check Out: ${checkoutRecord.check_out_time}, Status: ${checkoutRecord.status}`
+  );
+
+  // ── Test 7: autoAttendTeacher with mode: BOTH sets both check_in_time and check_out_time
+  const bothRecord = await mockProvider.autoAttendTeacher({
+    user_id: 'usr_auto_guru_both',
+    date: activeDate,
+    teacher_name: 'Guru Pengajar Both',
+    mode: 'BOTH',
+  });
+
+  assert(
+    'AutoAttendance 7: autoAttendTeacher with BOTH sets both check_in_time and check_out_time with TERLAMBAT status',
+    bothRecord.status === 'TERLAMBAT' &&
+      Boolean(bothRecord.check_in_time) &&
+      Boolean(bothRecord.check_out_time) &&
+      bothRecord.is_auto_attendance === true,
+    `In: ${bothRecord.check_in_time}, Out: ${bothRecord.check_out_time}, Status: ${bothRecord.status}`
+  );
+
+  // ── Test 8: autoAttendUnabsentedTeachers auto-attends unabsented and skips excused leave & holidays
   const approvedLeave: LeaveRequest = {
     id: 'leave_budi_01',
     user_id: testTeacherLeave.id,
@@ -196,12 +233,13 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
     },
   ];
 
-  // Batch auto attendance on activeDate
+  // Batch auto attendance on activeDate with mode 'BOTH'
   const batchResults = await AttendancePolicyService.autoAttendUnabsentedTeachers(
     activeDate,
     [testTeacher1, testTeacher2, testTeacherLeave],
     [autoRecord], // Teacher 1 already auto-attended
     [approvedLeave], // Teacher Leave has approved leave
+    'BOTH',
     null,
     holidayList
   );
@@ -209,7 +247,7 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
   // Only Teacher 2 should be auto-attended in this batch
   const attendedIds = batchResults.map((r) => r.user_id);
   assert(
-    'AutoAttendance 6: autoAttendUnabsentedTeachers auto-attends only unabsented personnel and skips approved leaves',
+    'AutoAttendance 8: autoAttendUnabsentedTeachers auto-attends only unabsented personnel and skips approved leaves',
     batchResults.length === 1 && attendedIds.includes(testTeacher2.id) && !attendedIds.includes(testTeacherLeave.id),
     `Batch attended count: ${batchResults.length}, IDs: ${attendedIds.join(', ')}`
   );
@@ -220,12 +258,13 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
     [testTeacher1, testTeacher2],
     [],
     [],
+    'BOTH',
     null,
     holidayList
   );
 
   assert(
-    'AutoAttendance 7: autoAttendUnabsentedTeachers strictly skips scheduled school/national holidays',
+    'AutoAttendance 9: autoAttendUnabsentedTeachers strictly skips scheduled school/national holidays',
     holidayBatchResults.length === 0,
     `Holiday attended count: ${holidayBatchResults.length}`
   );

@@ -10,7 +10,7 @@ import type {
   UpdateCounselingDTO,
   CounselingFilter,
 } from '../types/counseling.types';
-import type { IDataProvider, AutoAttendTeacherDTO } from './data-provider.interface';
+import type { IDataProvider, AutoAttendTeacherDTO, AutoAttendMode } from './data-provider.interface';
 import type {
   UserProfile,
   AttendanceRecord,
@@ -831,15 +831,28 @@ export class MockProvider implements IDataProvider {
 
   public async autoAttendTeacher(dto: AutoAttendTeacherDTO, _token?: string): Promise<AttendanceRecord> {
     let checkinEnd: string = CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
+    let fridayCheckout: string = CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START;
+    let normalCheckout: string = CONSTANTS.DEFAULTS.WORK_CHECKOUT_START;
     let settings: SystemSettings | null = null;
     try {
       settings = await this.getSettings();
       if (settings?.work_checkin_end) {
         checkinEnd = settings.work_checkin_end.slice(0, 5);
       }
+      if (settings?.friday_checkout_start) {
+        fridayCheckout = settings.friday_checkout_start.slice(0, 5);
+      }
+      if (settings?.work_checkout_start) {
+        normalCheckout = settings.work_checkout_start.slice(0, 5);
+      }
     } catch {
       // fallback to default
     }
+
+    const [y, m, d] = dto.date.split('-').map(Number);
+    const dayOfWeek = new Date(y, (m || 1) - 1, d || 1).getDay();
+    const isFriday = dayOfWeek === 5;
+    const checkoutStart = isFriday ? fridayCheckout : normalCheckout;
 
     const ALL_KEY = 'smart_absensi_all_attendance_history';
     let allRecords: AttendanceRecord[] = [];
@@ -851,20 +864,43 @@ export class MockProvider implements IDataProvider {
       allRecords = [];
     }
 
-    // If record already exists with valid status, return it
-    const existing = allRecords.find((r) => r.user_id === dto.user_id && r.date === dto.date);
-    if (existing && existing.status && existing.status !== 'BELUM_ABSEN') {
-      return existing;
+    const existingIdx = allRecords.findIndex((r) => r.user_id === dto.user_id && r.date === dto.date);
+    const existing = existingIdx >= 0 ? allRecords[existingIdx] : null;
+
+    const mode: AutoAttendMode = dto.mode || 'BOTH';
+
+    let finalStatus: AttendanceStatus = 'TERLAMBAT';
+    let finalCheckInTime: string | null = dto.check_in_time || `${checkinEnd}:00`;
+    let finalCheckOutTime: string | null = null;
+    let defaultNotes = 'Presensi otomatis sistem (Terlambat - 0 Poin)';
+
+    if (mode === 'CHECK_IN') {
+      finalStatus = 'TERLAMBAT';
+      finalCheckInTime = dto.check_in_time || `${checkinEnd}:00`;
+      finalCheckOutTime = existing?.check_out_time || null;
+      defaultNotes = 'Presensi otomatis sistem (Masuk Terlambat - 0 Poin)';
+    } else if (mode === 'CHECK_OUT') {
+      finalStatus = existing?.status || 'HADIR';
+      finalCheckInTime = existing?.check_in_time || (existing ? null : `${checkinEnd}:00`);
+      finalCheckOutTime = dto.check_out_time || `${checkoutStart}:00`;
+      defaultNotes = existing?.notes
+        ? `${existing.notes} • Auto Pulang (${finalCheckOutTime})`
+        : 'Presensi otomatis sistem (Pulang Tuntas)';
+    } else {
+      // 'BOTH' (default)
+      finalStatus = 'TERLAMBAT';
+      finalCheckInTime = dto.check_in_time || `${checkinEnd}:00`;
+      finalCheckOutTime = dto.check_out_time || `${checkoutStart}:00`;
+      defaultNotes = 'Presensi otomatis sistem (Masuk Terlambat 0 Poin & Pulang Tuntas)';
     }
 
-    const timeFormatted = dto.check_in_time || `${checkinEnd}:00`;
     const autoRecord: AttendanceRecord = {
       id: existing?.id || `att_${dto.user_id}_${dto.date}`,
       user_id: dto.user_id,
       date: dto.date,
-      status: 'TERLAMBAT',
-      check_in_time: timeFormatted,
-      check_out_time: null,
+      status: finalStatus,
+      check_in_time: finalCheckInTime,
+      check_out_time: finalCheckOutTime,
       check_in_lat: settings?.geofence_lat || -6.613144,
       check_in_lng: settings?.geofence_lng || 106.684975,
       check_in_distance_meters: 0,
@@ -872,15 +908,13 @@ export class MockProvider implements IDataProvider {
       attendance_source: 'SYSTEM_AUTO',
       is_offline: false,
       is_auto_attendance: true,
-      notes: dto.notes || 'Presensi otomatis sistem (Terlambat - 0 Poin)',
-      points_awarded: 0,
-      created_at: new Date().toISOString(),
+      notes: dto.notes || defaultNotes,
+      points_awarded: (mode === 'CHECK_IN' || mode === 'BOTH') ? 0 : (existing?.points_awarded || 0),
+      created_at: existing?.created_at || new Date().toISOString(),
     };
 
-    if (existing) {
-      const idx = allRecords.findIndex((r) => r.id === existing.id);
-      if (idx >= 0) allRecords[idx] = autoRecord;
-      else allRecords.push(autoRecord);
+    if (existingIdx >= 0) {
+      allRecords[existingIdx] = autoRecord;
     } else {
       allRecords.push(autoRecord);
     }
@@ -892,19 +926,37 @@ export class MockProvider implements IDataProvider {
       safeSetStorage('smart_absensi_today_attendance', JSON.stringify(autoRecord));
     }
 
-    // Record 0 points ledger
-    try {
-      await this.recordTeacherPoint({
-        user_id: dto.user_id,
-        teacher_name: dto.teacher_name,
-        date: dto.date,
-        points: 0,
-        activity_type: 'CHECK_IN_LATE',
-        title: 'Presensi Otomatis Sistem (Terlambat - 0 Poin)',
-        description: 'Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (0 Poin)',
-      });
-    } catch (errPoint) {
-      console.warn('Failed to record 0 points for auto attendance:', errPoint);
+    // Record points
+    if (mode === 'CHECK_IN' || mode === 'BOTH') {
+      try {
+        await this.recordTeacherPoint({
+          user_id: dto.user_id,
+          teacher_name: dto.teacher_name,
+          date: dto.date,
+          points: 0,
+          activity_type: 'CHECK_IN_LATE',
+          title: 'Presensi Otomatis Sistem (Terlambat - 0 Poin)',
+          description: 'Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (0 Poin)',
+        });
+      } catch (errPoint) {
+        console.warn('Failed to record 0 points for auto attendance check-in:', errPoint);
+      }
+    }
+
+    if (mode === 'CHECK_OUT' || mode === 'BOTH') {
+      try {
+        await this.recordTeacherPoint({
+          user_id: dto.user_id,
+          teacher_name: dto.teacher_name,
+          date: dto.date,
+          points: 10,
+          activity_type: 'CHECK_OUT',
+          title: 'Presensi Pulang Tuntas Bertugas',
+          description: `Tercatat presensi pulang otomatis pada pukul ${finalCheckOutTime} WIB`,
+        });
+      } catch (errPoint) {
+        console.warn('Failed to record check-out point for auto attendance:', errPoint);
+      }
     }
 
     if (typeof window !== 'undefined') {

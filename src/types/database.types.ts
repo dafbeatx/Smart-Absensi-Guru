@@ -21,6 +21,8 @@ export type VerificationMethod = 'QR_GPS' | 'MANUAL_OPERATOR' | 'SYSTEM_AUTO' | 
 
 export type AttendanceSource = 'QR' | 'MANUAL' | 'OFFLINE_SYNC' | 'BIOMETRIC' | 'SYSTEM_AUTO';
 
+export type AutoAttendMode = 'CHECK_IN' | 'CHECK_OUT' | 'BOTH';
+
 export type NotificationType = 'IN_APP' | 'WHATSAPP' | 'SYSTEM' | 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR' | 'ANNOUNCEMENT';
 
 export type AttendanceAction = 'CHECK_IN' | 'CHECK_OUT' | 'ALREADY_COMPLETED';
