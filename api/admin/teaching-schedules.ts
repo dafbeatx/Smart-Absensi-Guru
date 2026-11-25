@@ -6,6 +6,7 @@
 import {
   serverSupabase,
   authenticateUser,
+  isAuthFailure,
   applyAuthCorsHeaders,
   isAllowedAuthOrigin,
 } from '../_shared/session-auth.js';
@@ -84,7 +85,7 @@ export default async function handler(req: any, res: any) {
   // 1. Strict Session Authentication (zero mock_token / SB_JWT_ / usr_ bypasses)
   const auth = await authenticateUser(req);
 
-  if (!auth.ok) {
+  if (isAuthFailure(auth)) {
     return res.status(auth.status).json({
       success: false,
       errorCode: auth.errorCode,

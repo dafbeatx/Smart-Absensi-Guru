@@ -10,6 +10,12 @@ export type SessionOwnershipResult =
   | { ok: true; session: { id: string; owner_user_id?: string | null; teacher?: string | null; kkm?: number | null; answer_key?: string[] | null; scoring_config?: any } }
   | { ok: false; status: number; code: string; message: string };
 
+export function isSessionOwnershipFailure(
+  result: SessionOwnershipResult
+): result is { ok: false; status: number; code: string; message: string } {
+  return !result.ok;
+}
+
 /**
  * Enforces session ownership for GURU while permitting ADMIN/OPERATOR/KEPSEK supervision.
  * Prevents horizontal privilege escalation / IDOR on both GET audit logs and POST mutations.

@@ -160,6 +160,10 @@ export interface AuthErrorContext {
 
 export type AuthContext = AuthSuccessContext | AuthErrorContext;
 
+export function isAuthFailure(auth: AuthContext): auth is AuthErrorContext {
+  return !auth.ok;
+}
+
 /**
  * Checks whether an HTTP request origin is authorized for credentialed CORS
  * across Web PWA (Vercel prod/preview), local dev, Capacitor Android, and Electron containers.

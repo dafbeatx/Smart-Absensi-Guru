@@ -9,12 +9,14 @@
 
 import {
   authenticateUser,
+  isAuthFailure,
   serverSupabase,
   applyAuthCorsHeaders,
   isAllowedAuthOrigin,
 } from './_shared/session-auth.js';
 import {
   verifyExamSessionOwnership,
+  isSessionOwnershipFailure,
   syncStudentGradeMirrorOnServer,
   saveSingleGradeServerFallback,
   handleDeleteGradedStudentOnServer,
@@ -35,7 +37,7 @@ export default async function handler(req: any, res: any) {
 
   // 2. Strict Session Authentication (zero SB_JWT_ / mock bypasses)
   const auth = await authenticateUser(req);
-  if (!auth.ok) {
+  if (isAuthFailure(auth)) {
     return res.status(auth.status).json({
       success: false,
       code: auth.errorCode,
@@ -63,7 +65,7 @@ export default async function handler(req: any, res: any) {
     }
 
     const ownership = await verifyExamSessionOwnership(String(session_id), callerUser, callerRole);
-    if (!ownership.ok) {
+    if (isSessionOwnershipFailure(ownership)) {
       return res.status(ownership.status).json({
         success: false,
         code: ownership.code,
@@ -125,7 +127,7 @@ export default async function handler(req: any, res: any) {
 
     // Enforce session existence & GURU ownership verification
     const ownership = await verifyExamSessionOwnership(String(session_id), callerUser, callerRole);
-    if (!ownership.ok) {
+    if (isSessionOwnershipFailure(ownership)) {
       return res.status(ownership.status).json({
         success: false,
         code: ownership.code,
