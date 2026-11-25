@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 import type { UserProfile } from '../types/database.types';
 import { getOrCreateDeviceUUID, getDeviceModelString } from '../utils/device.utils';
 
+export const AUTH_STORAGE_KEY = 'smart_absensi_auth_storage';
+
 export interface AuthState {
   user: UserProfile | null;
   token: string | null;
@@ -41,16 +43,24 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         const currentToken = get().token;
-        if (currentToken && currentToken.startsWith('saga_sess_') && typeof window !== 'undefined' && typeof window.fetch === 'function') {
-          fetch('/api/auth/logout', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${currentToken}`,
-              'Content-Type': 'application/json',
-            },
-          }).catch(() => {
-            // fire-and-forget: fail gracefully if offline
-          });
+        if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          };
+          if (currentToken && currentToken.startsWith('saga_sess_')) {
+            headers['Authorization'] = `Bearer ${currentToken}`;
+          }
+          // Fire-and-forget server revocation & HttpOnly cookie clearing across all platforms
+          if ((currentToken && currentToken.startsWith('saga_sess_')) || window.location.protocol.startsWith('http')) {
+            fetch('/api/auth/logout', {
+              method: 'POST',
+              credentials: 'include',
+              keepalive: true,
+              headers,
+            }).catch(() => {
+              // fail gracefully if offline
+            });
+          }
         }
         if (typeof window !== 'undefined') {
           try {
@@ -78,7 +88,7 @@ export const useAuthStore = create<AuthState>()(
       setLoading: (isLoading: boolean) => set({ isLoading }),
     }),
     {
-      name: 'smart_absensi_auth_storage', // Persist session in LocalStorage
+      name: AUTH_STORAGE_KEY, // Persist session in LocalStorage
       partialize: (state) => ({
         user: state.user,
         token: state.token,
@@ -88,3 +98,12 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+// Cross-tab auth synchronization: if user logs out or switches account in another tab, sync immediately
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === AUTH_STORAGE_KEY) {
+      useAuthStore.persist.rehydrate();
+    }
+  });
+}

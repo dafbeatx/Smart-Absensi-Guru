@@ -154,6 +154,7 @@ export const App: React.FC = () => {
   const userPhone = user?.phone_number;
   const userNip = user?.nip;
   const userRole = user?.role;
+  const userFullName = user?.full_name;
 
   const isCelebrationOpen = usePointRewardStore((s) => s.isOpen);
   const celebrationData = usePointRewardStore((s) => s.data);
@@ -363,8 +364,8 @@ export const App: React.FC = () => {
       if (shouldSendDailySurveyReminder(userId)) {
         NotificationService.notifyPendingSurveyReminder(
           userId,
-          user?.full_name || 'Bapak/Ibu Pendidik',
-          user?.role || 'GURU'
+          userFullName || 'Bapak/Ibu Pendidik',
+          userRole || 'GURU'
         );
         markDailySurveyReminderSent(userId);
       }
@@ -393,7 +394,26 @@ export const App: React.FC = () => {
       window.removeEventListener('smart_absensi_open_survey_analytics', handleOpenSurveyAnalytics);
       window.removeEventListener('smart_absensi_open_survey_modal', handleOpenSurveyModal);
     };
-  }, [userId]);
+  }, [userId, userFullName, userRole]);
+
+  // Synchronize active role mode & clear stale overlay state on auth/user transitions (Always runs unconditionally above returns)
+  useEffect(() => {
+    if (!isAuthenticated || !userId) {
+      setIsScannerOpen(false);
+      setIsSwitchRoleModalOpen(false);
+      setIsTestRunnerOpen(false);
+      setIsFridaySurveyOpen(false);
+      setIsSurveyAnalyticsOpen(false);
+      setActiveRoleMode('GURU');
+      return;
+    }
+    const saved = localStorage.getItem(`smart_absensi_active_role_mode_${userId}`);
+    if (saved === 'GURU' || saved === 'ADMIN' || saved === 'OPERATOR' || saved === 'KEPSEK') {
+      setActiveRoleMode(saved);
+    } else {
+      setActiveRoleMode((userRole as 'GURU' | 'ADMIN' | 'OPERATOR' | 'KEPSEK') || 'GURU');
+    }
+  }, [isAuthenticated, userId, userRole]);
 
   useEffect(() => {
     // Inisialisasi Mobile Hardware & Gesture Back Navigation Engine (Web Browser PWA + Capacitor)
@@ -407,16 +427,34 @@ export const App: React.FC = () => {
             (latestUser.id === userId ||
               latestUser.phone_number === userPhone ||
               (userNip && latestUser.nip === userNip));
-          if (isSameUser && latestUser.role !== userRole) {
+
+          if (!latestUser || !isSameUser || latestUser.is_active === false) {
+            useToastStore.getState().showToast(
+              'warning',
+              'Sesi Login Berakhir',
+              'Akun tidak aktif atau sesi tidak valid. Silakan login kembali.'
+            );
+            useAuthStore.getState().logout();
+            return;
+          }
+
+          if (
+            latestUser.role !== userRole ||
+            latestUser.full_name !== userFullName ||
+            Boolean(latestUser.must_change_pin) !== Boolean(useAuthStore.getState().user?.must_change_pin)
+          ) {
             useAuthStore.getState().updateUserProfile({
               role: latestUser.role,
               full_name: latestUser.full_name,
               position: latestUser.position,
+              avatar_url: latestUser.avatar_url,
+              is_active: latestUser.is_active,
+              must_change_pin: latestUser.must_change_pin,
             });
           }
 
           // Send Telegram Web Login notification once per browser session
-          if (latestUser && typeof sessionStorage !== 'undefined') {
+          if (typeof sessionStorage !== 'undefined') {
             const sessionKey = `tg_web_entry_${latestUser.id}_${getTodayDateInJakarta()}`;
             if (!sessionStorage.getItem(sessionKey)) {
               sessionStorage.setItem(sessionKey, '1');
@@ -429,7 +467,23 @@ export const App: React.FC = () => {
             }
           }
         })
-        .catch(console.warn);
+        .catch((err: unknown) => {
+          const errObj = err as { code?: string; status?: number; message?: string };
+          if (
+            errObj?.code?.startsWith?.('AUTH_') ||
+            errObj?.status === 401 ||
+            errObj?.status === 403
+          ) {
+            useToastStore.getState().showToast(
+              'warning',
+              'Sesi Login Berakhir',
+              errObj.message || 'Sesi Anda telah dicabut atau kedaluwarsa. Silakan login kembali.'
+            );
+            useAuthStore.getState().logout();
+          } else {
+            console.warn('Session verification skipped/deferred (offline or network):', err);
+          }
+        });
 
       GPSService.syncGeofenceSettings().catch(console.warn);
       GPSService.startBackgroundWarmUp();
@@ -438,7 +492,7 @@ export const App: React.FC = () => {
       cleanupBackNav();
       GPSService.stopBackgroundWarmUp();
     };
-  }, [isAuthenticated, token, userId, userPhone, userNip, userRole]);
+  }, [isAuthenticated, token, userId, userPhone, userNip, userRole, userFullName]);
 
   if (!isAuthenticated || !user) {
     return (
@@ -464,16 +518,15 @@ export const App: React.FC = () => {
     );
   }
 
-  useEffect(() => {
-    if (user?.id) {
-      const saved = localStorage.getItem(`smart_absensi_active_role_mode_${user.id}`);
-      if (saved === 'GURU' || saved === 'ADMIN' || saved === 'OPERATOR' || saved === 'KEPSEK') {
-        setActiveRoleMode(saved as any);
-      } else {
-        setActiveRoleMode((user.role as any) || 'GURU');
-      }
-    }
-  }, [user?.id, user?.role]);
+  // Server-enforced mandatory PIN change gate: block dashboard mounting completely until cleared
+  if (user.must_change_pin) {
+    return (
+      <>
+        <ForceChangePinModal />
+        <ToastContainer />
+      </>
+    );
+  }
 
   const handleSelectRoleMode = (mode: 'GURU' | 'ADMIN' | 'OPERATOR' | 'KEPSEK') => {
     if (user?.id) {

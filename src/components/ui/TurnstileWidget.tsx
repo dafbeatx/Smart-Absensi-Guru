@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, RefreshCw, AlertTriangle } from 'lucide-react';
+import { detectNativeContainer } from '../../utils/device.utils';
 
 declare global {
   interface Window {
@@ -37,11 +38,53 @@ export interface TurnstileWidgetProps {
   className?: string;
 }
 
-// Cloudflare's Official Testing Site Key (Always Passes) for dev/fallback
+// Cloudflare's Official Testing Site Key (Always Passes) for local Vite dev server only
 const DEFAULT_TEST_SITE_KEY = '1x00000000000000000000AA';
 const CANONICAL_PROJECT_SITE_KEY = '0x4AAAAAAEIxMhyntpJB_Iqo';
 
-const isLocalOrLanHost = (): boolean => {
+let turnstileScriptPromise: Promise<void> | null = null;
+
+function loadTurnstileScript(): Promise<void> {
+  if (typeof window === 'undefined') {
+    return Promise.resolve();
+  }
+  if (window.turnstile) {
+    return Promise.resolve();
+  }
+  if (turnstileScriptPromise) {
+    return turnstileScriptPromise;
+  }
+
+  turnstileScriptPromise = new Promise<void>((resolve, reject) => {
+    const existingScript = document.getElementById('cf-turnstile-script') as HTMLScriptElement | null;
+    if (existingScript && !window.turnstile) {
+      // Remove orphaned/failed script element before retrying
+      existingScript.remove();
+    }
+
+    const script = document.createElement('script');
+    script.id = 'cf-turnstile-script';
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback';
+    script.async = true;
+    script.defer = true;
+
+    window.onloadTurnstileCallback = () => {
+      resolve();
+    };
+
+    script.onerror = () => {
+      turnstileScriptPromise = null;
+      script.remove();
+      reject(new Error('Gagal memuat skrip verifikasi Cloudflare Turnstile.'));
+    };
+
+    document.head.appendChild(script);
+  });
+
+  return turnstileScriptPromise;
+}
+
+const isLocalDevHost = (): boolean => {
   if (typeof window === 'undefined') return false;
   const host = window.location.hostname;
   return (
@@ -56,188 +99,205 @@ const isLocalOrLanHost = (): boolean => {
   );
 };
 
-const checkNativeEnvironment = (): { isNative: boolean; type: 'android' | 'windows' | 'none'; label: string } => {
-  if (typeof window === 'undefined') return { isNative: false, type: 'none', label: '' };
+export const TurnstileWidget = React.forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
+  (
+    {
+      siteKey: propsSiteKey,
+      onVerify,
+      onError,
+      onExpire,
+      action = 'login',
+      theme = 'light',
+      className = 'flex justify-center my-3',
+    },
+    ref
+  ) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const widgetIdRef = useRef<string | null>(null);
+    const [nativeEnv] = useState(detectNativeContainer);
+    const [status, setStatus] = useState<'loading' | 'ready' | 'verified' | 'error'>('loading');
+    const [retryTrigger, setRetryTrigger] = useState(0);
 
-  const isFile = window.location.protocol === 'file:';
-  const isCapacitorScheme = window.location.protocol === 'capacitor:';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isCapacitorNative = Boolean((window as any).Capacitor?.isNativePlatform?.());
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isElectron = isFile || /electron/i.test(navigator.userAgent) || Boolean((window as any).electronAPI?.isDesktop);
-  const isAndroidContainer = isCapacitorScheme || isCapacitorNative || (window.location.hostname === 'localhost' && /android/i.test(navigator.userAgent));
+    // Keep latest callbacks in refs so typing in parent inputs NEVER tears down the widget
+    const onVerifyRef = useRef(onVerify);
+    const onErrorRef = useRef(onError);
+    const onExpireRef = useRef(onExpire);
 
-  if (isElectron) {
-    return { isNative: true, type: 'windows', label: 'Windows Desktop' };
-  }
-  if (isAndroidContainer) {
-    return { isNative: true, type: 'android', label: 'Android Native' };
-  }
+    useEffect(() => {
+      onVerifyRef.current = onVerify;
+      onErrorRef.current = onError;
+      onExpireRef.current = onExpire;
+    }, [onVerify, onError, onExpire]);
 
-  return { isNative: false, type: 'none', label: '' };
-};
-
-export const TurnstileWidget = React.forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(({
-  siteKey: propsSiteKey,
-  onVerify,
-  onError,
-  onExpire,
-  action = 'login',
-  theme = 'light',
-  className = 'flex justify-center my-3',
-}, ref) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const widgetIdRef = useRef<string | null>(null);
-  const [nativeEnv] = useState(checkNativeEnvironment);
-  const [useFallbackBadge, setUseFallbackBadge] = useState<boolean>(false);
-
-  React.useImperativeHandle(ref, () => ({
-    reset: () => {
+    const handleTriggerReset = () => {
+      setStatus('ready');
+      onExpireRef.current?.();
       if (widgetIdRef.current && window.turnstile) {
         try {
           window.turnstile.reset(widgetIdRef.current);
+          return;
         } catch {
-          // ignore
+          // Fall through to full remount if widget handle is stale
         }
       }
-    },
-  }));
-
-  // Canonical Sitekey Resolution
-  const isLocal = isLocalOrLanHost();
-  const siteKey = isLocal
-    ? DEFAULT_TEST_SITE_KEY
-    : (propsSiteKey || import.meta.env.VITE_TURNSTILE_SITE_KEY || CANONICAL_PROJECT_SITE_KEY);
-
-  useEffect(() => {
-    // 1. Native Mobile APK & Desktop EXE Bypass
-    // Turnstile is a web-bot challenge designed for public browsers. Native apps are installed binaries.
-    // Cloudflare blocks file:// and unlisted localhost origins in APK/EXE with "Domain not allowed".
-    if (nativeEnv.isNative) {
-      if (onVerify) {
-        onVerify(`native-${nativeEnv.type}-verified-token`);
-      }
-      return;
-    }
-
-    let isMounted = true;
-    let hasVerified = false;
-
-    // Timeout pengaman 6 detik: jika Cloudflare macet / spinning terus tanpa ceklis
-    const timeoutTimer = setTimeout(() => {
-      if (isMounted && !hasVerified) {
-        console.warn('Turnstile verification timeout (tidak ceklis dalam 6 detik). Mengaktifkan fallback aman.');
-        setUseFallbackBadge(true);
-        if (onVerify) onVerify('cf-timeout-fallback-token');
-      }
-    }, 6000);
-
-    const renderWidget = () => {
-      if (!containerRef.current || !window.turnstile || widgetIdRef.current) return;
-
-      try {
-        widgetIdRef.current = window.turnstile.render(containerRef.current, {
-          sitekey: siteKey,
-          theme,
-          size: 'normal',
-          action,
-          callback: (token: string) => {
-            hasVerified = true;
-            clearTimeout(timeoutTimer);
-            if (isMounted && onVerify) onVerify(token);
-          },
-          'error-callback': () => {
-            clearTimeout(timeoutTimer);
-            if (isMounted) {
-              console.warn('Turnstile encountered error. Engaging seamless fallback.');
-              setUseFallbackBadge(true);
-              if (onVerify) onVerify('cf-fallback-verified-token');
-              if (onError) onError();
-            }
-          },
-          'expired-callback': () => {
-            if (isMounted && onExpire) onExpire();
-          },
-        });
-      } catch (err) {
-        clearTimeout(timeoutTimer);
-        console.warn('Failed to render Turnstile widget:', err);
-        if (isMounted) {
-          setUseFallbackBadge(true);
-          if (onVerify) onVerify('cf-fallback-verified-token');
-        }
-      }
+      setRetryTrigger((prev) => prev + 1);
     };
 
-    // Inject Cloudflare Turnstile API Script if not present
-    const existingScript = document.getElementById('cf-turnstile-script');
-    if (!existingScript) {
-      const script = document.createElement('script');
-      script.id = 'cf-turnstile-script';
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback';
-      script.async = true;
-      script.defer = true;
+    React.useImperativeHandle(ref, () => ({
+      reset: handleTriggerReset,
+    }));
 
-      script.onerror = () => {
-        if (isMounted) {
-          console.warn('Turnstile script failed to load. Enabling trusted fallback.');
-          setUseFallbackBadge(true);
-          if (onVerify) onVerify('cf-script-fallback-token');
+    // Canonical Sitekey Resolution
+    const isDevLocal = Boolean(import.meta.env.DEV) && isLocalDevHost();
+    const configuredSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || propsSiteKey || CANONICAL_PROJECT_SITE_KEY;
+    const siteKey = isDevLocal && !import.meta.env.VITE_TURNSTILE_SITE_KEY ? DEFAULT_TEST_SITE_KEY : configuredSiteKey;
+
+    useEffect(() => {
+      // 1. Native Mobile APK (Capacitor) & Desktop EXE (Electron) Attestation
+      // Cloudflare Turnstile rejects file:// and unlisted localhost WebView origins ("Domain not allowed").
+      if (nativeEnv.isNative) {
+        const token = nativeEnv.type === 'windows' ? 'native-windows-verified-token' : 'native-android-verified-token';
+        setStatus('verified');
+        onVerifyRef.current?.(token);
+        return;
+      }
+
+      let isMounted = true;
+      let hasSettled = false;
+
+      // Safety load timeout (12s): clears loading state and prompts explicit user retry rather than minting fake bypass tokens
+      const timeoutTimer = setTimeout(() => {
+        if (isMounted && !hasSettled) {
+          setStatus('error');
+          onErrorRef.current?.();
         }
-      };
+      }, 12000);
 
-      window.onloadTurnstileCallback = () => {
-        if (isMounted) renderWidget();
-      };
+      const renderWidget = () => {
+        if (!isMounted || !containerRef.current || !window.turnstile || widgetIdRef.current) return;
 
-      document.head.appendChild(script);
-    } else if (window.turnstile) {
-      renderWidget();
-    } else {
-      window.onloadTurnstileCallback = () => {
-        if (isMounted) renderWidget();
-      };
-    }
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutTimer);
-      if (widgetIdRef.current && window.turnstile) {
         try {
-          window.turnstile.remove(widgetIdRef.current);
+          setStatus('ready');
+          widgetIdRef.current = window.turnstile.render(containerRef.current, {
+            sitekey: siteKey,
+            theme,
+            size: 'normal',
+            action,
+            callback: (token: string) => {
+              hasSettled = true;
+              clearTimeout(timeoutTimer);
+              if (isMounted) {
+                setStatus('verified');
+                onVerifyRef.current?.(token);
+              }
+            },
+            'error-callback': () => {
+              hasSettled = true;
+              clearTimeout(timeoutTimer);
+              if (isMounted) {
+                setStatus('error');
+                onErrorRef.current?.();
+              }
+            },
+            'expired-callback': () => {
+              hasSettled = false;
+              if (isMounted) {
+                onExpireRef.current?.();
+                // Auto-reset expired single-use token so user can re-verify smoothly
+                if (widgetIdRef.current && window.turnstile) {
+                  try {
+                    window.turnstile.reset(widgetIdRef.current);
+                  } catch {
+                    setStatus('error');
+                  }
+                }
+              }
+            },
+          });
         } catch {
-          // ignore
+          hasSettled = true;
+          clearTimeout(timeoutTimer);
+          if (isMounted) {
+            setStatus('error');
+            onErrorRef.current?.();
+          }
         }
-        widgetIdRef.current = null;
-      }
-    };
-  }, [siteKey, action, theme, nativeEnv.isNative, nativeEnv.type, onVerify, onError, onExpire]);
+      };
 
-  // If in Native Container (Android APK or Windows EXE), display official trusted badge
-  if (nativeEnv.isNative) {
-    return (
-      <div className={className}>
-        <div className="flex items-center justify-center gap-2 py-2 px-3 bg-emerald-50/90 border border-emerald-200/90 rounded-xl text-emerald-800 text-xs font-semibold shadow-xs select-none animate-fade-in">
-          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>Aplikasi Resmi Terverifikasi ({nativeEnv.label})</span>
+      loadTurnstileScript()
+        .then(() => {
+          renderWidget();
+        })
+        .catch(() => {
+          hasSettled = true;
+          clearTimeout(timeoutTimer);
+          if (isMounted) {
+            setStatus('error');
+            onErrorRef.current?.();
+          }
+        });
+
+      return () => {
+        isMounted = false;
+        clearTimeout(timeoutTimer);
+        if (widgetIdRef.current && window.turnstile) {
+          try {
+            window.turnstile.remove(widgetIdRef.current);
+          } catch {
+            // ignore cleanup error
+          }
+          widgetIdRef.current = null;
+        }
+      };
+    }, [siteKey, action, theme, nativeEnv.isNative, nativeEnv.type, retryTrigger]);
+
+    // If in Native Container (Android APK or Windows EXE), display official trusted badge
+    if (nativeEnv.isNative) {
+      return (
+        <div className={className}>
+          <div className="flex items-center justify-center gap-2 py-2.5 px-3.5 bg-emerald-50/90 border border-emerald-200/90 rounded-xl text-emerald-800 text-xs font-semibold shadow-xs select-none animate-fade-in">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Aplikasi Resmi Terverifikasi ({nativeEnv.label})</span>
+          </div>
         </div>
+      );
+    }
+
+    if (status === 'error') {
+      return (
+        <div className={`${className} flex-col items-center gap-2`}>
+          <div className="w-full flex flex-col items-center gap-2 py-3 px-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs text-center">
+            <div className="flex items-center gap-1.5 font-bold text-amber-800">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Verifikasi Keamanan Belum Selesai</span>
+            </div>
+            <p className="text-[11px] text-amber-700 leading-relaxed">
+              Widget keamanan Cloudflare gagal dimuat atau waktu tunggu habis. Pastikan koneksi stabil lalu muat ulang.
+            </p>
+            <button
+              type="button"
+              onClick={handleTriggerReset}
+              className="min-h-11 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs inline-flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Muat Ulang Verifikasi</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={`${className} flex-col items-center`}>
+        <div ref={containerRef} className="min-h-[65px] flex items-center justify-center" />
+        {status === 'loading' && (
+          <p className="text-[11px] text-slate-400 font-medium mt-1">
+            Memuat verifikasi keamanan Cloudflare...
+          </p>
+        )}
       </div>
     );
   }
-
-  // If Cloudflare fails or is blocked on web, show seamless fallback badge
-  if (useFallbackBadge) {
-    return (
-      <div className={className}>
-        <div className="flex items-center justify-center gap-2 py-2 px-3 bg-emerald-50/90 border border-emerald-200/90 rounded-xl text-emerald-800 text-xs font-semibold shadow-xs select-none animate-fade-in">
-          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>Verifikasi Keamanan Aktif</span>
-        </div>
-      </div>
-    );
-  }
-
-  return <div ref={containerRef} className={className} />;
-});
+);
 
 TurnstileWidget.displayName = 'TurnstileWidget';

@@ -2464,6 +2464,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       showToast('error', 'PIN Harus 6 Angka!', 'Masukkan 6 digit angka untuk PIN baru.');
       return;
     }
+    if (newPin === '123456') {
+      showToast('error', 'PIN Tidak Diizinkan', 'PIN baru tidak boleh menggunakan PIN bawaan (123456).');
+      return;
+    }
     if (newPin !== confirmPin) {
       showToast('error', 'Konfirmasi PIN Tidak Cocok!', 'PIN baru dan konfirmasi PIN harus sama.');
       return;

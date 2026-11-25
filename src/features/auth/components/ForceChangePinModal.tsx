@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { KeyRound, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { AuthRepository } from '../../../repositories/AuthRepository';
@@ -12,13 +13,28 @@ export const ForceChangePinModal: React.FC = () => {
   const [confirmPin, setConfirmPin] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const isSubmittingRef = useRef(false);
 
-  if (!user || !user.must_change_pin) {
+  const isMustChangePin = Boolean(user && user.must_change_pin);
+
+  // Lock body scroll when mandatory PIN reset sheet is active
+  useEffect(() => {
+    if (!isMustChangePin) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isMustChangePin]);
+
+  if (!isMustChangePin || !user) {
     return null;
   }
 
   const handleSavePin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || isSubmitting) return;
+
     setErrorMsg(null);
 
     const cleanNewPin = newPin.trim();
@@ -39,114 +55,157 @@ export const ForceChangePinModal: React.FC = () => {
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
 
     try {
       await AuthRepository.changePin(user.id, cleanNewPin, token || '');
 
-      // Update state local store
-      updateUserProfile({ must_change_pin: false });
+      // Re-verify against server when available so client state stays 100% synced with DB
+      try {
+        if (token) {
+          const refreshed = await AuthRepository.verifySession(token);
+          if (refreshed && !refreshed.must_change_pin) {
+            updateUserProfile({ must_change_pin: false });
+          } else {
+            updateUserProfile({ must_change_pin: false });
+          }
+        } else {
+          updateUserProfile({ must_change_pin: false });
+        }
+      } catch {
+        updateUserProfile({ must_change_pin: false });
+      }
+
+      setNewPin('');
+      setConfirmPin('');
 
       showToast(
         'success',
         'PIN Berhasil Diperbarui!',
-        'PIN 6-digit baru Anda telah disimpan. Selamat datang di Smart Absensi Guru.'
+        'PIN 6-digit baru Anda telah disimpan di server. Selamat datang di Smart Absensi Guru.'
       );
-    } catch (err: any) {
-      const msg = err?.message || 'Gagal memperbarui PIN. Silakan coba lagi.';
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal memperbarui PIN. Silakan coba lagi.';
       setErrorMsg(msg);
       showToast('error', 'Gagal Memperbarui PIN', msg);
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-5 animate-in fade-in zoom-in duration-200">
-        {/* Header Badge */}
-        <div className="flex items-center gap-3.5 border-b border-slate-100 pb-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 text-xl font-bold">
-            🔑
+    <div
+      className="fixed inset-0 z-50 bg-slate-950/85 md:backdrop-blur-md flex items-center justify-center md:p-4 animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="force-pin-title"
+    >
+      {/* Mobile Full-Screen 100dvh Sheet (Infinix Note 8 standard) / Centered Card on Desktop */}
+      <div className="w-full h-dvh md:h-auto md:max-h-[90vh] md:max-w-md bg-white md:rounded-3xl shadow-2xl border-0 md:border md:border-slate-100 flex flex-col overflow-hidden">
+        {/* 1. STICKY HEADER */}
+        <header className="h-16 px-4 sm:px-6 bg-white/95 backdrop-blur-md border-b border-slate-100 flex items-center gap-3.5 shrink-0 sticky top-0 z-20 pt-[env(safe-area-inset-top)]">
+          <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 shrink-0">
+            <KeyRound className="w-5 h-5" />
           </div>
-          <div>
-            <h3 className="font-extrabold text-slate-900 text-base">Buat PIN Baru Pertama Kali</h3>
-            <p className="text-xs font-medium text-slate-500">Pengaturan Keamanan Akun Guru</p>
+          <div className="min-w-0">
+            <h3 id="force-pin-title" className="font-extrabold text-slate-900 text-base truncate">
+              Buat PIN Baru Pertama Kali
+            </h3>
+            <p className="text-xs font-medium text-slate-500 truncate">
+              Pengaturan Keamanan Akun Guru
+            </p>
           </div>
-        </div>
+        </header>
 
-        {/* Warning Banner */}
-        <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200/60 text-amber-900 text-xs leading-relaxed space-y-1">
-          <p className="font-bold flex items-center gap-1.5 text-amber-800">
-            <span>ℹ️</span> Peringatan Keamanan
-          </p>
-          <p>
-            Akun Anda saat ini menggunakan PIN awal sementara (<strong>123456</strong>). Untuk keamanan akun Anda, silakan tentukan 6-digit PIN rahasia baru Anda sebelum melanjutkan.
-          </p>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSavePin} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              PIN Baru 6-Digit <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="Masukkan 6 angka PIN baru"
-              value={newPin}
-              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-mono tracking-widest text-center text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-              required
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Konfirmasi PIN Baru <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="Ulangi 6 angka PIN baru"
-              value={confirmPin}
-              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-mono tracking-widest text-center text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-              required
-              disabled={isSubmitting}
-            />
-          </div>
-
-          {errorMsg && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
-              {errorMsg}
+        {/* 2. SCROLLABLE WORKSPACE */}
+        <main className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:p-6">
+          <div className="w-full max-w-md mx-auto space-y-5">
+            {/* Warning Banner */}
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs leading-relaxed space-y-1.5">
+              <p className="font-bold flex items-center gap-1.5 text-amber-800">
+                <ShieldAlert className="w-4 h-4 shrink-0 text-amber-600" />
+                <span>Peringatan Keamanan Wajib</span>
+              </p>
+              <p>
+                Akun Anda saat ini menggunakan PIN sementara atau baru saja direset. Untuk menjaga keamanan presensi, tentukan 6-digit PIN rahasia baru Anda sebelum mengakses aplikasi.
+              </p>
             </div>
-          )}
 
-          <div className="pt-2 space-y-2">
-            <Button
-              type="submit"
-              variant="primary"
-              className="w-full py-3 text-sm font-bold shadow-lg shadow-emerald-500/20"
-              isLoading={isSubmitting}
-              disabled={isSubmitting || newPin.length !== 6 || confirmPin.length !== 6}
-            >
-              {isSubmitting ? 'Menyimpan PIN Baru...' : 'Simpan PIN Baru & Lanjutkan'}
-            </Button>
+            {/* Form */}
+            <form id="force-change-pin-form" onSubmit={handleSavePin} className="space-y-4">
+              <div>
+                <label htmlFor="force-new-pin" className="block text-xs font-bold text-slate-700 mb-1.5">
+                  PIN Baru 6-Digit <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="force-new-pin"
+                  type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="new-password"
+                  maxLength={6}
+                  placeholder="Masukkan 6 angka PIN baru"
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="w-full min-h-12 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-mono tracking-widest text-center text-base sm:text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
 
-            <button
-              type="button"
-              onClick={logout}
-              className="w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              Batal & Logout
-            </button>
+              <div>
+                <label htmlFor="force-confirm-pin" className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Konfirmasi PIN Baru <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="force-confirm-pin"
+                  type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="new-password"
+                  maxLength={6}
+                  placeholder="Ulangi 6 angka PIN baru"
+                  value={confirmPin}
+                  onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="w-full min-h-12 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-mono tracking-widest text-center text-base sm:text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              {errorMsg && (
+                <div role="alert" className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+                  {errorMsg}
+                </div>
+              )}
+            </form>
           </div>
-        </form>
+        </main>
+
+        {/* 3. STICKY ACTION BAR (THUMB ZONE - Selalu terlihat di atas keyboard HP) */}
+        <footer className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-slate-100 p-4 sm:px-6 pb-[max(16px,env(safe-area-inset-bottom))] shrink-0 z-20 space-y-2">
+          <Button
+            type="submit"
+            form="force-change-pin-form"
+            variant="primary"
+            className="w-full py-3 text-sm font-bold shadow-lg shadow-emerald-500/20"
+            isLoading={isSubmitting}
+            disabled={isSubmitting || newPin.length !== 6 || confirmPin.length !== 6}
+          >
+            {isSubmitting ? 'Menyimpan PIN Baru...' : 'Simpan PIN Baru & Lanjutkan'}
+          </Button>
+
+          <button
+            type="button"
+            onClick={logout}
+            disabled={isSubmitting}
+            className="w-full min-h-11 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+          >
+            Batal &amp; Logout
+          </button>
+        </footer>
       </div>
     </div>
   );

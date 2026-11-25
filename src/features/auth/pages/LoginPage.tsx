@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { Button } from '../../../components/ui/Button';
@@ -21,19 +21,44 @@ export const LoginPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+  const isSubmittingRef = useRef(false);
+  const isMountedRef = useRef(true);
 
   const { loginSuccess } = useAuthStore();
   const appName = useSettingsStore((s) => s.settings.app_name) || 'SMART ABSENSI GURU';
   const institutionName = useSettingsStore((s) => s.settings.institution_name) || 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam';
 
   useEffect(() => {
+    isMountedRef.current = true;
     useSettingsStore.getState().loadSettings().catch(() => {});
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
+
   const deviceUUID = getOrCreateDeviceUUID();
   const deviceModel = getDeviceModelString();
 
+  const handleTurnstileVerify = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
+
+  const handleTurnstileExpire = useCallback(() => {
+    setTurnstileToken(null);
+  }, []);
+
+  const handleTurnstileError = useCallback(() => {
+    setTurnstileToken(null);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Synchronous double-submit & race condition guard (e.g. rapid Enter presses)
+    if (isSubmittingRef.current || isLoading) {
+      return;
+    }
+
     setIdentityError('');
     setPinError('');
     setErrorMessage(null);
@@ -50,27 +75,30 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
+    if (!turnstileToken) {
+      setErrorMessage('Selesaikan verifikasi keamanan Cloudflare Turnstile terlebih dahulu.');
+      return;
+    }
+
+    isSubmittingRef.current = true;
     setIsLoading(true);
     const maskedIdentity = identity.length > 4 ? `${identity.substring(0, 4)}***` : identity;
     logger.info('LoginPage', `Attempting login for identity: ${maskedIdentity}`);
-    if (turnstileToken) {
-      logger.info('LoginPage', 'Turnstile token present for bot verification.');
-    }
 
     try {
       const res = await AuthRepository.login({
-        identity,
-        pin,
+        identity: identity.trim(),
+        pin: pin.trim(),
         device_uuid: deviceUUID,
         device_model: deviceModel,
-        turnstile_token: turnstileToken || undefined,
+        turnstile_token: turnstileToken,
       });
 
       logger.info('LoginPage', `Login successful for user: ${res.user.full_name} (${res.user.role})`);
       notifySuccess('Login Berhasil!', `Selamat datang kembali, ${res.user.full_name}`);
       loginSuccess(res.token, res.user);
 
-      // Dispatch Telegram web login notification
+      // Dispatch Telegram web login notification (non-blocking)
       TelegramService.sendWebLoginNotification({
         teacherName: res.user.full_name,
         nip: res.user.nip || undefined,
@@ -78,92 +106,106 @@ export const LoginPage: React.FC = () => {
         device: deviceModel || (typeof navigator !== 'undefined' ? navigator.userAgent : 'Web Browser'),
         timeStr: getCurrentTimeInJakarta(),
         dateStr: getTodayDateInJakarta(),
-      }).catch((e) => console.warn('Telegram login notification error:', e));
+      }).catch((err) => console.warn('Telegram login notification error:', err));
     } catch (err: unknown) {
-      setIsLoading(false);
-      // Single-use token lifecycle: reset widget on failure before retry
+      // Single-use Turnstile token lifecycle: always reset widget and clear token after failed/network-error login
       turnstileRef.current?.reset();
-      setTurnstileToken(null);
-      const cleanMsg = handleAppError(err, 'LoginPage', 'Kendala Login', false);
-      setErrorMessage(cleanMsg);
+      if (isMountedRef.current) {
+        setTurnstileToken(null);
+        const cleanMsg = handleAppError(err, 'LoginPage', 'Kendala Login', false);
+        setErrorMessage(cleanMsg);
+      }
+    } finally {
+      isSubmittingRef.current = false;
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center p-4">
-      <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
-        {/* Branding Hierarchy */}
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 bg-white p-1 rounded-2xl mx-auto flex items-center justify-center shadow-lg border border-slate-200 ring-4 ring-emerald-50">
-            <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-xl" />
+    <div className="min-h-dvh w-full bg-white sm:bg-slate-100 flex flex-col justify-start sm:justify-center items-center p-0 sm:p-4 overflow-y-auto">
+      <div className="w-full min-h-dvh sm:min-h-0 sm:max-w-md bg-white px-4 py-6 sm:p-8 sm:rounded-3xl sm:border sm:border-slate-200 sm:shadow-xl flex flex-col justify-between sm:justify-start gap-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+        <div className="w-full max-w-md mx-auto space-y-6">
+          {/* Branding Hierarchy */}
+          <div className="text-center space-y-2 pt-2 sm:pt-0">
+            <div className="w-16 h-16 bg-white p-1 rounded-2xl mx-auto flex items-center justify-center shadow-lg border border-slate-200 ring-4 ring-emerald-50">
+              <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-xl" />
+            </div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">{appName}</h1>
+            <p className="text-xs font-semibold text-slate-600">
+              {institutionName}
+            </p>
+            <div>
+              <span className="inline-block px-2.5 py-0.5 bg-slate-100 text-slate-500 font-mono text-[10px] rounded-full border border-slate-200">
+                v1.0 Release Candidate
+              </span>
+            </div>
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">{appName}</h1>
-          <p className="text-xs font-semibold text-slate-600">
-            {institutionName}
-          </p>
-          <div>
-            <span className="inline-block px-2.5 py-0.5 bg-slate-100 text-slate-500 font-mono text-[10px] rounded-full border border-slate-200">
-              v1.0 Release Candidate
-            </span>
-          </div>
+
+          {errorMessage && (
+            <div role="alert" className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold space-y-1">
+              <div className="flex items-center gap-1.5 font-bold">
+                <span>⚠️</span> Kendala Login
+              </div>
+              <p>{errorMessage}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              label="Nomor WhatsApp / NPP"
+              type="tel"
+              inputMode="tel"
+              autoComplete="username"
+              placeholder="Masukkan Nomor WA / NPP"
+              value={identity}
+              onChange={(e) => setIdentity(e.target.value)}
+              error={identityError}
+              disabled={isLoading}
+              required
+            />
+
+            <Input
+              label="PIN 6-Digit"
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="current-password"
+              placeholder="••••••"
+              maxLength={6}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              error={pinError}
+              disabled={isLoading}
+              required
+            />
+
+            <TurnstileWidget
+              ref={turnstileRef}
+              action="login"
+              onVerify={handleTurnstileVerify}
+              onExpire={handleTurnstileExpire}
+              onError={handleTurnstileError}
+            />
+
+            <div className="pt-2">
+              <Button
+                type="submit"
+                variant="primary"
+                className="w-full"
+                isLoading={isLoading}
+                disabled={isLoading || !turnstileToken}
+              >
+                MASUK KE APLIKASI
+              </Button>
+            </div>
+          </form>
         </div>
 
-        {errorMessage && (
-          <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold space-y-1">
-            <div className="flex items-center gap-1.5 font-bold">
-              <span>⚠️</span> Kendala Login
-            </div>
-            <p>{errorMessage}</p>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Nomor WhatsApp / NPP"
-            type="tel"
-            inputMode="tel"
-            pattern="[0-9]*"
-            autoComplete="tel"
-            placeholder="Masukkan Nomor WA (Contoh: 081234567890)"
-            value={identity}
-            onChange={(e) => setIdentity(e.target.value)}
-            error={identityError}
-            required
-          />
-
-          <Input
-            label="PIN 6-Digit"
-            type="password"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            autoComplete="current-password"
-            placeholder="••••••"
-            maxLength={6}
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            error={pinError}
-            required
-          />
-
-          <TurnstileWidget
-            ref={turnstileRef}
-            siteKey="0x4AAAAAAEIxMhyntpJB_Iqo"
-            action="login"
-            onVerify={(token) => setTurnstileToken(token)}
-            onExpire={() => setTurnstileToken(null)}
-            onError={() => setTurnstileToken(null)}
-          />
-
-          <div className="pt-2">
-            <Button type="submit" variant="primary" className="w-full" isLoading={isLoading}>
-              MASUK KE APLIKASI
-            </Button>
-          </div>
-        </form>
-
-        <div className="text-center pt-2 border-t border-slate-100">
+        <div className="w-full max-w-md mx-auto text-center pt-3 border-t border-slate-100">
           <p className="text-xs text-slate-500">
-            Lupa PIN atau mengganti HP? <span className="font-bold text-emerald-600 cursor-pointer">Silakan hubungi Admin Website.</span>
+            Lupa PIN atau mengganti HP? <span className="font-bold text-emerald-600">Silakan hubungi Admin Website.</span>
           </p>
         </div>
       </div>

@@ -44,7 +44,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
           id={inputId}
           aria-invalid={error ? true : undefined}
           aria-describedby={errorId}
-          className={`w-full bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 transition-all ${
+          className={`w-full min-h-11 bg-white rounded-xl px-3.5 py-2.5 text-base sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 transition-all ${
             leftIcon ? 'pl-10' : ''
           } ${rightIcon ? 'pr-10' : ''} ${
             error

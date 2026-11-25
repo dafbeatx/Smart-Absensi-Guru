@@ -67,6 +67,7 @@ function createMockReqRes(options: {
     end: () => res,
     getStatusCode: () => statusCode,
     getData: () => responseData,
+    getHeaders: () => headersSet,
   };
 
   return { req, res };
@@ -212,13 +213,38 @@ class MockAuthDatabase {
               eq: (col: string, val: any) => {
                 const updateChain: any = {
                   is: (isCol: string, isVal: any) => {
-                    if (table === 'user_sessions' && col === 'token_hash') {
-                      const session = db.sessions[val];
-                      if (session && (isVal === null ? session[isCol] === null : session[isCol] === isVal)) {
-                        Object.assign(session, updates);
+                    const applyRevoke = (excludeId?: string) => {
+                      if (table === 'user_sessions' && col === 'token_hash') {
+                        const session = db.sessions[val];
+                        if (session && (isVal === null ? session[isCol] === null : session[isCol] === isVal)) {
+                          Object.assign(session, updates);
+                        }
+                      } else if (table === 'user_sessions' && col === 'user_id') {
+                        for (const session of Object.values(db.sessions)) {
+                          if (
+                            session.user_id === val &&
+                            (!excludeId || session.id !== excludeId) &&
+                            (isVal === null ? session[isCol] === null : session[isCol] === isVal)
+                          ) {
+                            Object.assign(session, updates);
+                          }
+                        }
                       }
-                    }
-                    return Promise.resolve({ error: null });
+                    };
+
+                    const isPromise = Promise.resolve({ error: null });
+                    const chainWithNeq: any = {
+                      neq: (neqCol: string, neqVal: any) => {
+                        if (neqCol === 'id') applyRevoke(neqVal);
+                        return Promise.resolve({ error: null });
+                      },
+                      then: (resolve: any, reject?: any) => {
+                        applyRevoke();
+                        return isPromise.then(resolve, reject);
+                      },
+                      catch: (reject: any) => isPromise.catch(reject),
+                    };
+                    return chainWithNeq;
                   },
                   then: (resolve: any) => {
                     if (table === 'users' && col === 'id') {
@@ -676,6 +702,156 @@ export async function runAuthHardeningSessionTestSuite(): Promise<TestSuiteResul
       'Auth Hardening 20: Supabase Service Role Key is absent from VITE_ client variables and bundle environment',
       !isServiceRoleExposedInVite,
       `VITE_ keys scanned: ${viteEnvKeys.length}, Service role exposed: ${isServiceRoleExposedInVite}`
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 21. HttpOnly Session Cookie & No-Cache Headers Issued on Login / Cleared on Logout
+    // ─────────────────────────────────────────────────────────────────────────
+    const loginHeaders18 = res18.getHeaders();
+    const setCookieHeader18 = String(loginHeaders18['set-cookie'] || '');
+    const { req: logoutReq21, res: logoutRes21 } = createMockReqRes({
+      method: 'POST',
+      headers: {
+        cookie: `saga_session=${encodeURIComponent(issuedToken18)}`,
+      },
+    });
+    await logoutHandler(logoutReq21, logoutRes21);
+    const logoutCookie21 = String(logoutRes21.getHeaders()['set-cookie'] || '');
+    const authAfterCookieLogout: any = await authenticateUser({
+      headers: { cookie: `saga_session=${encodeURIComponent(issuedToken18)}` },
+    });
+
+    assert(
+      'Auth Hardening 21: Login issues HttpOnly cookie + no-store headers; logout via Cookie revokes DB session and clears cookie',
+      setCookieHeader18.includes('saga_session=') &&
+        setCookieHeader18.includes('HttpOnly') &&
+        String(loginHeaders18['cache-control'] || '').includes('no-store') &&
+        logoutCookie21.includes('Max-Age=0') &&
+        authAfterCookieLogout.ok === false &&
+        authAfterCookieLogout.errorCode === 'AUTH_SESSION_REVOKED',
+      `Set-Cookie: ${Boolean(setCookieHeader18)}, Logout cleared: ${logoutCookie21.includes('Max-Age=0')}, Post-logout code: ${authAfterCookieLogout.errorCode}`
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 22. Anti-Enumeration & PostgREST Filter Injection Prevention
+    // ─────────────────────────────────────────────────────────────────────────
+    const { req: reqNotFound, res: resNotFound } = createMockReqRes({
+      method: 'POST',
+      body: { identity: '089999999999', pin: '123456' },
+    });
+    await loginHandler(reqNotFound, resNotFound);
+
+    const { req: reqInjection, res: resInjection } = createMockReqRes({
+      method: 'POST',
+      body: { identity: '081234567890,role.eq.ADMIN', pin: '123456' },
+    });
+    await loginHandler(reqInjection, resInjection);
+
+    assert(
+      'Auth Hardening 22: Unknown user matches wrong-PIN generic error (no enumeration) & PostgREST filter injection rejected',
+      resNotFound.getStatusCode() === 401 &&
+        resNotFound.getData()?.errorCode === 'AUTH_INVALID_CREDENTIALS' &&
+        resInjection.getStatusCode() === 400 &&
+        resInjection.getData()?.errorCode === 'VALIDATION_ERROR',
+      `NotFound code: ${resNotFound.getData()?.errorCode}, Injection status: ${resInjection.getStatusCode()}`
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 23. Turnstile Production Security: Zero Fallback/Timeout Bypass & Fail-Closed
+    // ─────────────────────────────────────────────────────────────────────────
+    const origSecret = process.env.TURNSTILE_SECRET_KEY;
+    const origVercelEnv = process.env.VERCEL_ENV;
+    process.env.TURNSTILE_SECRET_KEY = 'test-secret-key';
+
+    const { req: reqTimeoutBypass, res: resTimeoutBypass } = createMockReqRes({
+      method: 'POST',
+      headers: { origin: 'https://smart-absensi-guru-eight.vercel.app' },
+      body: {
+        identity: '081234567890',
+        pin: '123456',
+        turnstile_token: 'cf-timeout-fallback-token',
+      },
+    });
+    await loginHandler(reqTimeoutBypass, resTimeoutBypass);
+
+    const { req: reqWebNativeSpoof, res: resWebNativeSpoof } = createMockReqRes({
+      method: 'POST',
+      headers: {
+        origin: 'https://smart-absensi-guru-eight.vercel.app',
+        'x-saga-platform': 'android-capacitor',
+      },
+      body: {
+        identity: '081234567890',
+        pin: '123456',
+        device_uuid: 'device-uuid-spoof-12345',
+        turnstile_token: 'native-android-verified-token',
+      },
+    });
+    await loginHandler(reqWebNativeSpoof, resWebNativeSpoof);
+
+    delete process.env.TURNSTILE_SECRET_KEY;
+    process.env.VERCEL_ENV = 'production';
+    const { req: reqProdNoSecret, res: resProdNoSecret } = createMockReqRes({
+      method: 'POST',
+      body: { identity: '081234567890', pin: '123456' },
+    });
+    await loginHandler(reqProdNoSecret, resProdNoSecret);
+
+    if (origSecret !== undefined) process.env.TURNSTILE_SECRET_KEY = origSecret;
+    else delete process.env.TURNSTILE_SECRET_KEY;
+    if (origVercelEnv !== undefined) process.env.VERCEL_ENV = origVercelEnv;
+    else delete process.env.VERCEL_ENV;
+
+    assert(
+      'Auth Hardening 23: Server Turnstile rejects cf-timeout bypass, blocks native spoofing from web Origin, and fails closed in production',
+      resTimeoutBypass.getStatusCode() === 403 &&
+        resTimeoutBypass.getData()?.errorCode === 'BOT_VERIFICATION_FAILED' &&
+        resWebNativeSpoof.getStatusCode() === 403 &&
+        resProdNoSecret.getStatusCode() === 503,
+      `Timeout: ${resTimeoutBypass.getStatusCode()}, WebSpoof: ${resWebNativeSpoof.getStatusCode()}, ProdNoSecret: ${resProdNoSecret.getStatusCode()}`
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 24. Server-Side must_change_pin & Change-PIN Session Rotation
+    // ─────────────────────────────────────────────────────────────────────────
+    const { req: reqFreshLogin, res: resFreshLogin } = createMockReqRes({
+      method: 'POST',
+      body: { identity: '081234567890', pin: '123456' },
+    });
+    await loginHandler(reqFreshLogin, resFreshLogin);
+    const freshData = resFreshLogin.getData();
+
+    const { req: reqChangePinWeak, res: resChangePinWeak } = createMockReqRes({
+      method: 'POST',
+      headers: { authorization: `Bearer ${freshData?.token}` },
+      body: { new_pin: '123456' },
+    });
+    (reqChangePinWeak as any).query = { action: 'change-pin' };
+    await loginHandler(reqChangePinWeak, resChangePinWeak);
+
+    const { req: reqChangePinValid, res: resChangePinValid } = createMockReqRes({
+      method: 'POST',
+      headers: { authorization: `Bearer ${freshData?.token}` },
+      body: { new_pin: '654321' },
+    });
+    (reqChangePinValid as any).query = { action: 'change-pin' };
+    await loginHandler(reqChangePinValid, resChangePinValid);
+
+    const { req: reqSessionCheck, res: resSessionCheck } = createMockReqRes({
+      method: 'GET',
+      headers: { authorization: `Bearer ${freshData?.token}` },
+    });
+    (reqSessionCheck as any).query = { action: 'session' };
+    await loginHandler(reqSessionCheck, resSessionCheck);
+
+    assert(
+      'Auth Hardening 24: Server enforces must_change_pin for default PIN 123456, rejects 123456 on change-pin, and clears flag in DB on valid change',
+      freshData?.user?.must_change_pin === true &&
+        resChangePinWeak.getStatusCode() === 400 &&
+        resChangePinValid.getStatusCode() === 200 &&
+        resSessionCheck.getStatusCode() === 200 &&
+        resSessionCheck.getData()?.user?.must_change_pin === false,
+      `Login mustChange: ${freshData?.user?.must_change_pin}, Weak: ${resChangePinWeak.getStatusCode()}, Session mustChange after update: ${resSessionCheck.getData()?.user?.must_change_pin}`
     );
   } finally {
     resetServerSupabaseClient();

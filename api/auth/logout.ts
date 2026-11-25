@@ -1,13 +1,17 @@
 // api/auth/logout.ts
 // Serverless Logout Engine for Smart Absensi Guru (SAGA)
-// Revokes stateful session token in database immediately upon logout
+// Revokes stateful session token in database immediately upon logout and clears HttpOnly cookie
 
-import { serverSupabase, hashSessionToken } from '../_shared/session-auth.js';
+import {
+  serverSupabase,
+  hashSessionToken,
+  applyAuthCorsHeaders,
+  extractSessionToken,
+  buildClearSessionCookie,
+} from '../_shared/session-auth.js';
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  applyAuthCorsHeaders(req, res, 'POST, OPTIONS');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -21,26 +25,46 @@ export default async function handler(req: any, res: any) {
     });
   }
 
-  const authHeader = req.headers?.authorization || req.headers?.['x-session-token'];
-  if (!authHeader || typeof authHeader !== 'string') {
+  // Selalu bersihkan cookie sesi klien secara eksplisit
+  res.setHeader('Set-Cookie', buildClearSessionCookie(req));
+
+  const rawToken = extractSessionToken(req);
+  if (!rawToken || !rawToken.startsWith('saga_sess_')) {
     return res.status(200).json({
       success: true,
       message: 'Sesi telah berakhir atau tidak ditemukan.',
     });
   }
 
-  const rawToken = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (!rawToken || !rawToken.startsWith('saga_sess_')) {
-    return res.status(200).json({
-      success: true,
-      message: 'Sesi telah berakhir.',
-    });
-  }
-
   const tokenHash = hashSessionToken(rawToken);
+  const revokeAll = Boolean(req.body?.all_sessions);
 
   try {
-    // Tandai sesi sebagai dicabut (revoked)
+    if (revokeAll) {
+      const { data: sessionRow } = await serverSupabase
+        .from('user_sessions')
+        .select('user_id')
+        .eq('token_hash', tokenHash)
+        .maybeSingle();
+
+      if (sessionRow?.user_id) {
+        await serverSupabase
+          .from('user_sessions')
+          .update({
+            revoked_at: new Date().toISOString(),
+            revocation_reason: 'USER_LOGOUT_ALL',
+          })
+          .eq('user_id', sessionRow.user_id)
+          .is('revoked_at', null);
+
+        return res.status(200).json({
+          success: true,
+          message: 'Seluruh sesi perangkat berhasil diakhiri.',
+        });
+      }
+    }
+
+    // Tandai sesi aktif sebagai dicabut (revoked) di database
     await serverSupabase
       .from('user_sessions')
       .update({

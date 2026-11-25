@@ -108,6 +108,7 @@ import type { MeetingMinute } from '../types/meeting-minutes.types';
 import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters, getEffectiveAllowedRadius, sanitizeCoordinate, sanitizeSchoolCoordinates } from '../utils/geofence.utils';
 import { logger } from '../utils/logger.utils';
+import { detectNativeContainer } from '../utils/device.utils';
 import { convertToWebP } from '../utils/image.utils';
 import {
   normalizeDayOfWeek,
@@ -178,15 +179,17 @@ export class SupabaseProvider implements IDataProvider {
   // Schema migration resilience: auto-detect if teaching_assignment column exists in Supabase
   // Prevents 400 errors when the SQL migration (52) hasn't been run yet
   private _hasTeachingAssignmentCol: boolean | null = null;
+  private _hasMustChangePinCol: boolean | null = null;
 
   private get userSelectCols(): string {
-    const base = 'id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at';
-    return this._hasTeachingAssignmentCol === false ? base : `${base}, teaching_assignment`;
+    let cols = 'id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at';
+    if (this._hasTeachingAssignmentCol !== false) cols += ', teaching_assignment';
+    if (this._hasMustChangePinCol !== false) cols += ', must_change_pin';
+    return cols;
   }
 
   private get userSelectColsNoAvatar(): string {
-    const base = 'id, nip, full_name, phone_number, role, position, account_status, avatar_url, created_at';
-    return this._hasTeachingAssignmentCol === false ? base : `${base}, teaching_assignment`;
+    return this.userSelectCols;
   }
 
   private isTeachingAssignmentSchemaError(error: any): boolean {
@@ -198,6 +201,39 @@ export class SupabaseProvider implements IDataProvider {
   // Dual-layer persistence mirror for teaching assignment:
   // Guarantees zero data loss if the Supabase migration hasn't been run yet or schema cache is pending
   private static LOCAL_TEACHING_ASSIGNMENTS_KEY = 'smart_absensi_teacher_assignments';
+
+  private isMustChangePinSchemaError(error: any): boolean {
+    if (!error) return false;
+    const msg = error.message || '';
+    return msg.includes('must_change_pin') && (msg.includes('schema cache') || msg.includes('does not exist') || msg.includes('column'));
+  }
+
+  public clearAllCaches(): void {
+    this.cachedSettings = null;
+    this.cachedSettingsTimestamp = 0;
+    this.cachedHolidays = null;
+    this.cachedHolidaysTimestamp = 0;
+    this.cachedUsers = null;
+    this.cachedUsersTimestamp = 0;
+    this.cachedAllLeaves = null;
+    this.cachedAllLeavesTimestamp = 0;
+    this.cachedDutySchedules = null;
+    this.cachedDutySchedulesTimestamp = 0;
+    this.cachedInventorySarpras = null;
+    this.cachedInventorySarprasTimestamp = 0;
+    this.cachedTodayAttendance.clear();
+    this.cachedMonthlyAttendance.clear();
+    this.cachedTeacherPointHistory.clear();
+    this.cachedUserLeaves.clear();
+    this.cachedTodayTeacherMood.clear();
+    this.cachedDeviceBinding.clear();
+    this.cachedNotifications.clear();
+    this.cachedNotificationReads.clear();
+    this.cachedTeachingSchedules.clear();
+    this.cachedExamCommittees.clear();
+    this.cachedExamSchedules.clear();
+    this.inFlightRequests.clear();
+  }
 
   private getLocalTeachingAssignments(): Record<string, string> {
     if (typeof window === 'undefined' || !window.localStorage) return {};
@@ -253,6 +289,12 @@ export class SupabaseProvider implements IDataProvider {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZucHBmbWpzYnF4YnRpb3lwbmFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzcyNDksImV4cCI6MjEwNDk1MzI0OX0.ewXX-KW3SMEF-KtOZ5P1MY5IpZSJQImDt5g9maTOWfE';
 
     this.client = createClient(url, key);
+
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('smart_absensi_logout', () => {
+        this.clearAllCaches();
+      });
+    }
   }
 
   public getClient(): SupabaseClient {
@@ -262,14 +304,29 @@ export class SupabaseProvider implements IDataProvider {
   // ─── AUTHENTICATION API ───────────────────────────────────────────────────
 
   public async login(dto: LoginDTO): Promise<LoginResponseDTO> {
+    const cleanIdentity = String(dto.identity || '').trim();
+    const isDevMode = Boolean(typeof import.meta !== 'undefined' && import.meta.env?.DEV);
+
     // 1. Jalur Utama: Server-Side Stateful Session Engine (/api/auth/login)
     if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      const nativeInfo = detectNativeContainer();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (nativeInfo.platformHeader) {
+        headers['X-SAGA-Platform'] = nativeInfo.platformHeader;
+      }
+
+      let resp: Response | null = null;
+      let shouldFallbackToDirectDb = false;
+
       try {
-        const resp = await fetch('/api/auth/login', {
+        resp = await fetch('/api/auth/login', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          headers,
           body: JSON.stringify({
-            identity: dto.identity,
+            identity: cleanIdentity,
             pin: dto.pin,
             device_uuid: dto.device_uuid,
             device_model: dto.device_model,
@@ -277,7 +334,16 @@ export class SupabaseProvider implements IDataProvider {
             'cf-turnstile-response': dto.turnstile_token,
           }),
         });
+      } catch (networkErr: any) {
+        if (isDevMode) {
+          shouldFallbackToDirectDb = true;
+          logger.warn('SupabaseProvider', 'Dev serverless login API unreachable, falling back locally', networkErr);
+        } else {
+          throw new Error('Gagal terhubung ke server autentikasi. Periksa koneksi internet Anda lalu coba lagi.');
+        }
+      }
 
+      if (resp) {
         const json = await resp.json().catch(() => null);
 
         if (resp.ok && json?.success && json?.token) {
@@ -288,33 +354,35 @@ export class SupabaseProvider implements IDataProvider {
           };
         }
 
-        if (!resp.ok && json?.errorMessage) {
-          throw new Error(json.errorMessage);
+        // Hanya fallback di Vite dev lokal bila route /api/auth/login belum tersedia (404)
+        if (isDevMode && resp.status === 404) {
+          shouldFallbackToDirectDb = true;
+        } else {
+          throw new Error(
+            json?.errorMessage ||
+              'Gagal memverifikasi login pada server. Silakan periksa kembali data Anda.'
+          );
         }
-      } catch (err: any) {
-        // Jika penolakan kredensial / akun terkunci dari server, teruskan error ke UI
-        if (
-          err.message &&
-          (err.message.includes('PIN') ||
-            err.message.includes('terblokir') ||
-            err.message.includes('ditemukan') ||
-            err.message.includes('terkunci'))
-        ) {
-          throw err;
-        }
-        logger.warn('SupabaseProvider', 'Serverless login API offline/unreachable, fallback ke direct client provider', err);
+      }
+
+      if (!shouldFallbackToDirectDb) {
+        throw new Error('Gagal terhubung ke server autentikasi.');
       }
     }
 
-    // 2. Jalur Fallback (untuk testing offline/unit test runner tanpa backend server)
+    // 2. Jalur Fallback (hanya untuk Node CLI test runner / Vite local dev tanpa Vercel Functions)
+    if (!/^[a-zA-Z0-9_@+\-\s.]{1,64}$/.test(cleanIdentity)) {
+      throw new Error('No HP / NPP atau PIN 6-digit yang Anda masukkan tidak valid.');
+    }
+
     const { data: user, error } = await this.client
       .from('users')
       .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, pin_hash, created_at')
-      .or(`phone_number.eq.${dto.identity},nip.eq.${dto.identity}`)
+      .or(`phone_number.eq.${cleanIdentity},nip.eq.${cleanIdentity}`)
       .single();
 
     if (error || !user) {
-      throw new Error('Akun pengguna tidak ditemukan. Periksa No HP / NPP Anda.');
+      throw new Error('No HP / NPP atau PIN 6-digit yang Anda masukkan tidak valid.');
     }
 
     if (user.account_status === 'LOCKED' || user.account_status === 'INACTIVE') {
@@ -325,7 +393,7 @@ export class SupabaseProvider implements IDataProvider {
     const isPinMatch = user.pin_hash === hashedInputPin || user.pin_hash === dto.pin;
 
     if (!user.pin_hash || !isPinMatch) {
-      throw new Error('PIN 6-digit yang Anda masukkan salah.');
+      throw new Error('No HP / NPP atau PIN 6-digit yang Anda masukkan tidak valid.');
     }
 
     const userProfile: UserProfile = {
@@ -337,6 +405,7 @@ export class SupabaseProvider implements IDataProvider {
       position: user.position,
       avatar_url: user.avatar_url || null,
       is_active: user.account_status === 'ACTIVE',
+      must_change_pin: dto.pin === '123456',
       created_at: user.created_at,
     };
 
@@ -350,23 +419,68 @@ export class SupabaseProvider implements IDataProvider {
 
   public async verifySession(token: string): Promise<UserProfile> {
     const activeUser = useAuthStore.getState().user;
-    const parts = token.split('_');
-    const userIdFromToken = parts.length >= 3 ? parts[2] : null;
+    const isDevMode = Boolean(typeof import.meta !== 'undefined' && import.meta.env?.DEV);
+
+    // 1. Authoritative Server-Side Session Verification (checks user_sessions.revoked_at, expires_at, must_change_pin)
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      try {
+        const resp = await fetch('/api/auth/session', {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+
+        const json = await resp.json().catch(() => null);
+
+        if (resp.ok && json?.success && json?.user) {
+          const srvUser = json.user as UserProfile;
+          const localAssignments = this.getLocalTeachingAssignments();
+          const localSubj = localAssignments[srvUser.id] || (srvUser.nip ? localAssignments[srvUser.nip] : undefined);
+          return {
+            ...srvUser,
+            teaching_assignment: srvUser.teaching_assignment || localSubj || undefined,
+          };
+        }
+
+        if (resp.status === 401 || resp.status === 403) {
+          const sessionErr = new Error(json?.errorMessage || 'Sesi login telah berakhir atau dicabut.') as Error & {
+            code?: string;
+            status?: number;
+          };
+          sessionErr.code = json?.errorCode || 'AUTH_SESSION_INVALID';
+          sessionErr.status = resp.status;
+          throw sessionErr;
+        }
+
+        if (!(isDevMode && resp.status === 404)) {
+          logger.warn('SupabaseProvider', 'Server session check returned unexpected status:', resp.status);
+        }
+      } catch (err: any) {
+        if (err?.code?.startsWith?.('AUTH_') || err?.status === 401 || err?.status === 403) {
+          throw err;
+        }
+        // Offline / network failure: gracefully fall through to read-only public view or cached active user
+      }
+    }
+
+    // 2. Fallback read-only check via users_public_view (safe columns; never selects pin_hash)
+    const parts = token ? token.split('_') : [];
+    const userIdFromToken = parts.length >= 3 && !token.startsWith('saga_sess_') ? parts[2] : null;
     const searchId = activeUser?.id || userIdFromToken;
+    const safeMatch = (val?: string | null) => Boolean(val && /^[a-zA-Z0-9_@+\-\s.]{1,64}$/.test(val));
 
     if (searchId) {
       const filters: string[] = [];
-      // Support both UUIDs and custom string IDs (e.g., usr_guru_007)
-      filters.push(`id.eq.${searchId}`);
-      if (activeUser?.nip && activeUser.nip !== searchId) {
-        filters.push(`nip.eq.${activeUser.nip}`);
+      if (safeMatch(searchId)) filters.push(`id.eq.${searchId}`);
+      if (safeMatch(activeUser?.nip) && activeUser?.nip !== searchId) {
+        filters.push(`nip.eq.${activeUser?.nip}`);
       }
-      if (activeUser?.phone_number) {
-        filters.push(`phone_number.eq.${activeUser.phone_number}`);
+      if (safeMatch(activeUser?.phone_number)) {
+        filters.push(`phone_number.eq.${activeUser?.phone_number}`);
       }
 
       if (filters.length > 0) {
-        // Query via users_public_view with safe columns (excludes pin_hash, reducing Supabase egress)
         let userQuery = await this.client
           .from('users_public_view')
           .select(this.userSelectCols)
@@ -381,7 +495,6 @@ export class SupabaseProvider implements IDataProvider {
             .maybeSingle();
         }
 
-        // Fallback: if teaching_assignment column doesn't exist yet, retry without it
         if (userQuery.error && this.isTeachingAssignmentSchemaError(userQuery.error)) {
           this._hasTeachingAssignmentCol = false;
           userQuery = await this.client
@@ -389,28 +502,39 @@ export class SupabaseProvider implements IDataProvider {
             .select(this.userSelectCols)
             .or(filters.join(','))
             .maybeSingle();
-          if (userQuery.error && (userQuery.error.code === '42P01' || userQuery.error.message?.includes('does not exist'))) {
-            userQuery = await this.client
-              .from('users')
-              .select(this.userSelectCols)
-              .or(filters.join(','))
-              .maybeSingle();
-          }
         }
 
-        // Mark column as available if query succeeded with it
-        if (!userQuery.error && this._hasTeachingAssignmentCol === null) {
-          this._hasTeachingAssignmentCol = true;
+        if (userQuery.error && this.isMustChangePinSchemaError(userQuery.error)) {
+          this._hasMustChangePinCol = false;
+          userQuery = await this.client
+            .from('users_public_view')
+            .select(this.userSelectCols)
+            .or(filters.join(','))
+            .maybeSingle();
+        }
+
+        if (!userQuery.error) {
+          if (this._hasTeachingAssignmentCol === null) this._hasTeachingAssignmentCol = true;
+          if (this._hasMustChangePinCol === null) this._hasMustChangePinCol = true;
         }
 
         const user = userQuery.data as any;
 
         if (user) {
+          if (user.account_status && user.account_status !== 'ACTIVE') {
+            const inactiveErr = new Error('Akun Anda sedang terblokir atau tidak aktif.') as Error & {
+              code?: string;
+              status?: number;
+            };
+            inactiveErr.code = 'AUTH_USER_INACTIVE';
+            inactiveErr.status = 401;
+            throw inactiveErr;
+          }
+
           const localAssignments = this.getLocalTeachingAssignments();
           const localSubj = localAssignments[user.id] || (user.nip ? localAssignments[user.nip] : undefined);
           let teachingAssignment = user.teaching_assignment || localSubj || undefined;
 
-          // Auto-infer from position if teaching_assignment is unset
           if (!teachingAssignment && user.position) {
             const posMatch = user.position.match(/guru\s+(?:mapel\s+|mata\s+pelajaran\s+|bidang\s+studi\s+)?(.+)/i);
             if (posMatch && posMatch[1]) {
@@ -421,7 +545,6 @@ export class SupabaseProvider implements IDataProvider {
             }
           }
 
-          // Canonical fallback for known permanent faculty members
           if (!teachingAssignment && user.full_name) {
             const lower = user.full_name.toLowerCase();
             if (lower.includes('widianingsih') || lower.includes('widia')) {
@@ -440,6 +563,7 @@ export class SupabaseProvider implements IDataProvider {
             position: user.position,
             avatar_url: user.avatar_url || null,
             is_active: user.account_status === 'ACTIVE',
+            must_change_pin: user.must_change_pin !== undefined ? Boolean(user.must_change_pin) : activeUser?.must_change_pin,
             teaching_assignment: teachingAssignment,
             created_at: user.created_at,
           };
@@ -472,23 +596,95 @@ export class SupabaseProvider implements IDataProvider {
     return true;
   }
 
-  public async changePin(userId: string, newPin: string, _token: string): Promise<boolean> {
+  public async changePin(userId: string, newPin: string, token: string): Promise<boolean> {
+    const isDevMode = Boolean(typeof import.meta !== 'undefined' && import.meta.env?.DEV);
+
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      let resp: Response | null = null;
+      try {
+        resp = await fetch('/api/auth/change-pin', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ new_pin: newPin }),
+        });
+      } catch {
+        if (!isDevMode) {
+          throw new Error('Gagal terhubung ke server untuk menyimpan PIN baru.');
+        }
+      }
+
+      if (resp) {
+        const json = await resp.json().catch(() => null);
+        if (resp.ok && json?.success) {
+          this.cachedUsers = null;
+          this.cachedUsersTimestamp = 0;
+          return true;
+        }
+        if (!(isDevMode && resp.status === 404)) {
+          throw new Error(json?.errorMessage || 'Gagal memperbarui PIN.');
+        }
+      }
+    }
+
     const hashedPin = await hashPin(newPin);
-    const { error } = await this.client
-      .from('users')
-      .update({ pin_hash: hashedPin })
-      .eq('id', userId);
+    const updatePayload: Record<string, unknown> = { pin_hash: hashedPin, must_change_pin: false };
+    let { error } = await this.client.from('users').update(updatePayload).eq('id', userId);
+    if (error && this.isMustChangePinSchemaError(error)) {
+      delete updatePayload.must_change_pin;
+      const retry = await this.client.from('users').update(updatePayload).eq('id', userId);
+      error = retry.error;
+    }
 
     if (error) throw new Error('Gagal mengubah PIN: ' + error.message);
     return true;
   }
 
-  public async resetPin(userId: string, newPin: string, _token: string): Promise<boolean> {
+  public async resetPin(userId: string, newPin: string, token: string): Promise<boolean> {
+    const isDevMode = Boolean(typeof import.meta !== 'undefined' && import.meta.env?.DEV);
+
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      let resp: Response | null = null;
+      try {
+        resp = await fetch('/api/auth/change-pin', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ target_user_id: userId, new_pin: newPin }),
+        });
+      } catch {
+        if (!isDevMode) {
+          throw new Error('Gagal terhubung ke server untuk mereset PIN.');
+        }
+      }
+
+      if (resp) {
+        const json = await resp.json().catch(() => null);
+        if (resp.ok && json?.success) {
+          this.cachedUsers = null;
+          this.cachedUsersTimestamp = 0;
+          return true;
+        }
+        if (!(isDevMode && resp.status === 404)) {
+          throw new Error(json?.errorMessage || 'Gagal mereset PIN pengguna.');
+        }
+      }
+    }
+
     const hashedPin = await hashPin(newPin);
-    const { error } = await this.client
-      .from('users')
-      .update({ pin_hash: hashedPin })
-      .eq('id', userId);
+    const updatePayload: Record<string, unknown> = { pin_hash: hashedPin, must_change_pin: true };
+    let { error } = await this.client.from('users').update(updatePayload).eq('id', userId);
+    if (error && this.isMustChangePinSchemaError(error)) {
+      delete updatePayload.must_change_pin;
+      const retry = await this.client.from('users').update(updatePayload).eq('id', userId);
+      error = retry.error;
+    }
 
     if (error) throw new Error('Gagal mereset PIN: ' + error.message);
     return true;
@@ -2222,13 +2418,22 @@ export class SupabaseProvider implements IDataProvider {
         .order('created_at', { ascending: false });
     }
 
-    // Fallback: if teaching_assignment column doesn't exist yet, retry without it
-    if (userQuery.error && this.isTeachingAssignmentSchemaError(userQuery.error)) {
-      this._hasTeachingAssignmentCol = false;
+    // Fallback: if optional columns don't exist yet, retry without them
+    if (userQuery.error && (this.isTeachingAssignmentSchemaError(userQuery.error) || this.isMustChangePinSchemaError(userQuery.error))) {
+      if (this.isTeachingAssignmentSchemaError(userQuery.error)) this._hasTeachingAssignmentCol = false;
+      if (this.isMustChangePinSchemaError(userQuery.error)) this._hasMustChangePinCol = false;
       userQuery = await this.client
         .from('users_public_view')
         .select(this.userSelectColsNoAvatar)
         .order('created_at', { ascending: false });
+      if (userQuery.error && (this.isTeachingAssignmentSchemaError(userQuery.error) || this.isMustChangePinSchemaError(userQuery.error))) {
+        if (this.isTeachingAssignmentSchemaError(userQuery.error)) this._hasTeachingAssignmentCol = false;
+        if (this.isMustChangePinSchemaError(userQuery.error)) this._hasMustChangePinCol = false;
+        userQuery = await this.client
+          .from('users_public_view')
+          .select(this.userSelectColsNoAvatar)
+          .order('created_at', { ascending: false });
+      }
       if (userQuery.error && (userQuery.error.code === '42P01' || userQuery.error.message?.includes('does not exist'))) {
         userQuery = await this.client
           .from('users')
@@ -2237,8 +2442,9 @@ export class SupabaseProvider implements IDataProvider {
       }
     }
 
-    if (!userQuery.error && this._hasTeachingAssignmentCol === null) {
-      this._hasTeachingAssignmentCol = true;
+    if (!userQuery.error) {
+      if (this._hasTeachingAssignmentCol === null) this._hasTeachingAssignmentCol = true;
+      if (this._hasMustChangePinCol === null) this._hasMustChangePinCol = true;
     }
 
     const data = userQuery.data as any[];
@@ -2311,17 +2517,26 @@ export class SupabaseProvider implements IDataProvider {
       account_status: 'ACTIVE',
     };
 
-    // Only include teaching_assignment if the column is known to exist
+    // Only include optional columns if known to exist
     if (this._hasTeachingAssignmentCol !== false) {
       newUser.teaching_assignment = formattedAssignment;
+    }
+    if (this._hasMustChangePinCol !== false) {
+      newUser.must_change_pin = defaultPin === '123456';
     }
 
     let insertResult = await this.client.from('users').insert(newUser);
 
-    // Fallback: if teaching_assignment column doesn't exist yet, retry without it
-    if (insertResult.error && this.isTeachingAssignmentSchemaError(insertResult.error)) {
-      this._hasTeachingAssignmentCol = false;
-      delete newUser.teaching_assignment;
+    // Fallback: if optional columns don't exist yet, retry without them
+    if (insertResult.error && (this.isTeachingAssignmentSchemaError(insertResult.error) || this.isMustChangePinSchemaError(insertResult.error))) {
+      if (this.isTeachingAssignmentSchemaError(insertResult.error)) {
+        this._hasTeachingAssignmentCol = false;
+        delete newUser.teaching_assignment;
+      }
+      if (this.isMustChangePinSchemaError(insertResult.error)) {
+        this._hasMustChangePinCol = false;
+        delete newUser.must_change_pin;
+      }
       insertResult = await this.client.from('users').insert(newUser);
     }
 

@@ -3,7 +3,7 @@
  * Handles offline caching strategies, background sync, and local push reminders
  */
 
-const CACHE_NAME = 'smart-absensi-cache-v2';
+const CACHE_NAME = 'smart-absensi-cache-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -40,22 +40,36 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event - Hybrid Network-First & Stale-While-Revalidate Caching Strategy
+// Fetch Event - Strict Network-Only for Auth & API; Stale-While-Revalidate for Static Shell
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests, Supabase REST API calls, and version.json from Cache
+  // 1. STRICT NETWORK-ONLY untuk seluruh endpoint autentikasi (/api/auth/*) & Cloudflare Turnstile
+  // Tidak pernah menyentuh Cache Storage atau menyajikan respons cache usang.
+  if (
+    url.pathname.startsWith('/api/auth/') ||
+    url.pathname.startsWith('/api/') ||
+    url.hostname.includes('challenges.cloudflare.com')
+  ) {
+    if (request.method === 'GET') {
+      event.respondWith(fetch(request, { cache: 'no-store' }));
+    }
+    return;
+  }
+
+  // 2. Skip non-GET requests, Supabase REST/Auth API calls, dan version.json from Cache
   if (
     request.method !== 'GET' ||
     url.pathname.includes('/rest/v1/') ||
+    url.pathname.includes('/auth/v1/') ||
     url.hostname.includes('supabase.co') ||
     url.pathname.includes('version.json')
   ) {
     return;
   }
 
-  // OpenStreetMap tile images - Cache First
+  // 3. OpenStreetMap tile images - Cache First
   if (url.hostname.includes('tile.openstreetmap.org')) {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
@@ -72,7 +86,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static Assets / Fonts / Images - Stale-While-Revalidate
+  // 4. Static Assets / Fonts / Images - Stale-While-Revalidate
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       const fetchPromise = fetch(request)
@@ -117,7 +131,7 @@ self.addEventListener('push', (event) => {
   if (event.data) {
     try {
       payload = { ...payload, ...event.data.json() };
-    } catch (e) {
+    } catch {
       payload.body = event.data.text();
     }
   }

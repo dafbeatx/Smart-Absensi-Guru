@@ -26,3 +26,50 @@ export const getDeviceModelString = (): string => {
   if (/Macintosh/i.test(ua)) return 'Mac OS';
   return 'Browser Web Perangkat';
 };
+
+export interface NativeContainerInfo {
+  isNative: boolean;
+  type: 'android' | 'windows' | 'none';
+  platformHeader: 'android-capacitor' | 'electron-desktop' | '';
+  label: string;
+}
+
+/**
+ * Detects whether the app is running inside Capacitor Android APK or Electron Desktop EXE.
+ * Shared across TurnstileWidget and SupabaseProvider to eliminate duplicated platform checks.
+ */
+export const detectNativeContainer = (): NativeContainerInfo => {
+  if (typeof window === 'undefined') {
+    return { isNative: false, type: 'none', platformHeader: '', label: '' };
+  }
+
+  const isFile = window.location.protocol === 'file:';
+  const isCapacitorScheme = window.location.protocol === 'capacitor:' || window.location.protocol === 'ionic:';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const isCapacitorNative = Boolean((window as any).Capacitor?.isNativePlatform?.());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const isElectron = isFile || /electron/i.test(navigator.userAgent) || Boolean((window as any).electronAPI?.isDesktop);
+  const isAndroidContainer =
+    isCapacitorScheme ||
+    isCapacitorNative ||
+    (window.location.hostname === 'localhost' && /android/i.test(navigator.userAgent));
+
+  if (isElectron) {
+    return {
+      isNative: true,
+      type: 'windows',
+      platformHeader: 'electron-desktop',
+      label: 'Windows Desktop',
+    };
+  }
+  if (isAndroidContainer) {
+    return {
+      isNative: true,
+      type: 'android',
+      platformHeader: 'android-capacitor',
+      label: 'Android Native',
+    };
+  }
+
+  return { isNative: false, type: 'none', platformHeader: '', label: '' };
+};
