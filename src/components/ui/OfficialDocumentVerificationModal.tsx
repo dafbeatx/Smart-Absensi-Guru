@@ -123,12 +123,12 @@ export const OfficialDocumentVerificationModal: React.FC<OfficialDocumentVerific
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm sm:p-4"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="doc-verify-modal-title"
     >
-      <div className="relative flex flex-col w-full h-[100dvh] sm:h-auto sm:max-h-[90dvh] sm:max-w-lg bg-slate-900 sm:rounded-2xl sm:border sm:border-slate-700/80 shadow-2xl overflow-hidden text-slate-100">
+      <div className="relative flex flex-col w-full h-dvh sm:h-auto sm:max-h-[90dvh] sm:max-w-lg bg-slate-900 sm:rounded-2xl sm:border sm:border-slate-700/80 shadow-2xl overflow-hidden text-slate-100">
         {/* Sticky Top Header */}
         <header
           className={`shrink-0 flex items-center justify-between px-4 py-3.5 border-b ${
@@ -174,7 +174,7 @@ export const OfficialDocumentVerificationModal: React.FC<OfficialDocumentVerific
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+            className="shrink-0 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 transition-colors min-w-11 min-h-11 flex items-center justify-center"
             aria-label="Tutup verifikasi dokumen"
           >
             <X className="w-5 h-5" />
@@ -286,7 +286,7 @@ export const OfficialDocumentVerificationModal: React.FC<OfficialDocumentVerific
             <Button
               type="button"
               variant="secondary"
-              className="min-h-[44px] flex-1 gap-2"
+              className="min-h-11 flex-1 gap-2"
               onClick={() => setRetryCounter((c) => c + 1)}
             >
               <RefreshCw className="w-4 h-4" />
@@ -296,7 +296,7 @@ export const OfficialDocumentVerificationModal: React.FC<OfficialDocumentVerific
           <Button
             type="button"
             variant="primary"
-            className="min-h-[44px] flex-1"
+            className="min-h-11 flex-1"
             onClick={onClose}
           >
             Tutup
