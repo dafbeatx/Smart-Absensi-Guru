@@ -47,11 +47,11 @@ export const useAuthStore = create<AuthState>()(
           const headers: Record<string, string> = {
             'Content-Type': 'application/json',
           };
-          if (currentToken && currentToken.startsWith('saga_sess_')) {
+          if (currentToken && (currentToken.startsWith('saga_sess_') || currentToken.startsWith('saga_tok_'))) {
             headers['Authorization'] = `Bearer ${currentToken}`;
           }
           // Fire-and-forget server revocation & HttpOnly cookie clearing across all platforms
-          if ((currentToken && currentToken.startsWith('saga_sess_')) || window.location.protocol.startsWith('http')) {
+          if ((currentToken && (currentToken.startsWith('saga_sess_') || currentToken.startsWith('saga_tok_'))) || window.location.protocol.startsWith('http')) {
             fetch('/api/auth/logout', {
               method: 'POST',
               credentials: 'include',

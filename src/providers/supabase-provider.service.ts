@@ -466,7 +466,8 @@ export class SupabaseProvider implements IDataProvider {
 
     // 2. Fallback read-only check via users_public_view (safe columns; never selects pin_hash)
     const parts = token ? token.split('_') : [];
-    const userIdFromToken = parts.length >= 3 && !token.startsWith('saga_sess_') ? parts[2] : null;
+    const userIdFromToken =
+      parts.length >= 3 && !token.startsWith('saga_sess_') && !token.startsWith('saga_tok_') ? parts[2] : null;
     const searchId = activeUser?.id || userIdFromToken;
     const safeMatch = (val?: string | null) => Boolean(val && /^[a-zA-Z0-9_@+\-\s.]{1,64}$/.test(val));
 

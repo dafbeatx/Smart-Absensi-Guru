@@ -853,6 +853,62 @@ export async function runAuthHardeningSessionTestSuite(): Promise<TestSuiteResul
         resSessionCheck.getData()?.user?.must_change_pin === false,
       `Login mustChange: ${freshData?.user?.must_change_pin}, Weak: ${resChangePinWeak.getStatusCode()}, Session mustChange after update: ${resSessionCheck.getData()?.user?.must_change_pin}`
     );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 25. PGRST205 Transition Resilience: HMAC-SHA256 Signed Token when user_sessions Missing
+    // ─────────────────────────────────────────────────────────────────────────
+    const origSvcKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-server-only-hmac-signing-key-2026';
+
+    const baseClient = mockDb.createClient();
+    const pgrst205Client = {
+      from: (table: string) => {
+        const q = baseClient.from(table);
+        if (table === 'user_sessions') {
+          return {
+            ...q,
+            insert: async () => ({
+              data: null,
+              error: {
+                code: 'PGRST205',
+                message: "Could not find the table 'public.user_sessions' in the schema cache",
+              },
+            }),
+          };
+        }
+        return q;
+      },
+    };
+    setServerSupabaseClient(pgrst205Client);
+
+    const { req: reqHmacLogin, res: resHmacLogin } = createMockReqRes({
+      method: 'POST',
+      body: { identity: '081234567890', pin: '654321' },
+    });
+    await loginHandler(reqHmacLogin, resHmacLogin);
+    const hmacData = resHmacLogin.getData();
+
+    const hmacAuthValid = await authenticateUser({
+      headers: { authorization: `Bearer ${hmacData?.token || ''}` },
+    });
+    const hmacAuthTampered: any = await authenticateUser({
+      headers: { authorization: `Bearer ${hmacData?.token || ''}tampered` },
+    });
+
+    setServerSupabaseClient(baseClient);
+    if (origSvcKey !== undefined) process.env.SUPABASE_SERVICE_ROLE_KEY = origSvcKey;
+    else delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    assert(
+      'Auth Hardening 25: Issues verifiable HMAC-SHA256 saga_tok_ on PGRST205 missing table and rejects tampered signatures',
+      resHmacLogin.getStatusCode() === 200 &&
+        String(hmacData?.token || '').startsWith('saga_tok_') &&
+        hmacAuthValid.ok === true &&
+        hmacAuthValid.userId === 'usr_guru_001' &&
+        hmacAuthTampered.ok === false &&
+        hmacAuthTampered.errorCode === 'AUTH_SESSION_INVALID',
+      `Status: ${resHmacLogin.getStatusCode()}, Prefix: ${String(hmacData?.token || '').slice(0, 9)}, ValidOk: ${hmacAuthValid.ok}, TamperedCode: ${hmacAuthTampered.errorCode}`
+    );
   } finally {
     resetServerSupabaseClient();
   }

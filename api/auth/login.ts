@@ -13,6 +13,7 @@ import {
   applyAuthCorsHeaders,
   buildSessionCookie,
   buildClearSessionCookie,
+  signHmacSessionToken,
   SESSION_MAX_AGE_SECONDS,
 } from '../_shared/session-auth.js';
 
@@ -606,7 +607,7 @@ export default async function handler(req: any, res: any) {
       created_at: user.created_at,
     };
 
-    // 8. Simpan HANYA token_hash ke Database (Fail-Closed: Tolak login bila gagal menyimpan sesi)
+    // 8. Simpan HANYA token_hash ke Database
     const { error: sessionErr } = await serverSupabase.from('user_sessions').insert({
       user_id: user.id,
       token_hash: tokenHash,
@@ -618,7 +619,29 @@ export default async function handler(req: any, res: any) {
     });
 
     if (sessionErr) {
-      console.error('[api/auth/login] Failed to persist user session:', sessionErr.message);
+      const errMsg = String(sessionErr.message || '');
+      const errCode = String(sessionErr.code || '');
+      const isMissingSessionsTable =
+        errCode === 'PGRST205' ||
+        errCode === '42P01' ||
+        errMsg.includes('user_sessions') && (errMsg.includes('schema cache') || errMsg.includes('does not exist'));
+
+      // Jika tabel user_sessions belum dibuat pada DB Toren 2 (PGRST205 / 42P01),
+      // terbitkan token HMAC-SHA256 bertanda tangan kriptografis server (BUKAN SB_JWT_ unsigned).
+      if (isMissingSessionsTable) {
+        const signedToken = signHmacSessionToken(user.id, user.role, SESSION_MAX_AGE_SECONDS);
+        if (signedToken) {
+          console.warn('[api/auth/login] public.user_sessions belum ditemukan di schema cache; menerbitkan token HMAC-SHA256 terverifikasi server. Jalankan sql/71_ensure_user_sessions_toren2.sql di Supabase.');
+          res.setHeader('Set-Cookie', buildSessionCookie(req, signedToken, SESSION_MAX_AGE_SECONDS));
+          return res.status(200).json({
+            success: true,
+            token: signedToken,
+            user: userProfile,
+          });
+        }
+      }
+
+      console.error('[api/auth/login] Failed to persist user session:', errCode, errMsg);
       return res.status(500).json({
         success: false,
         errorCode: 'SESSION_PERSISTENCE_FAILED',

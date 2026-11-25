@@ -4,6 +4,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'node:crypto';
+import { Buffer } from 'node:buffer';
 
 const safeEnv: Record<string, string | undefined> =
   typeof process !== 'undefined' && process?.env
@@ -27,6 +28,74 @@ const SUPABASE_URL =
 
 export const SESSION_COOKIE_NAME = 'saga_session';
 export const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
+/**
+ * Returns a strict server-only HMAC signing key (never falls back to public ANON key).
+ */
+export function getServerHmacSecret(): string | null {
+  const secret =
+    safeEnv.AUTH_JWT_SECRET ||
+    safeEnv.SUPABASE_SERVICE_ROLE_KEY_TOREN2 ||
+    safeEnv.SUPABASE_SERVICE_ROLE_KEY ||
+    '';
+  return secret.trim().length > 0 ? secret.trim() : null;
+}
+
+/**
+ * Signs a server-verifiable HMAC-SHA256 transition session token (saga_tok_<payload>.<sig>)
+ * Used ONLY if public.user_sessions has not been created on Toren 2 yet (PGRST205 / 42P01).
+ */
+export function signHmacSessionToken(userId: string, role: string, ttlSeconds = SESSION_MAX_AGE_SECONDS): string | null {
+  const secret = getServerHmacSecret();
+  if (!secret) return null;
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const payload = {
+    typ: 'saga_hmac_v1',
+    sub: userId,
+    role,
+    iat: nowSec,
+    exp: nowSec + ttlSeconds,
+    jti: crypto.randomBytes(16).toString('hex'),
+  };
+  const payloadB64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  const sig = crypto.createHmac('sha256', secret).update(payloadB64).digest('base64url');
+  return `saga_tok_${payloadB64}.${sig}`;
+}
+
+/**
+ * Verifies an HMAC-SHA256 signed transition session token using constant-time comparison.
+ */
+function verifyHmacSessionToken(rawToken: string): { valid: true; sub: string; exp: number; jti: string } | { valid: false; expired?: boolean } {
+  const secret = getServerHmacSecret();
+  if (!secret || !rawToken.startsWith('saga_tok_')) return { valid: false };
+
+  const body = rawToken.slice('saga_tok_'.length);
+  const dotIdx = body.indexOf('.');
+  if (dotIdx <= 0 || dotIdx === body.length - 1) return { valid: false };
+
+  const payloadB64 = body.slice(0, dotIdx);
+  const providedSig = body.slice(dotIdx + 1);
+  const expectedSig = crypto.createHmac('sha256', secret).update(payloadB64).digest('base64url');
+
+  const bufA = crypto.createHash('sha256').update(providedSig, 'utf8').digest();
+  const bufB = crypto.createHash('sha256').update(expectedSig, 'utf8').digest();
+  if (!crypto.timingSafeEqual(bufA, bufB)) return { valid: false };
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+    if (!parsed || parsed.typ !== 'saga_hmac_v1' || typeof parsed.sub !== 'string' || typeof parsed.exp !== 'number') {
+      return { valid: false };
+    }
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (parsed.exp <= nowSec) {
+      return { valid: false, expired: true };
+    }
+    return { valid: true, sub: parsed.sub, exp: parsed.exp, jti: String(parsed.jti || 'hmac') };
+  } catch {
+    return { valid: false };
+  }
+}
 
 let activeClient: any = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: {
@@ -252,14 +321,78 @@ export async function authenticateUser(req: any): Promise<AuthContext> {
     };
   }
 
-  // Hanya token resmi stateful (prefix saga_sess_) yang diterima oleh session middleware baru
-  if (!rawToken.startsWith('saga_sess_')) {
+  // Dukung token stateful DB (saga_sess_) dan token transisi terverifikasi HMAC server (saga_tok_)
+  if (!rawToken.startsWith('saga_sess_') && !rawToken.startsWith('saga_tok_')) {
     return {
       ok: false,
       status: 401,
       errorCode: 'AUTH_SESSION_INVALID',
       errorMessage: 'Format token tidak valid atau bukan sesi server-verifiable.',
     };
+  }
+
+  if (rawToken.startsWith('saga_tok_')) {
+    const hmacRes = verifyHmacSessionToken(rawToken);
+    if (!hmacRes.valid) {
+      return {
+        ok: false,
+        status: 401,
+        errorCode: hmacRes.expired ? 'AUTH_SESSION_EXPIRED' : 'AUTH_SESSION_INVALID',
+        errorMessage: hmacRes.expired
+          ? 'Masa berlaku sesi telah habis. Silakan login kembali.'
+          : 'Token sesi HMAC tidak valid atau telah dimanipulasi.',
+      };
+    }
+
+    try {
+      let userQuery = await serverSupabase
+        .from('users')
+        .select('id, nip, full_name, role, position, account_status, avatar_url, phone_number, must_change_pin')
+        .eq('id', hmacRes.sub)
+        .maybeSingle();
+
+      if (userQuery.error && String(userQuery.error.message || '').includes('must_change_pin')) {
+        userQuery = await serverSupabase
+          .from('users')
+          .select('id, nip, full_name, role, position, account_status, avatar_url, phone_number')
+          .eq('id', hmacRes.sub)
+          .maybeSingle();
+      }
+
+      const user = userQuery.data;
+      if (!user || user.account_status !== 'ACTIVE') {
+        return {
+          ok: false,
+          status: 401,
+          errorCode: 'AUTH_USER_INACTIVE',
+          errorMessage: 'Akun Anda sedang terblokir atau tidak aktif. Hubungi Admin Sekolah.',
+        };
+      }
+
+      return {
+        ok: true,
+        userId: user.id,
+        user: {
+          id: user.id,
+          nip: user.nip ?? null,
+          full_name: user.full_name,
+          role: user.role,
+          position: user.position ?? null,
+          avatar_url: user.avatar_url ?? null,
+          phone_number: user.phone_number ?? null,
+          must_change_pin: Boolean(user.must_change_pin),
+        },
+        role: user.role,
+        sessionId: `hmac_${hmacRes.jti}`,
+      };
+    } catch {
+      return {
+        ok: false,
+        status: 500,
+        errorCode: 'AUTH_SESSION_INVALID',
+        errorMessage: 'Terjadi kendala saat memvalidasi sesi pengguna.',
+      };
+    }
   }
 
   const tokenHash = hashSessionToken(rawToken);
