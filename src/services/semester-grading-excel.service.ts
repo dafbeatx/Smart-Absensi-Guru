@@ -13,6 +13,7 @@ import * as fflate from 'fflate';
 import { logger } from '../utils/logger.utils';
 import type { ExamSessionRecord, GradedStudentScoreRecord } from '../types/database.types';
 import { ExamCorrectionRepository } from '../repositories/ExamCorrectionRepository';
+import { decodeXmlEntities, triggerBlobDownload } from '../utils/html.utils';
 
 export interface StudentScoreEntry {
   name: string;
@@ -106,14 +107,7 @@ export class SemesterGradingExcelService {
         throw new Error(`Gagal memuat template: ${resp.statusText}`);
       }
       const blob = await resp.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = customFileName || 'FORMAT_PENILAIAN_ASTS_&_ASAS_RESMI.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      triggerBlobDownload(blob, customFileName || 'FORMAT_PENILAIAN_ASTS_&_ASAS_RESMI.xlsx');
       logger.info('SemesterGradingExcelService', 'Blank template downloaded successfully');
     } catch (err: any) {
       logger.error('SemesterGradingExcelService', 'Failed to download clean template:', err);
@@ -256,8 +250,11 @@ export class SemesterGradingExcelService {
 
       if (!isNone) {
         gradedStudents.forEach((st) => {
+          if (st.final_score === null || st.final_score === undefined || Number.isNaN(Number(st.final_score))) {
+            return;
+          }
           const normName = st.name.trim().toUpperCase();
-          const score = Number(st.final_score) || 0;
+          const score = Number(st.final_score);
           if (!classScoreMap[normCls][normName]) {
             classScoreMap[normCls][normName] = {};
           }
@@ -273,10 +270,10 @@ export class SemesterGradingExcelService {
       }
     }
 
-    // Extract shared strings untuk membaca nama siswa di tabel tiap kelas
+    // Extract shared strings untuk membaca nama siswa di tabel tiap kelas (dengan decode entitas XML)
     const ssXml = new TextDecoder().decode(files['xl/sharedStrings.xml'] || new Uint8Array());
     const sharedStrings = [...ssXml.matchAll(/<si>(.*?)<\/si>/gs)].map((si) => {
-      const tMatches = [...si[1].matchAll(/<t[^>]*>(.*?)<\/t>/gs)].map((m) => m[1]);
+      const tMatches = [...si[1].matchAll(/<t[^>]*>(.*?)<\/t>/gs)].map((m) => decodeXmlEntities(m[1]));
       return tMatches.join('');
     });
 
@@ -293,29 +290,24 @@ export class SemesterGradingExcelService {
       if (!files[sheetPath]) return;
       let xml = new TextDecoder().decode(files[sheetPath]);
 
-      // Update header info di kelas dengan tipe string eksplisit (t="str") untuk formula berbasis teks
+      // Update header info di kelas dengan dukungan formula berpasangan <f>...</f> maupun self-closing <f .../>
+      const replaceFormulaTextHeader = (cellRef: string, textValue: string) => {
+        xml = xml.replace(
+          new RegExp(`(<c\\s+[^>]*r="${cellRef}"[^>]*)(><f[^>]*\\/>|><f[^>]*>[^<]*<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`, 'g'),
+          (_m, cOpen, fTag, _v, cClose) => {
+            const cleanOpen = cOpen.replace(/\s*t="[^"]*"/g, '');
+            return `${cleanOpen} t="str"${fTag}<v>${this.escapeXml(textValue)}</v>${cClose}`;
+          }
+        );
+      };
+      replaceFormulaTextHeader('B5', effectiveSubject);
+      replaceFormulaTextHeader('E4', academicYear);
+      replaceFormulaTextHeader('H4', semester);
+
       xml = xml.replace(
-        /(<c\s+[^>]*r="B5"[^>]*)(><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g,
-        (_m, cOpen, fTag, _v, cClose) => {
-          const cleanOpen = cOpen.replace(/\s*t="[^"]*"/g, '');
-          return `${cleanOpen} t="str"${fTag}<v>${this.escapeXml(effectiveSubject)}</v>${cClose}`;
-        }
+        /(<c\s+[^>]*r="E5"[^>]*)(><f[^>]*\/>|><f[^>]*>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g,
+        `$1$2<v>${effectiveKkm}</v>$4`
       );
-      xml = xml.replace(
-        /(<c\s+[^>]*r="E4"[^>]*)(><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g,
-        (_m, cOpen, fTag, _v, cClose) => {
-          const cleanOpen = cOpen.replace(/\s*t="[^"]*"/g, '');
-          return `${cleanOpen} t="str"${fTag}<v>${this.escapeXml(academicYear)}</v>${cClose}`;
-        }
-      );
-      xml = xml.replace(
-        /(<c\s+[^>]*r="H4"[^>]*)(><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g,
-        (_m, cOpen, fTag, _v, cClose) => {
-          const cleanOpen = cOpen.replace(/\s*t="[^"]*"/g, '');
-          return `${cleanOpen} t="str"${fTag}<v>${this.escapeXml(semester)}</v>${cClose}`;
-        }
-      );
-      xml = xml.replace(/(<c\s+[^>]*r="E5"[^>]*><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g, `$1<v>${effectiveKkm}</v>$3`);
 
       const studentGrades = classScoreMap[clsName];
 
@@ -330,9 +322,9 @@ export class SemesterGradingExcelService {
             const strIdx = parseInt(bMatch[1], 10);
             studentName = (sharedStrings[strIdx] || '').trim().toUpperCase();
           } else {
-            const inlineMatch = rowContent.match(/<c\s+[^>]*r="B\d+"[^>]*t="inlineStr"[^>]*><is><t>([^<]+)<\/t><\/is><\/c>/);
+            const inlineMatch = rowContent.match(/<c\s+[^>]*r="B\d+"[^>]*t="inlineStr"[^>]*><is><t[^>]*>([^<]+)<\/t><\/is><\/c>/);
             if (inlineMatch) {
-              studentName = inlineMatch[1].trim().toUpperCase();
+              studentName = decodeXmlEntities(inlineMatch[1]).trim().toUpperCase();
             }
           }
           if (!studentName || studentName.includes('REKAP')) return rowMatch;
@@ -342,14 +334,17 @@ export class SemesterGradingExcelService {
 
           let updatedRow = rowMatch;
 
-          if (grade.asts !== null && grade.asts !== undefined && !isNaN(grade.asts)) {
+          const hasAsts = grade.asts !== null && grade.asts !== undefined && !isNaN(Number(grade.asts));
+          const hasAsas = grade.asas !== null && grade.asas !== undefined && !isNaN(Number(grade.asas));
+
+          if (hasAsts) {
             const astsVal = Number(grade.asts);
             updatedRow = updatedRow.replace(
               new RegExp(`(<c\\s+[^>]*r="D${r}"[^>]*>).*?(<\\/c>)|(<c\\s+[^>]*r="D${r}"[^>]*\\/>)`),
               `<c r="D${r}" s="17"><v>${astsVal}</v></c>`
             );
           }
-          if (grade.asas !== null && grade.asas !== undefined && !isNaN(grade.asas)) {
+          if (hasAsas) {
             const asasVal = Number(grade.asas);
             updatedRow = updatedRow.replace(
               new RegExp(`(<c\\s+[^>]*r="E${r}"[^>]*>).*?(<\\/c>)|(<c\\s+[^>]*r="E${r}"[^>]*\\/>)`),
@@ -357,24 +352,47 @@ export class SemesterGradingExcelService {
             );
           }
 
-          // Perbarui cached values pada F, G, H, I dengan formula tetap utuh
-          const aVal = grade.asts ?? 0;
-          const sVal = grade.asas ?? 0;
-          const finalScore = Math.round((aVal * 0.5 + sVal * 0.5) * 10) / 10;
-          const pred = finalScore >= 90 ? 'A' : (finalScore >= 80 ? 'B' : (finalScore >= effectiveKkm ? 'C' : 'D'));
-          const status = finalScore >= effectiveKkm ? 'Tuntas' : 'Belum Tuntas';
-          const desc = pred === 'A'
-            ? 'Penguasaan kompetensi sangat baik.'
-            : (pred === 'B'
-              ? 'Penguasaan kompetensi baik.'
-              : (pred === 'C'
-                ? 'Penguasaan kompetensi cukup dan masih perlu penguatan.'
-                : 'Belum mencapai KKM.'));
+          if (hasAsts || hasAsas) {
+            // Perbarui cached values pada F, G, H, I dengan menjaga formula baik <f>...</f> maupun self-closing <f t="shared" si="0"/>
+            const aVal = hasAsts ? Number(grade.asts) : 0;
+            const sVal = hasAsas ? Number(grade.asas) : 0;
+            const finalScore = Math.round((aVal * 0.5 + sVal * 0.5) * 10) / 10;
+            const pred = finalScore >= 90 ? 'A' : (finalScore >= 80 ? 'B' : (finalScore >= effectiveKkm ? 'C' : 'D'));
+            const status = finalScore >= effectiveKkm ? 'Tuntas' : 'Belum Tuntas';
+            const desc = pred === 'A'
+              ? 'Penguasaan kompetensi sangat baik.'
+              : (pred === 'B'
+                ? 'Penguasaan kompetensi baik.'
+                : (pred === 'C'
+                  ? 'Penguasaan kompetensi cukup dan masih perlu penguatan.'
+                  : 'Belum mencapai KKM.'));
 
-          updatedRow = updatedRow.replace(new RegExp(`(<c\\s+[^>]*r="F${r}"[^>]*><f>.*?<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`), `$1<v>${finalScore}</v>$3`);
-          updatedRow = updatedRow.replace(new RegExp(`(<c\\s+[^>]*r="G${r}"[^>]*><f>.*?<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`), `$1<v>${pred}</v>$3`);
-          updatedRow = updatedRow.replace(new RegExp(`(<c\\s+[^>]*r="H${r}"[^>]*><f>.*?<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`), `$1<v>${status}</v>$3`);
-          updatedRow = updatedRow.replace(new RegExp(`(<c\\s+[^>]*r="I${r}"[^>]*><f[^>]*>.*?<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`), `$1<v>${this.escapeXml(desc)}</v>$3`);
+            updatedRow = updatedRow.replace(
+              new RegExp(`(<c\\s+[^>]*r="F${r}"[^>]*)(><f[^>]*\\/>|><f[^>]*>.*?<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`),
+              `$1$2<v>${finalScore}</v>$4`
+            );
+            updatedRow = updatedRow.replace(
+              new RegExp(`(<c\\s+[^>]*r="G${r}"[^>]*)(><f[^>]*\\/>|><f[^>]*>.*?<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`),
+              (_m, cOpen, fTag, _v, cClose) => {
+                const cleanOpen = cOpen.replace(/\s*t="[^"]*"/g, '');
+                return `${cleanOpen} t="str"${fTag}<v>${this.escapeXml(pred)}</v>${cClose}`;
+              }
+            );
+            updatedRow = updatedRow.replace(
+              new RegExp(`(<c\\s+[^>]*r="H${r}"[^>]*)(><f[^>]*\\/>|><f[^>]*>.*?<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`),
+              (_m, cOpen, fTag, _v, cClose) => {
+                const cleanOpen = cOpen.replace(/\s*t="[^"]*"/g, '');
+                return `${cleanOpen} t="str"${fTag}<v>${this.escapeXml(status)}</v>${cClose}`;
+              }
+            );
+            updatedRow = updatedRow.replace(
+              new RegExp(`(<c\\s+[^>]*r="I${r}"[^>]*)(><f[^>]*\\/>|><f[^>]*>.*?<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`),
+              (_m, cOpen, fTag, _v, cClose) => {
+                const cleanOpen = cOpen.replace(/\s*t="[^"]*"/g, '');
+                return `${cleanOpen} t="str"${fTag}<v>${this.escapeXml(desc)}</v>${cClose}`;
+              }
+            );
+          }
 
           return updatedRow;
         });
@@ -439,14 +457,7 @@ export class SemesterGradingExcelService {
       const blob = new Blob([zipped as any], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      triggerBlobDownload(blob, filename);
     } else {
       // Lingkungan Node (test runner)
       const dynamicImport = new Function('m', 'return import(m)');
@@ -582,8 +593,11 @@ export class SemesterGradingExcelService {
 
       if (!isNone) {
         gradedStudents.forEach((st) => {
+          if (st.final_score === null || st.final_score === undefined || Number.isNaN(Number(st.final_score))) {
+            return;
+          }
           const normName = st.name.trim().toUpperCase();
-          const score = Number(st.final_score) || 0;
+          const score = Number(st.final_score);
           if (!classScoreMap[normCls][normName]) {
             classScoreMap[normCls][normName] = {};
           }
@@ -808,6 +822,18 @@ export class SemesterGradingExcelService {
     return null;
   }
 
+  private static parseImportedScoreCell(raw: unknown): number | null {
+    if (raw === null || raw === undefined) return null;
+    if (typeof raw === 'number') {
+      return Number.isFinite(raw) ? raw : null;
+    }
+    const trimmed = String(raw).trim();
+    if (!trimmed) return null;
+    const normalized = trimmed.replace(',', '.');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   /**
    * Membaca dan mem-parsing berkas Excel "FORMAT PENILAIAN ASTS & ASAS.xlsx" yang diupload guru.
    */
@@ -866,9 +892,9 @@ export class SemesterGradingExcelService {
               const no = Number(row[0]) || (students.length + 1);
               const name = String(row[1]).trim();
               const gender = String(row[2] || 'L').trim().toUpperCase();
-              const asts = row[3] !== '' && !isNaN(Number(row[3])) ? Number(row[3]) : null;
-              const asas = row[4] !== '' && !isNaN(Number(row[4])) ? Number(row[4]) : null;
-              const finalScore = row[5] !== '' && !isNaN(Number(row[5])) ? Number(row[5]) : null;
+              const asts = this.parseImportedScoreCell(row[3]);
+              const asas = this.parseImportedScoreCell(row[4]);
+              const finalScore = this.parseImportedScoreCell(row[5]);
               const predicate = String(row[6] || '-').trim();
               const status = String(row[7] || '-').trim();
 

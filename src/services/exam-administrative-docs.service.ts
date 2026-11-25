@@ -23,6 +23,7 @@ import type {
 import type { ExamInvigilationMatrix } from './exam-matrix-builder.service';
 import { SIGNATORY_OFFICIALS, getDynamicBranding } from '../lib/excel-generator.lib';
 import { normalizeClassCode } from '../utils/class.utils';
+import { escapeHtml, getLevelSchoolBranding, openHtmlBlobPrintWindow, triggerBlobDownload } from '../utils/html.utils';
 import { getDeletedStudentKeys, getStudentNaturalKey } from '../utils/student-dedup.utils';
 
 export type AdminDocType =
@@ -156,6 +157,19 @@ export class ExamAdministrativeDocsService {
     return 'September 2026';
   }
 
+  private static resolveScheduleBranding(scheduleData: ExamScheduleData) {
+    const branding = getDynamicBranding();
+    const isSma =
+      scheduleData.educationLevel === 'SMA' ||
+      scheduleData.config.educationLevel === 'SMA' ||
+      scheduleData.config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) ||
+      false;
+    return {
+      isSma,
+      ...getLevelSchoolBranding(isSma ? 'SMA' : 'SMP', branding.institutionName),
+    };
+  }
+
   /**
    * Generates a 2-column borderless layout table for the signatory footer,
    * fully compatible with both browser print/PDF and Microsoft Word rendering.
@@ -171,10 +185,10 @@ export class ExamAdministrativeDocsService {
           <td style="border: none; width: 62%;"></td>
           <td style="border: none; width: 38%; text-align: left; font-size: 10.5pt; vertical-align: top;">
             <div class="footer-sign-box">
-              <div>${city},   ${signDate}</div>
+              <div>${escapeHtml(city)},   ${escapeHtml(signDate)}</div>
               <div>Ketua Penyelenggara,</div>
               <div class="footer-sign-space" style="height: 55px;"></div>
-              <div class="footer-sign-name" style="font-weight: bold; text-decoration: underline;">${committeeHead}</div>
+              <div class="footer-sign-name" style="font-weight: bold; text-decoration: underline;">${escapeHtml(committeeHead)}</div>
             </div>
           </td>
         </tr>
@@ -230,9 +244,15 @@ export class ExamAdministrativeDocsService {
           padding: ${isLandscape ? '8mm 12mm' : '10mm 15mm'} !important;
           margin: 0 auto !important;
           page-break-inside: avoid;
+          box-sizing: border-box;
+        }
+        .page-container:not(:last-child) {
           page-break-after: always;
           break-after: page;
-          box-sizing: border-box;
+        }
+        .page-container:last-child {
+          page-break-after: auto;
+          break-after: auto;
         }
       }
       .page-container {
@@ -242,7 +262,7 @@ export class ExamAdministrativeDocsService {
         padding: 10px 0;
         background: #ffffff;
       }
-      .page-break {
+      .page-break:not(:last-child) {
         page-break-after: always;
         break-after: page;
       }
@@ -395,9 +415,9 @@ export class ExamAdministrativeDocsService {
     scheduleData: ExamScheduleData,
     options?: AdminDocOptions
   ): string {
-    const branding = getDynamicBranding();
+    const levelBranding = this.resolveScheduleBranding(scheduleData);
     const config = scheduleData.config;
-    const institutionName = matrix?.institutionName || branding.institutionName || 'SMP TERPADU AL-ITTIHADIYAH';
+    const institutionName = matrix?.institutionName || levelBranding.institutionName;
     const examTitle = matrix?.title || config.examTitle || 'ASESMEN SUMATIF TENGAH SEMESTER (ASTS)';
     const academicYear = config.academicYear || '2026/2027';
 
@@ -445,8 +465,8 @@ export class ExamAdministrativeDocsService {
       .map(
         (d) => `
         <th style="width: 85px; min-width: 80px;">
-          <div>${d.dayName.toUpperCase()}</div>
-          <div style="font-size: 8.5pt; font-weight: normal; margin-top: 2px;">${d.dateFormattedDmy}</div>
+          <div>${escapeHtml(d.dayName.toUpperCase())}</div>
+          <div style="font-size: 8.5pt; font-weight: normal; margin-top: 2px;">${escapeHtml(d.dateFormattedDmy)}</div>
         </th>
       `
       )
@@ -457,7 +477,7 @@ export class ExamAdministrativeDocsService {
         (name, idx) => `
         <tr>
           <td class="text-center" style="width: 38px;">${idx + 1}</td>
-          <td style="font-weight: 500;">${name}</td>
+          <td style="font-weight: 500;">${escapeHtml(name)}</td>
           <td class="text-center" style="width: 100px;">Pengawas</td>
           ${daysToShow.map(() => `<td class="sig-cell"></td>`).join('')}
         </tr>
@@ -470,7 +490,7 @@ export class ExamAdministrativeDocsService {
       <html lang="id">
       <head>
         <meta charset="utf-8">
-        <title>Daftar Hadir Pengawas - ${institutionName}</title>
+        <title>Daftar Hadir Pengawas - ${escapeHtml(institutionName)}</title>
         <style>
           ${this.getOfficialDocumentStyles(options?.orientation)}
         </style>
@@ -479,9 +499,9 @@ export class ExamAdministrativeDocsService {
         <div class="page-container">
           <div class="doc-header">
             <h1 class="doc-title-main">DAFTAR HADIR PENGAWAS</h1>
-            <h2 class="doc-title-sub">${examTitle}</h2>
-            <div class="doc-institution">${institutionName}</div>
-            <div class="doc-academic-year">TAHUN PELAJARAN ${academicYear}</div>
+            <h2 class="doc-title-sub">${escapeHtml(examTitle)}</h2>
+            <div class="doc-institution">${escapeHtml(institutionName)}</div>
+            <div class="doc-academic-year">TAHUN PELAJARAN ${escapeHtml(academicYear)}</div>
           </div>
 
           <table class="doc-table">
@@ -517,9 +537,9 @@ export class ExamAdministrativeDocsService {
     scheduleData: ExamScheduleData,
     options?: AdminDocOptions
   ): string {
-    const branding = getDynamicBranding();
+    const levelBranding = this.resolveScheduleBranding(scheduleData);
     const config = scheduleData.config;
-    const institutionName = branding.institutionName || 'SMP TERPADU AL-ITTIHADIYAH';
+    const institutionName = levelBranding.institutionName;
     const academicYear = config.academicYear || '2026/2027';
     const examTypeStr = config.examTitle || config.examType || 'ASESMEN SUMATIF TENGAH SEMESTER (ASTS)';
 
@@ -557,7 +577,7 @@ export class ExamAdministrativeDocsService {
       if (dutiesThisDay.length > 0) {
         dutiesThisDay.forEach((duty, idx) => {
           const numPrefix = showNumbers ? `${idx + 1}.` : '&nbsp;';
-          subjectDivs.push(`<div style="${rowItemStyle}">${idx + 1}. ${duty.subject}</div>`);
+          subjectDivs.push(`<div style="${rowItemStyle}">${idx + 1}. ${escapeHtml(duty.subject)}</div>`);
           codeDivs.push(`<div style="${rowItemStyle}" class="text-center">${numPrefix}</div>`);
           proctorDivs.push(`<div style="${rowItemStyle}">${numPrefix}</div>`);
           sigDivs.push(`<div style="${rowItemStyle}">${numPrefix}</div>`);
@@ -566,7 +586,7 @@ export class ExamAdministrativeDocsService {
         const distinctSubj = Array.from(new Set(subjectsThisDay.map((s) => s.subject)));
         distinctSubj.forEach((subj, idx) => {
           const numPrefix = showNumbers ? `${idx + 1}.` : '&nbsp;';
-          subjectDivs.push(`<div style="${rowItemStyle}">${idx + 1}. ${subj}</div>`);
+          subjectDivs.push(`<div style="${rowItemStyle}">${idx + 1}. ${escapeHtml(subj)}</div>`);
           codeDivs.push(`<div style="${rowItemStyle}" class="text-center">${numPrefix}</div>`);
           proctorDivs.push(`<div style="${rowItemStyle}">${numPrefix}</div>`);
           sigDivs.push(`<div style="${rowItemStyle}">${numPrefix}</div>`);
@@ -591,7 +611,7 @@ export class ExamAdministrativeDocsService {
       const rowHtml = `
         <tr>
           <td class="text-center" style="width: 32px; vertical-align: top;">${dIdx + 1}</td>
-          <td style="width: 170px; font-weight: 500; vertical-align: top; white-space: nowrap;">${day.dateFormattedLong}</td>
+          <td style="width: 170px; font-weight: 500; vertical-align: top; white-space: nowrap;">${escapeHtml(day.dateFormattedLong)}</td>
           <td style="vertical-align: top;">${subjectCellHtml}</td>
           <td style="width: 70px; vertical-align: top;" class="text-center">${codeCellHtml}</td>
           <td style="width: ${proctorColWidth}; vertical-align: top;">${proctorCellHtml}</td>
@@ -615,9 +635,9 @@ export class ExamAdministrativeDocsService {
       <div class="page-container">
         <div class="doc-header">
           <h1 class="doc-title-main">DAFTAR SERAH TERIMA NASKAH SOAL DAN LEMBAR JAWABAN</h1>
-          <h2 class="doc-title-sub">${examTypeStr}</h2>
-          <div class="doc-institution">${institutionName}</div>
-          <div class="doc-academic-year">TAHUN PELAJARAN ${academicYear}</div>
+          <h2 class="doc-title-sub">${escapeHtml(examTypeStr)}</h2>
+          <div class="doc-institution">${escapeHtml(institutionName)}</div>
+          <div class="doc-academic-year">TAHUN PELAJARAN ${escapeHtml(academicYear)}</div>
         </div>
 
         <table class="badge-table" style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
@@ -627,7 +647,7 @@ export class ExamAdministrativeDocsService {
               <table align="right" class="badge-box-table" style="width: auto; border: 2px solid #5b9bd5; border-collapse: collapse; background-color: #d9e1f2; margin-left: auto;">
                 <tr style="border: none;">
                   <td class="badge-room" style="border: none; padding: 4px 18px; color: #c00000; font-weight: bold; font-size: 13.5pt; letter-spacing: 1px; text-align: center; white-space: nowrap;">
-                    ${badgeText}
+                    ${escapeHtml(badgeText)}
                   </td>
                 </tr>
               </table>
@@ -638,7 +658,7 @@ export class ExamAdministrativeDocsService {
         <table class="doc-table">
           <thead>
             <tr>
-              <th colspan="6" class="table-banner-th" style="background-color: #1f4e78; color: #ffffff; font-weight: bold; text-align: center; padding: 6px 4px; font-size: 10.5pt; letter-spacing: 0.5px; border: 1pt solid #000000;">Daftar Pengambilan Naskah Soal ${config.examType || 'ASTS'}</th>
+              <th colspan="6" class="table-banner-th" style="background-color: #1f4e78; color: #ffffff; font-weight: bold; text-align: center; padding: 6px 4px; font-size: 10.5pt; letter-spacing: 0.5px; border: 1pt solid #000000;">Daftar Pengambilan Naskah Soal ${escapeHtml(config.examType || 'ASTS')}</th>
             </tr>
             <tr>
               <th style="width: 32px;">No.</th>
@@ -657,7 +677,7 @@ export class ExamAdministrativeDocsService {
         <table class="doc-table" style="margin-top: 14px;">
           <thead>
             <tr>
-              <th colspan="6" class="table-banner-th" style="background-color: #1f4e78; color: #ffffff; font-weight: bold; text-align: center; padding: 6px 4px; font-size: 10.5pt; letter-spacing: 0.5px; border: 1pt solid #000000;">Daftar Penyerahan Lembar Jawaban ${config.examType || 'ASTS'}</th>
+              <th colspan="6" class="table-banner-th" style="background-color: #1f4e78; color: #ffffff; font-weight: bold; text-align: center; padding: 6px 4px; font-size: 10.5pt; letter-spacing: 0.5px; border: 1pt solid #000000;">Daftar Penyerahan Lembar Jawaban ${escapeHtml(config.examType || 'ASTS')}</th>
             </tr>
             <tr>
               <th style="width: 32px;">No.</th>
@@ -682,8 +702,7 @@ export class ExamAdministrativeDocsService {
     scheduleData: ExamScheduleData,
     options?: AdminDocOptions
   ): string {
-    const branding = getDynamicBranding();
-    const institutionName = branding.institutionName || 'SMP TERPADU AL-ITTIHADIYAH';
+    const { institutionName } = this.resolveScheduleBranding(scheduleData);
 
     let rooms: string[] = [];
     if (scheduleData.proctorSchedules) {
@@ -720,7 +739,7 @@ export class ExamAdministrativeDocsService {
       <html lang="id">
       <head>
         <meta charset="utf-8">
-        <title>Daftar Serah Terima Naskah Soal & LJK - ${institutionName}</title>
+        <title>Daftar Serah Terima Naskah Soal &amp; LJK - ${escapeHtml(institutionName)}</title>
         <style>
           ${this.getOfficialDocumentStyles(options?.orientation)}
         </style>
@@ -1428,14 +1447,8 @@ export class ExamAdministrativeDocsService {
     scheduleData: ExamScheduleData,
     options?: AdminDocOptions
   ): string {
-    const branding = getDynamicBranding();
+    const { isSma, institutionName } = this.resolveScheduleBranding(scheduleData);
     const config = scheduleData.config;
-    const isSma =
-      scheduleData.educationLevel === 'SMA' ||
-      scheduleData.config.educationLevel === 'SMA' ||
-      config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) ||
-      false;
-    const institutionName = branding.institutionName || (isSma ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL-ITTIHADIYAH');
     const academicYear = config.academicYear || '2025/2026';
     const semesterStr = config.semester ? config.semester.toUpperCase() : 'GENAP';
 
@@ -1461,16 +1474,16 @@ export class ExamAdministrativeDocsService {
 
     const subjectHeadersHtml = subjects.map((s) => `
       <th style="border: 1pt solid #000000; padding: 3px 1px; text-align: center; font-weight: bold; font-size: 8pt; line-height: 1.15; word-break: break-word; background-color: #ffffff; color: #000000;">
-        ${s}
+        ${escapeHtml(s)}
       </th>
     `).join('');
 
     const rowsHtml = students.map((s) => `
       <tr style="height: 24px;">
         <td style="border: 1pt solid #000000; text-align: center; padding: 2px 1px; font-size: 8.5pt;">${s.urut}</td>
-        <td style="border: 1pt solid #000000; text-align: center; padding: 2px 2px; font-size: 8.5pt; font-family: 'Times New Roman', serif;">${s.participantNumber}</td>
-        <td style="border: 1pt solid #000000; text-align: left; padding: 2px 4px; font-size: 8.5pt; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${s.fullName}</td>
-        <td style="border: 1pt solid #000000; text-align: center; padding: 2px 1px; font-size: 8.5pt;">${s.gender}</td>
+        <td style="border: 1pt solid #000000; text-align: center; padding: 2px 2px; font-size: 8.5pt; font-family: 'Times New Roman', serif;">${escapeHtml(s.participantNumber)}</td>
+        <td style="border: 1pt solid #000000; text-align: left; padding: 2px 4px; font-size: 8.5pt; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(s.fullName)}</td>
+        <td style="border: 1pt solid #000000; text-align: center; padding: 2px 1px; font-size: 8.5pt;">${escapeHtml(s.gender)}</td>
         ${subjects.map(() => `<td style="border: 1pt solid #000000; text-align: center; padding: 0; font-size: 8pt; background-color: #ffffff;">&nbsp;</td>`).join('')}
       </tr>
     `).join('');
@@ -1485,18 +1498,18 @@ export class ExamAdministrativeDocsService {
                 DAFTAR HADIR PESERTA
               </div>
               <div style="font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 0; line-height: 1.25;">
-                ${examTitle}
+                ${escapeHtml(examTitle)}
               </div>
               <div style="font-size: 12.5pt; font-weight: bold; text-transform: uppercase; margin: 0; line-height: 1.25; letter-spacing: 0.3px;">
-                ${institutionName}
+                ${escapeHtml(institutionName)}
               </div>
               <div style="font-size: 11pt; font-weight: bold; margin: 0; line-height: 1.25;">
-                Tahun Pelajaran ${academicYear}
+                Tahun Pelajaran ${escapeHtml(academicYear)}
               </div>
             </td>
             <td style="border: none; width: 30%; vertical-align: middle; text-align: right; padding: 0;" align="right">
-              <div class="room-badge" data-room="${roomBadge.toUpperCase()}" style="font-size: 24pt; font-weight: bold; font-family: 'Times New Roman', serif; letter-spacing: 0.5px; color: #000000; white-space: nowrap;">
-                ${roomBadge}
+              <div class="room-badge" data-room="${escapeHtml(roomBadge.toUpperCase())}" style="font-size: 24pt; font-weight: bold; font-family: 'Times New Roman', serif; letter-spacing: 0.5px; color: #000000; white-space: nowrap;">
+                ${escapeHtml(roomBadge)}
               </div>
             </td>
           </tr>
@@ -1539,10 +1552,10 @@ export class ExamAdministrativeDocsService {
           <tr style="border: none;">
             <td style="border: none; width: 72%; padding: 0;"></td>
             <td style="border: none; width: 28%; text-align: left; vertical-align: top; padding: 0;">
-              <div>${city}, ${signDate}</div>
+              <div>${escapeHtml(city)}, ${escapeHtml(signDate)}</div>
               <div>Ketua Pelaksana</div>
               <div style="height: 48px;"></div>
-              <div style="font-weight: bold; text-decoration: underline;">${committeeHead}</div>
+              <div style="font-weight: bold; text-decoration: underline;">${escapeHtml(committeeHead)}</div>
             </td>
           </tr>
         </table>
@@ -1555,14 +1568,7 @@ export class ExamAdministrativeDocsService {
     options?: AdminDocOptions
   ): string {
     const orientation = options?.orientation || 'landscape';
-    const branding = getDynamicBranding();
-    const config = scheduleData.config;
-    const isSma =
-      scheduleData.educationLevel === 'SMA' ||
-      scheduleData.config.educationLevel === 'SMA' ||
-      config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) ||
-      false;
-    const institutionName = branding.institutionName || (isSma ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL-ITTIHADIYAH');
+    const { institutionName } = this.resolveScheduleBranding(scheduleData);
 
     const roomStudentMap = this.resolveRoomStudents(scheduleData, options);
     const rooms = Object.keys(roomStudentMap);
@@ -1591,7 +1597,7 @@ export class ExamAdministrativeDocsService {
       <html lang="id">
       <head>
         <meta charset="utf-8">
-        <title>Daftar Hadir Peserta - ${institutionName}</title>
+        <title>Daftar Hadir Peserta - ${escapeHtml(institutionName)}</title>
         <style>
           ${this.getOfficialDocumentStyles(orientation)}
         </style>
@@ -1669,7 +1675,7 @@ export class ExamAdministrativeDocsService {
           const numFormatted = this.formatSeatingParticipantNumber(st.participantNumber, st.urut);
           cellsHtml += `
             <td style="width: 20%; border: 1.5pt solid #000000; padding: 10px 4px; text-align: center; font-size: 11pt; font-weight: bold; font-family: 'Times New Roman', serif; background-color: #ffffff; vertical-align: middle; height: 38px; white-space: nowrap;">
-              ${numFormatted}
+              ${escapeHtml(numFormatted)}
             </td>
           `;
         } else {
@@ -1693,10 +1699,10 @@ export class ExamAdministrativeDocsService {
             DENAH TEMPAT DUDUK
           </h1>
           <h2 style="font-size: 12.5pt; font-weight: bold; margin: 0 0 4px 0; text-transform: uppercase;">
-            PESERTA ${examTitle}
+            PESERTA ${escapeHtml(examTitle)}
           </h2>
           <div style="font-size: 11.5pt; font-weight: bold; text-transform: uppercase;">
-            TAHUN ${academicYear}
+            TAHUN ${escapeHtml(academicYear)}
           </div>
         </div>
 
@@ -1714,7 +1720,7 @@ export class ExamAdministrativeDocsService {
           <tr>
             <td style="border: none; text-align: left; vertical-align: middle; padding: 0 4px;">
               <span style="font-size: 20pt; font-weight: bold; letter-spacing: 1px; line-height: 1;">
-                ${roomBadge}
+                ${escapeHtml(roomBadge)}
               </span>
             </td>
             <td colspan="3" style="border: none; text-align: center; vertical-align: middle; padding: 0;">
@@ -1758,13 +1764,7 @@ export class ExamAdministrativeDocsService {
     options?: AdminDocOptions
   ): string {
     const orientation = 'landscape';
-    const branding = getDynamicBranding();
-    const isSma =
-      scheduleData.educationLevel === 'SMA' ||
-      scheduleData.config.educationLevel === 'SMA' ||
-      scheduleData.config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) ||
-      false;
-    const institutionName = branding.institutionName || (isSma ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL-ITTIHADIYAH');
+    const { institutionName } = this.resolveScheduleBranding(scheduleData);
 
     const roomStudentMap = this.resolveRoomStudents(scheduleData, options);
     const rooms = Object.keys(roomStudentMap);
@@ -1793,7 +1793,7 @@ export class ExamAdministrativeDocsService {
       <html lang="id">
       <head>
         <meta charset="utf-8">
-        <title>Denah Tempat Duduk Peserta - ${institutionName}</title>
+        <title>Denah Tempat Duduk Peserta - ${escapeHtml(institutionName)}</title>
         <style>
           ${this.getOfficialDocumentStyles(orientation)}
         </style>
@@ -1813,9 +1813,8 @@ export class ExamAdministrativeDocsService {
     scheduleData: ExamScheduleData,
     options?: AdminDocOptions
   ): string {
-    const branding = getDynamicBranding();
+    const { institutionName } = this.resolveScheduleBranding(scheduleData);
     const config = scheduleData.config;
-    const institutionName = branding.institutionName || 'SMP TERPADU AL-ITTIHADIYAH';
     const academicYear = config.academicYear || '2025/2026';
     const examTitle = config.examTitle || `ASESMEN ${config.examType || 'SUMATIF'}`;
 
@@ -1862,8 +1861,8 @@ export class ExamAdministrativeDocsService {
         return `
           <tr>
             <td class="text-center" style="width: 45px;">${idx + 1}</td>
-            <td style="font-weight: 500;">${subj}</td>
-            <td class="text-center" style="width: 140px;">${countVal}</td>
+            <td style="font-weight: 500;">${escapeHtml(subj)}</td>
+            <td class="text-center" style="width: 140px;">${escapeHtml(countVal)}</td>
             <td class="text-center" style="width: 140px;"></td>
             <td class="text-center" style="width: 140px;"></td>
             <td style="width: 150px;"></td>
@@ -1877,7 +1876,7 @@ export class ExamAdministrativeDocsService {
       <html lang="id">
       <head>
         <meta charset="utf-8">
-        <title>Rekapitulasi Kehadiran Peserta Ujian - ${institutionName}</title>
+        <title>Rekapitulasi Kehadiran Peserta Ujian - ${escapeHtml(institutionName)}</title>
         <style>
           ${this.getOfficialDocumentStyles(options?.orientation)}
         </style>
@@ -1885,10 +1884,10 @@ export class ExamAdministrativeDocsService {
       <body>
         <div class="page-container">
           <div class="doc-header">
-            <h1 class="doc-institution">${institutionName}</h1>
-            <div class="doc-academic-year">TAHUN PELAJARAN ${academicYear}</div>
+            <h1 class="doc-institution">${escapeHtml(institutionName)}</h1>
+            <div class="doc-academic-year">TAHUN PELAJARAN ${escapeHtml(academicYear)}</div>
             <div class="doc-title-sub" style="font-size: 11pt; color: #334155; margin-top: 4px;">
-              BERITA ACARA REKAPITULASI KEHADIRAN PESERTA ${examTitle.toUpperCase()}
+              BERITA ACARA REKAPITULASI KEHADIRAN PESERTA ${escapeHtml(examTitle.toUpperCase())}
             </div>
           </div>
 
@@ -1924,9 +1923,8 @@ export class ExamAdministrativeDocsService {
     scheduleData: ExamScheduleData,
     options?: AdminDocOptions
   ): string {
-    const branding = getDynamicBranding();
+    const { institutionName } = this.resolveScheduleBranding(scheduleData);
     const config = scheduleData.config;
-    const institutionName = branding.institutionName || 'SMP TERPADU AL-ITTIHADIYAH';
     const academicYear = config.academicYear || '2025/2026';
     const examTypeStr = config.examTitle || config.examType || 'ASESMEN SUMATIF AKHIR JENJANG (ASAJ)';
 
@@ -1993,8 +1991,8 @@ export class ExamAdministrativeDocsService {
       .map(
         (d) => `
         <th style="width: 85px; min-width: 80px;">
-          <div>${d.dayName.toUpperCase()}</div>
-          <div style="font-size: 8.5pt; font-weight: normal; margin-top: 2px;">${d.dateFormattedDmy}</div>
+          <div>${escapeHtml(d.dayName.toUpperCase())}</div>
+          <div style="font-size: 8.5pt; font-weight: normal; margin-top: 2px;">${escapeHtml(d.dateFormattedDmy)}</div>
         </th>
       `
       )
@@ -2005,8 +2003,8 @@ export class ExamAdministrativeDocsService {
         (item, idx) => `
         <tr>
           <td class="text-center" style="width: 38px;">${idx + 1}</td>
-          <td style="font-weight: 500;">${item.name}</td>
-          <td style="width: 140px;">${item.jabatan}</td>
+          <td style="font-weight: 500;">${escapeHtml(item.name)}</td>
+          <td style="width: 140px;">${escapeHtml(item.jabatan)}</td>
           ${daysToShow.map(() => `<td class="sig-cell"></td>`).join('')}
         </tr>
       `
@@ -2018,7 +2016,7 @@ export class ExamAdministrativeDocsService {
       <html lang="id">
       <head>
         <meta charset="utf-8">
-        <title>Daftar Hadir Panitia - ${institutionName}</title>
+        <title>Daftar Hadir Panitia - ${escapeHtml(institutionName)}</title>
         <style>
           ${this.getOfficialDocumentStyles(options?.orientation)}
         </style>
@@ -2027,9 +2025,9 @@ export class ExamAdministrativeDocsService {
         <div class="page-container">
           <div class="doc-header">
             <h1 class="doc-title-main">DAFTAR HADIR PANITIA</h1>
-            <h2 class="doc-title-sub">${examTypeStr}</h2>
-            <div class="doc-institution">${institutionName}</div>
-            <div class="doc-academic-year">TAHUN PELAJARAN ${academicYear}</div>
+            <h2 class="doc-title-sub">${escapeHtml(examTypeStr)}</h2>
+            <div class="doc-institution">${escapeHtml(institutionName)}</div>
+            <div class="doc-academic-year">TAHUN PELAJARAN ${escapeHtml(academicYear)}</div>
           </div>
 
           <table class="doc-table">
@@ -2074,7 +2072,7 @@ export class ExamAdministrativeDocsService {
       <div class="no-print-bar" style="position: sticky; top: 0; left: 0; right: 0; background: #023246; color: #ffffff; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 16px;">📄</span>
-          <span style="font-weight: 800; font-size: 13px;">${safeTitle}</span>
+          <span style="font-weight: 800; font-size: 13px;">${escapeHtml(safeTitle)}</span>
         </div>
         <div style="display: flex; gap: 8px;">
           <button type="button" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; background: #059669; color: #ffffff;" onclick="window.print()">
@@ -2097,7 +2095,7 @@ export class ExamAdministrativeDocsService {
         function downloadDocFile() {
           if (window.opener && window.opener.__exportHtmlToPdf) {
             window.opener.__exportHtmlToPdf(document.documentElement.outerHTML, {
-              filename: '${cleanPdfFileName}',
+              filename: ${JSON.stringify(cleanPdfFileName)},
               orientation: '${isLandscape ? 'landscape' : 'portrait'}'
             });
           } else {
@@ -2114,19 +2112,25 @@ export class ExamAdministrativeDocsService {
       enrichedHtml = topBarHtml + htmlContent;
     }
 
-    const blob = new Blob([enrichedHtml], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const printWindow = window.open(url, '_blank');
+    const printWindow = openHtmlBlobPrintWindow(enrichedHtml, { autoPrint: false });
 
     if (!printWindow) {
-      alert('Jendela pop-up cetak diblokir oleh browser. Izinkan pop-up untuk mencetak dokumen administrasi.');
+      // Fallback otomatis ke unduhan PDF A4 apabila jendela pop-up diblokir
+      void this.downloadPdfDocument(
+        htmlContent,
+        cleanPdfFileName,
+        isLandscape ? 'landscape' : 'portrait'
+      );
       return;
     }
 
-    printWindow.onload = () => {
-      if (title) printWindow.document.title = title;
-      printWindow.focus();
-    };
+    printWindow.addEventListener(
+      'load',
+      () => {
+        if (title) printWindow.document.title = title;
+      },
+      { once: true }
+    );
   }
 
   /**
@@ -2224,16 +2228,8 @@ export class ExamAdministrativeDocsService {
       type: 'application/msword;charset=utf-8',
     });
 
-    if (typeof window !== 'undefined') {
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName.endsWith('.doc') ? fileName : `${fileName}.doc`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }
+    const finalName = fileName.endsWith('.doc') ? fileName : `${fileName}.doc`;
+    triggerBlobDownload(blob, finalName);
   }
 
   /**
@@ -2673,9 +2669,9 @@ export class ExamAdministrativeDocsService {
     scheduleData: ExamScheduleData,
     options?: AdminDocOptions
   ): any {
-    const branding = getDynamicBranding();
+    const levelBranding = this.resolveScheduleBranding(scheduleData);
     const config = scheduleData.config;
-    const institutionName = branding.institutionName || 'SMP TERPADU AL-ITTIHADIYAH';
+    const institutionName = levelBranding.institutionName;
     const academicYear = config.academicYear || '2026/2027';
     const examTypeStr = config.examTitle || config.examType || 'ASESMEN SUMATIF TENGAH SEMESTER (ASTS)';
     const examTypeShort = config.examType || 'ASTS';

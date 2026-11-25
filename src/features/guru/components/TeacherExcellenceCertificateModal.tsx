@@ -8,6 +8,7 @@ import {
 import { APP_CONFIG } from '../../../config/app.config';
 import { SIGNATORY_OFFICIALS } from '../../../lib/excel-generator.lib';
 import { useToastStore } from '../../../store/useToastStore';
+import { openHtmlBlobPrintWindow } from '../../../utils/html.utils';
 import {
   Printer,
   Download,
@@ -86,9 +87,10 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
 
   const handleOpenNewTab = () => {
     const html = generateExcellenceCertificateHTML(certificatePayload);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+    const win = openHtmlBlobPrintWindow(html, { autoPrint: false });
+    if (!win) {
+      void handleDownload();
+    }
   };
 
   const handleShare = async () => {

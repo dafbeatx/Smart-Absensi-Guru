@@ -117,6 +117,24 @@ export function getOralExamPredicateBadgeStyle(grade: OralExamGrade | null | und
 }
 
 /**
+ * Membedakan apakah komponen checklist (Bahasa Inggris / Bahasa Arab) benar-benar
+ * sudah dinilai oleh penguji vs baris baru/lama yang belum disentuh sama sekali.
+ */
+export function isChecklistTrackAssessed(
+  score: number | null | undefined,
+  checklist: boolean[] | undefined,
+  assessedFlag: boolean | undefined
+): boolean {
+  if (assessedFlag === true) return true;
+  if (assessedFlag === false) return false;
+  if (score === null || score === undefined || Number.isNaN(score)) return false;
+  // Kompatibilitas mundur sesi lama localStorage: jika belum ada flag assessed,
+  // skor 0 dengan checklist kosong seluruhnya dianggap belum dinilai.
+  if (score > 0) return true;
+  return Boolean(checklist && checklist.some(Boolean));
+}
+
+/**
  * Menghitung ringkasan statistik sesi ujian lisan (rata-rata, persentase kelulusan/kategori)
  */
 export function calculateOralExamSummaryStats(
@@ -143,27 +161,34 @@ export function calculateOralExamSummaryStats(
 
   for (const s of students) {
     if (isChecklistMode) {
-      if (s.englishScore !== undefined || s.arabicScore !== undefined) {
+      const engDone = isChecklistTrackAssessed(s.englishScore, s.englishChecklist, s.englishAssessed);
+      const arabDone = isChecklistTrackAssessed(s.arabicScore, s.arabicChecklist, s.arabicAssessed);
+
+      if (engDone || arabDone) {
         completedStudents++;
       }
-      if (s.englishScore !== undefined) {
+      if (engDone && s.englishScore !== null && s.englishScore !== undefined && !Number.isNaN(s.englishScore)) {
         totalScore1 += s.englishScore;
         countScore1++;
+        if (s.englishPredicate) gradeDistribution[s.englishPredicate]++;
       }
-      if (s.arabicScore !== undefined) {
+      if (arabDone && s.arabicScore !== null && s.arabicScore !== undefined && !Number.isNaN(s.arabicScore)) {
         totalScore2 += s.arabicScore;
         countScore2++;
+        if (s.arabicPredicate) gradeDistribution[s.arabicPredicate]++;
       }
-      if (s.englishPredicate) gradeDistribution[s.englishPredicate]++;
-      if (s.arabicPredicate) gradeDistribution[s.arabicPredicate]++;
     } else {
-      if (s.btqScore !== null && s.btqScore !== undefined) {
+      const hasBtq = s.btqScore !== null && s.btqScore !== undefined && !Number.isNaN(s.btqScore);
+      const hasHaf = s.hafalanScore !== null && s.hafalanScore !== undefined && !Number.isNaN(s.hafalanScore);
+      if (hasBtq || hasHaf) {
         completedStudents++;
+      }
+      if (hasBtq && s.btqScore !== null && s.btqScore !== undefined) {
         totalScore1 += s.btqScore;
         countScore1++;
         if (s.btqPredicate) gradeDistribution[s.btqPredicate]++;
       }
-      if (s.hafalanScore !== null && s.hafalanScore !== undefined) {
+      if (hasHaf && s.hafalanScore !== null && s.hafalanScore !== undefined) {
         totalScore2 += s.hafalanScore;
         countScore2++;
         if (s.hafalanPredicate) gradeDistribution[s.hafalanPredicate]++;

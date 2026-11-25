@@ -19,8 +19,9 @@ import { Button } from '../../../components/ui/Button';
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { PDFPreviewModal } from '../../../components/dashboard/PDFPreviewModal';
 import { ReportService } from '../../../services/report.service';
-import { ExcelReportGenerator, SIGNATORY_OFFICIALS, isTeacherRecordMatch, isTeacherLeaveMatch } from '../../../lib/excel-generator.lib';
+import { ExcelReportGenerator, SIGNATORY_OFFICIALS, getDynamicBranding, isTeacherRecordMatch, isTeacherLeaveMatch } from '../../../lib/excel-generator.lib';
 import { PdfStamperService } from '../../../lib/pdf-stamper.lib';
+import { DocumentVerificationService, type SignedDocumentTokenResult } from '../../../services/document-verification.service';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
@@ -307,11 +308,46 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
     }
   };
 
+  const [previewSignedToken, setPreviewSignedToken] = useState<SignedDocumentTokenResult | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const docNo = `421.3/SAG-BOGOR/${parseIndonesianMonth(selectedMonth)}/${selectedYear}`;
+    DocumentVerificationService.issueDocumentSignature({
+      docNo,
+      type: 'REKAP_PRESENSI',
+      month: selectedMonth,
+      year: selectedYear,
+      school: getDynamicBranding().institutionName,
+      signatory: SIGNATORY_OFFICIALS.KEPSEK_NAME,
+    })
+      .then((res) => {
+        if (!cancelled) setPreviewSignedToken(res);
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewSignedToken(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMonth, selectedYear]);
+
   const handlePrintPDF = async () => {
     setIsDownloading(true);
     try {
-      const htmlContent = ExcelReportGenerator.getPrintablePDFHTML(reportPayload);
-      const opened = ExcelReportGenerator.generatePrintablePDF(reportPayload);
+      const docNo = `421.3/SAG-BOGOR/${parseIndonesianMonth(selectedMonth)}/${selectedYear}`;
+      const signedToken =
+        previewSignedToken ||
+        (await DocumentVerificationService.issueDocumentSignature({
+          docNo,
+          type: 'REKAP_PRESENSI',
+          month: selectedMonth,
+          year: selectedYear,
+          school: getDynamicBranding().institutionName,
+          signatory: SIGNATORY_OFFICIALS.KEPSEK_NAME,
+        }));
+      const htmlContent = ExcelReportGenerator.getPrintablePDFHTML(reportPayload, signedToken);
+      const opened = ExcelReportGenerator.generatePrintablePDF(reportPayload, signedToken);
       if (opened) {
         showToast('success', 'Jendela Cetak Dibuka', `Laporan PDF ${selectedMonth} ${selectedYear} siap dicetak.`);
       } else {
@@ -345,15 +381,29 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
     }
   };
 
-  const handlePrintIndividualTeacherPDF = (teacher: UserProfile) => {
+  const handlePrintIndividualTeacherPDF = async (teacher: UserProfile) => {
     try {
+      const monthNumber = parseIndonesianMonth(selectedMonth);
+      const monthPrefix = `${selectedYear}-${String(monthNumber).padStart(2, '0')}`;
+      const docNo = `421.3/IND-${teacher.nip || teacher.id.slice(0, 8)}/${monthPrefix}`;
+      const signedToken = await DocumentVerificationService.issueDocumentSignature({
+        docNo,
+        type: 'PRESENSI_INDIVIDU',
+        teacher: teacher.full_name,
+        month: selectedMonth,
+        year: selectedYear,
+        school: getDynamicBranding().institutionName,
+        signatory: SIGNATORY_OFFICIALS.KEPSEK_NAME,
+      });
+
       const htmlContent = ExcelReportGenerator.getIndividualTeacherPDFHTML(
         teacher,
         selectedMonth,
         selectedYear,
         monthlyRecords,
         effectiveLeaves,
-        holidays
+        holidays,
+        signedToken
       );
       const opened = ExcelReportGenerator.generateIndividualTeacherPDF(
         teacher,
@@ -361,7 +411,8 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
         selectedYear,
         monthlyRecords,
         effectiveLeaves,
-        holidays
+        holidays,
+        signedToken
       );
       if (opened) {
         showToast('success', 'PDF Dibuka', `Laporan presensi individu ${teacher.full_name} siap dicetak.`);
@@ -378,8 +429,8 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
 
   // Printable HTML for Tab 4 Preview
   const inPagePDFHtml = useMemo(() => {
-    return ExcelReportGenerator.getPrintablePDFHTML(reportPayload);
-  }, [reportPayload]);
+    return ExcelReportGenerator.getPrintablePDFHTML(reportPayload, previewSignedToken);
+  }, [reportPayload, previewSignedToken]);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 

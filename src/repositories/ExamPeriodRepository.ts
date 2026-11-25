@@ -34,23 +34,36 @@ const safeSetStorage = (key: string, value: string): void => {
   } catch {}
 };
 
+const safeRemoveStorage = (key: string): void => {
+  memoryPeriodStore.delete(key);
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.removeItem === 'function') {
+      localStorage.removeItem(key);
+    }
+  } catch {}
+};
+
 const MONTH_NAMES_ID = [
   'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
   'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
 ];
 
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+
 function formatIndonesianDate(d: Date): string {
   if (isNaN(d.getTime())) return '-';
-  const day = d.getDate();
-  const month = MONTH_NAMES_ID[d.getMonth()];
-  const year = d.getFullYear();
+  const wib = new Date(d.getTime() + WIB_OFFSET_MS);
+  const day = wib.getUTCDate();
+  const month = MONTH_NAMES_ID[wib.getUTCMonth()];
+  const year = wib.getUTCFullYear();
   return `${day} ${month} ${year}`;
 }
 
 function formatIndonesianTime(d: Date): string {
   if (isNaN(d.getTime())) return '00:00';
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const wib = new Date(d.getTime() + WIB_OFFSET_MS);
+  const hours = String(wib.getUTCHours()).padStart(2, '0');
+  const minutes = String(wib.getUTCMinutes()).padStart(2, '0');
   return `${hours}:${minutes}`;
 }
 
@@ -141,6 +154,9 @@ export class ExamPeriodRepository {
     const cleanYear = targetYear.replace(/[^\w]/g, '_');
     const storageKey = `${EXAM_PERIOD_STORAGE_KEY_PREFIX}_${cleanYear}`;
 
+    const prevYearStorage = safeGetStorage(storageKey);
+    const prevGlobalStorage = safeGetStorage('smart_absensi_exam_period_settings');
+
     try {
       const payload: ExamPeriodSettings = {
         ...settings,
@@ -153,11 +169,21 @@ export class ExamPeriodRepository {
       safeSetStorage('smart_absensi_exam_period_settings', JSON.stringify(payload));
 
       // 2. Persist to Cloud Provider
+      let cloudOk = false;
       try {
         const provider = ProviderFactory.getProvider();
-        await provider.saveExamPeriodSettings(payload);
+        cloudOk = await provider.saveExamPeriodSettings(payload);
       } catch (cloudErr) {
         logger.warn('ExamPeriodRepository', 'Failed to push exam period settings to provider:', cloudErr);
+        cloudOk = false;
+      }
+
+      if (!cloudOk) {
+        if (prevYearStorage !== null) safeSetStorage(storageKey, prevYearStorage);
+        else safeRemoveStorage(storageKey);
+        if (prevGlobalStorage !== null) safeSetStorage('smart_absensi_exam_period_settings', prevGlobalStorage);
+        else safeRemoveStorage('smart_absensi_exam_period_settings');
+        return false;
       }
 
       // 3. Broadcast real-time event across components and tabs
@@ -170,6 +196,10 @@ export class ExamPeriodRepository {
       return true;
     } catch (err) {
       logger.error('ExamPeriodRepository', 'Failed to save exam period settings:', err);
+      if (prevYearStorage !== null) safeSetStorage(storageKey, prevYearStorage);
+      else safeRemoveStorage(storageKey);
+      if (prevGlobalStorage !== null) safeSetStorage('smart_absensi_exam_period_settings', prevGlobalStorage);
+      else safeRemoveStorage('smart_absensi_exam_period_settings');
       return false;
     }
   }
@@ -232,11 +262,13 @@ export class ExamPeriodRepository {
 
           if (settings.endTime && settings.endTime.includes(':')) {
             const timeParts = settings.endTime.split(':').map(Number);
-            hour = isNaN(timeParts[0]) ? 17 : timeParts[0];
-            minute = isNaN(timeParts[1]) ? 0 : timeParts[1];
+            hour = isNaN(timeParts[0]) ? 17 : Math.min(23, Math.max(0, timeParts[0]));
+            minute = isNaN(timeParts[1]) ? 0 : Math.min(59, Math.max(0, timeParts[1]));
           }
 
-          const expiryDate = new Date(year, month - 1, day, hour, minute, 59, 999);
+          const pad2 = (n: number) => String(n).padStart(2, '0');
+          const expiryIsoWib = `${year}-${pad2(month)}-${pad2(day)}T${pad2(hour)}:${pad2(minute)}:59.999+07:00`;
+          const expiryDate = new Date(expiryIsoWib);
 
           if (!isNaN(expiryDate.getTime())) {
             const isPast = now.getTime() > expiryDate.getTime();

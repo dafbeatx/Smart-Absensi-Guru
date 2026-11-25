@@ -1,5 +1,6 @@
-import { ExcelReportGenerator, isTeacherLeaveMatch, isTeacherRecordMatch } from '../lib/excel-generator.lib';
+import { ExcelReportGenerator, SIGNATORY_OFFICIALS, getDynamicBranding, isTeacherLeaveMatch, isTeacherRecordMatch } from '../lib/excel-generator.lib';
 import type { MultiSheetReportPayload } from '../lib/excel-generator.lib';
+import { DocumentVerificationService } from './document-verification.service';
 import { AnalyticsService } from './analytics.service';
 import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog, HolidayRecord } from '../types/database.types';
 import { getTodayDateInJakarta, getMonthWorkingDays, parseIndonesianMonth, isDateOffDay } from '../utils/time.utils';
@@ -173,7 +174,16 @@ export class ReportService {
     holidays: HolidayRecord[] = []
   ): Promise<boolean> {
     const payload = this.preparePayload(month, year, teachers, attendanceRecords, leaveRequests, auditLogs, holidays);
-    ExcelReportGenerator.generatePrintablePDF(payload);
+    const docNo = `421.3/SAG-BOGOR/${parseIndonesianMonth(month)}/${year}`;
+    const signedToken = await DocumentVerificationService.issueDocumentSignature({
+      docNo,
+      type: 'REKAP_PRESENSI',
+      month,
+      year,
+      school: getDynamicBranding().institutionName,
+      signatory: SIGNATORY_OFFICIALS.KEPSEK_NAME,
+    });
+    ExcelReportGenerator.generatePrintablePDF(payload, signedToken);
     return true;
   }
 
@@ -188,7 +198,19 @@ export class ReportService {
     leaveRequests: LeaveRequest[] = [],
     holidays: HolidayRecord[] = []
   ): Promise<boolean> {
-    ExcelReportGenerator.generateIndividualTeacherPDF(teacher, month, year, attendanceRecords, leaveRequests, holidays);
+    const monthNumber = parseIndonesianMonth(month);
+    const monthPrefix = `${year}-${String(monthNumber).padStart(2, '0')}`;
+    const docNo = `421.3/IND-${teacher.nip || teacher.id.slice(0, 8)}/${monthPrefix}`;
+    const signedToken = await DocumentVerificationService.issueDocumentSignature({
+      docNo,
+      type: 'PRESENSI_INDIVIDU',
+      teacher: teacher.full_name,
+      month,
+      year,
+      school: getDynamicBranding().institutionName,
+      signatory: SIGNATORY_OFFICIALS.KEPSEK_NAME,
+    });
+    ExcelReportGenerator.generateIndividualTeacherPDF(teacher, month, year, attendanceRecords, leaveRequests, holidays, signedToken);
     return true;
   }
 

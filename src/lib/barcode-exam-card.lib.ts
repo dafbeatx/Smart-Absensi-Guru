@@ -11,6 +11,13 @@ import { SMP_AL_ITTIHADIYAH_LOGO_BASE64 } from '../assets/logo-smp-terpadu';
 import { SMA_AS_SALAAM_LOGO_BASE64 } from '../assets/logo-sma-terpadu';
 import type { StudentItem } from '../types/database.types';
 import { resolveSchoolLevel } from '../utils/class.utils';
+import {
+  escapeHtml,
+  formatNppHtmlLine,
+  getLevelSchoolBranding,
+  openHtmlBlobPrintWindow,
+  resolvePrintAssetUrl,
+} from '../utils/html.utils';
 import { exportHtmlToPdf } from './pdf-export.lib';
 
 export type EducationLevel = 'SMP' | 'SMA';
@@ -167,7 +174,7 @@ export class BarcodeExamCardService {
     const totalWidth = x;
     const totalHeight = showText ? height + 11 : height;
     const textElement = showText
-      ? `<text x="${(totalWidth / 2).toFixed(1)}" y="${totalHeight - 1}" text-anchor="middle" font-family="monospace" font-size="8.5" font-weight="700" fill="#0f172a">${text}</text>`
+      ? `<text x="${(totalWidth / 2).toFixed(1)}" y="${totalHeight - 1}" text-anchor="middle" font-family="monospace" font-size="8.5" font-weight="700" fill="#0f172a">${escapeHtml(text)}</text>`
       : '';
 
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalWidth.toFixed(1)} ${totalHeight}" width="${totalWidth.toFixed(1)}" height="${totalHeight}" style="display: block; margin: 0 auto;">${rects.join('')}${textElement}</svg>`;
@@ -183,14 +190,18 @@ export class BarcodeExamCardService {
   ): string {
     const selectedLevel: EducationLevel = options.level || 'SMP';
     const isSMP = selectedLevel === 'SMP';
+    const levelBranding = getLevelSchoolBranding(
+      selectedLevel,
+      options.institutionName || options.namaSekolah,
+      options.institutionAddress
+    );
 
     // Konfigurasi Lembaga Berdasarkan Jenjang (SMP vs SMA Terpisah)
-    const schoolName = isSMP
-      ? (options.institutionName || options.namaSekolah || 'SMP TERPADU AL-ITTIHADIYAH')
-      : (options.institutionName || options.namaSekolah || 'SMA TERPADU AS SALAAM');
-    const schoolAddress = options.institutionAddress || (isSMP ? 'Ciampea - Bogor' : 'Bogor - Jawa Barat');
-    const headerColor = isSMP ? '#047857' : '#065f46'; // Hijau Al-Ittihadiyah vs Hijau Hutan As Salaam
-    const logoSrc = isSMP ? SMP_AL_ITTIHADIYAH_LOGO_BASE64 : SMA_AS_SALAAM_LOGO_BASE64;
+    const schoolName = levelBranding.institutionName;
+    const schoolAddress = levelBranding.address;
+    const headerColor = levelBranding.accentColor; // Hijau Al-Ittihadiyah vs Hijau Hutan As Salaam
+    const logoSrc = resolvePrintAssetUrl(isSMP ? SMP_AL_ITTIHADIYAH_LOGO_BASE64 : SMA_AS_SALAAM_LOGO_BASE64);
+    const stampSrc = levelBranding.stampPath ? resolvePrintAssetUrl(levelBranding.stampPath) : null;
 
     const kepsekName = options.principalName || options.kepalaSekolah || SIGNATORY_OFFICIALS.KEPSEK_NAME;
     const rawTitle = options.examTitle || options.namaUjian || 'PENILAIAN AKHIR SEMESTER (PAS) GANJIL';
@@ -199,7 +210,9 @@ export class BarcodeExamCardService {
     const cleanAcademicYear = academicYear.replace(/\//g, '-');
     const semesterStr = (options.semester || 'Ganjil').toUpperCase();
     const defaultRoom = options.roomName || options.ruangDefault || 'Ruang 01';
-    const kepsekNip = options.nipKepalaSekolah || '197605122005011004';
+    const kepsekNppHtml = formatNppHtmlLine(options.nipKepalaSekolah, {
+      style: 'font-size: 5px; color: #64748b;',
+    });
 
     // Filter siswa agar tidak tercampur jika opsi level diberikan
     const activeStudents = options.level ? filterStudentsByLevel(students, options.level) : students;
@@ -210,14 +223,14 @@ export class BarcodeExamCardService {
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Kartu Peserta Ujian - ${schoolName}</title>
+  <title>Kartu Peserta Ujian - ${escapeHtml(schoolName)}</title>
   <style>
     @page { size: A4 portrait; margin: 10mm; }
     body { font-family: 'Inter', sans-serif; text-align: center; padding: 50px; color: #475569; }
   </style>
 </head>
 <body>
-  <h2>Tidak ada data peserta ujian yang ditemukan untuk jenjang ${selectedLevel}.</h2>
+  <h2>Tidak ada data peserta ujian yang ditemukan untuk jenjang ${escapeHtml(selectedLevel)}.</h2>
   <p>Silakan pilih jenjang atau rombel kelas yang sesuai.</p>
 </body>
 </html>
@@ -236,7 +249,7 @@ export class BarcodeExamCardService {
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Kartu Peserta Ujian (${selectedLevel}) - ${schoolName}</title>
+  <title>Kartu Peserta Ujian (${escapeHtml(selectedLevel)}) - ${escapeHtml(schoolName)}</title>
   <style>
     @page {
       size: A4 portrait;
@@ -266,10 +279,12 @@ export class BarcodeExamCardService {
       grid-auto-rows: 54mm;
       gap: 5mm 8mm;
       justify-content: center;
-      page-break-after: always;
-      break-after: page;
       box-shadow: 0 4px 12px rgba(0,0,0,0.08);
       box-sizing: border-box;
+    }
+    .a4-sheet:not(:last-child) {
+      page-break-after: always;
+      break-after: page;
     }
     @media print {
       body { background: #ffffff; }
@@ -563,12 +578,12 @@ export class BarcodeExamCardService {
               <div class="exam-card">
                 <div class="card-header">
                   <div class="logo-box">
-                    <img src="${logoSrc}" alt="Logo ${selectedLevel}" />
+                    <img src="${escapeHtml(logoSrc)}" alt="Logo ${escapeHtml(selectedLevel)}" />
                   </div>
                   <div class="header-text">
-                    <div class="inst-name">${schoolName}</div>
-                    <div class="doc-title">${title}</div>
-                    <div class="doc-sub">TA ${academicYear} • SEMESTER ${semesterStr} • ${schoolAddress}</div>
+                    <div class="inst-name">${escapeHtml(schoolName)}</div>
+                    <div class="doc-title">${escapeHtml(title)}</div>
+                    <div class="doc-sub">TA ${escapeHtml(academicYear)} • SEMESTER ${escapeHtml(semesterStr)} • ${escapeHtml(schoolAddress)}</div>
                   </div>
                 </div>
 
@@ -582,27 +597,27 @@ export class BarcodeExamCardService {
                     <tr>
                       <td class="lbl">No. Peserta</td>
                       <td class="sep">:</td>
-                      <td class="val" style="color: ${headerColor}; font-family: monospace;">${examNumber}</td>
+                      <td class="val" style="color: ${headerColor}; font-family: monospace;">${escapeHtml(examNumber)}</td>
                     </tr>
                     <tr>
                       <td class="lbl">Nama Siswa</td>
                       <td class="sep">:</td>
-                      <td class="val" style="font-size: 6.8px;">${studentName}</td>
+                      <td class="val" style="font-size: 6.8px;">${escapeHtml(studentName)}</td>
                     </tr>
                     <tr>
                       <td class="lbl">NISN</td>
                       <td class="sep">:</td>
-                      <td class="val" style="font-family: monospace;">${studentNisn}</td>
+                      <td class="val" style="font-family: monospace;">${escapeHtml(studentNisn)}</td>
                     </tr>
                     <tr>
                       <td class="lbl">Kelas / Rombel</td>
                       <td class="sep">:</td>
-                      <td class="val">${studentClass}</td>
+                      <td class="val">${escapeHtml(studentClass)}</td>
                     </tr>
                     <tr>
                       <td class="lbl">Ruang Ujian</td>
                       <td class="sep">:</td>
-                      <td class="val">${studentRoom}</td>
+                      <td class="val">${escapeHtml(studentRoom)}</td>
                     </tr>
                   </table>
                 </div>
@@ -616,10 +631,10 @@ export class BarcodeExamCardService {
                     <div>Mengetahui,</div>
                     <div style="font-weight: bold; margin-bottom: 12px;">Kepala Sekolah</div>
                     <div class="stamp-container">
-                      <img src="/stempel-ttd-kepsek-as-salaam.png" alt="Stempel & TTD Kepala Sekolah" style="width: 100%; height: 100%; object-fit: contain;" />
+                      ${stampSrc ? `<img src="${escapeHtml(stampSrc)}" alt="Stempel &amp; TTD Kepala Sekolah" style="width: 100%; height: 100%; object-fit: contain;" />` : ''}
                     </div>
-                    <div class="sig-name">${kepsekName}</div>
-                    <div style="font-size: 5px; color: #64748b;">NPP. ${kepsekNip}</div>
+                    <div class="sig-name">${escapeHtml(kepsekName)}</div>
+                    ${kepsekNppHtml}
                   </div>
                 </div>
               </div>
@@ -635,7 +650,7 @@ export class BarcodeExamCardService {
     function downloadAllCardsFile() {
       if (window.opener && window.opener.__exportHtmlToPdf) {
         window.opener.__exportHtmlToPdf(document.documentElement.outerHTML, {
-          filename: 'Kartu_Peserta_' + '${selectedLevel}_' + '${cleanAcademicYear}' + '.pdf',
+          filename: ${JSON.stringify(`Kartu_Peserta_${selectedLevel}_${cleanAcademicYear}.pdf`)},
           orientation: 'portrait'
         });
       } else {
@@ -658,17 +673,15 @@ export class BarcodeExamCardService {
     if (typeof window === 'undefined') return false;
     const html = this.generateExamCardsA4HTML(students, options);
 
-    try {
-      const printWindow = window.open('', '_blank', 'width=1000,height=800');
-      if (!printWindow) return false;
+    const win = openHtmlBlobPrintWindow(html, {
+      autoPrint: false,
+      windowFeatures: 'width=1000,height=800',
+    });
+    if (win) return true;
 
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.focus();
-      return true;
-    } catch {
-      return false;
-    }
+    // Fallback ke unduhan PDF A4 apabila jendela pop-up diblokir
+    void this.downloadExamCardsA4(students, options);
+    return false;
   }
 
   /**

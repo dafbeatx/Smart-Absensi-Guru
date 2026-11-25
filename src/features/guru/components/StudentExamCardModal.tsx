@@ -176,7 +176,11 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
         `Menyiapkan ${filteredStudents.length} kartu ujian ${selectedLevel} (Ukuran KTP 85.6x54mm • 8 kartu/lembar A4).`
       );
     } else {
-      showToast('error', 'Pop-up Terblokir', 'Izinkan pop-up di browser untuk mencetak kartu ujian.');
+      showToast(
+        'info',
+        'Dialihkan ke Unduhan PDF',
+        `Pop-up cetak diblokir — mengunduh PDF ${filteredStudents.length} kartu ujian ${selectedLevel}.`
+      );
     }
   };
 
@@ -223,6 +227,7 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
       onClose={onClose}
       title="🏷️ Generator Kartu Peserta Ujian & Barcode Siswa"
       maxWidth="2xl"
+      mobileFullscreen
     >
       <div className="space-y-3.5 py-1 text-slate-800">
         {/* ── 1. TAB PEMILIH JENJANG PENDIDIKAN (SMP VS SMA TERPISAH) ─────── */}
@@ -341,7 +346,7 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
             <select
               value={examTitle}
               onChange={(e) => setExamTitle(e.target.value)}
-              className="w-full bg-white border border-slate-300 rounded-xl p-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#287094]"
+              className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-300 rounded-xl px-2.5 py-2 sm:p-1.5 text-base sm:text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#287094]"
             >
               <option value="Penilaian Akhir Semester (PAS) Ganjil">Penilaian Akhir Semester (PAS)</option>
               <option value="Penilaian Tengah Semester (PTS) Ganjil">Penilaian Tengah Semester (PTS)</option>
@@ -362,12 +367,12 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
                 value={academicYear}
                 onChange={(e) => setAcademicYear(e.target.value)}
                 placeholder="2026/2027"
-                className="w-2/3 bg-white border border-slate-300 rounded-xl p-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#287094]"
+                className="w-2/3 min-h-11 sm:min-h-0 bg-white border border-slate-300 rounded-xl px-2.5 py-2 sm:p-1.5 text-base sm:text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#287094]"
               />
               <select
                 value={semester}
                 onChange={(e) => setSemester(e.target.value as 'Ganjil' | 'Genap')}
-                className="w-1/3 bg-white border border-slate-300 rounded-xl p-1.5 text-xs font-bold text-slate-800 focus:outline-none"
+                className="w-1/3 min-h-11 sm:min-h-0 bg-white border border-slate-300 rounded-xl px-2 py-2 sm:p-1.5 text-base sm:text-xs font-bold text-slate-800 focus:outline-none"
               >
                 <option value="Ganjil">Ganjil</option>
                 <option value="Genap">Genap</option>
@@ -385,7 +390,7 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
               value={roomName}
               onChange={(e) => setRoomName(e.target.value)}
               placeholder="Ruang 01"
-              className="w-full bg-white border border-slate-300 rounded-xl p-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#287094]"
+              className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-300 rounded-xl px-2.5 py-2 sm:p-1.5 text-base sm:text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#287094]"
             />
           </div>
 
@@ -397,7 +402,7 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full bg-white border border-slate-300 rounded-xl p-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#287094]"
+              className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-300 rounded-xl px-2.5 py-2 sm:p-1.5 text-base sm:text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#287094]"
             >
               <option value="ALL">Semua Kelas {selectedLevel} ({levelStudents.length} Siswa)</option>
               {availableClasses.map((cls) => (
@@ -415,13 +420,13 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
           <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs flex flex-col h-100">
             <div className="p-2 border-b border-slate-100 bg-slate-50/70">
               <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <Search className="w-3.5 h-3.5 absolute left-3 top-3.5 sm:top-2.5 text-slate-400" />
                 <input
                   type="text"
                   placeholder={`Cari nama/NISN siswa ${selectedLevel}...`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#287094]"
+                  className="w-full min-h-11 sm:min-h-0 pl-8 pr-3 py-2 sm:py-1.5 bg-white border border-slate-200 rounded-xl text-base sm:text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#287094]"
                 />
               </div>
               <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500 px-1">
@@ -535,7 +540,7 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
                       {examTitle}
                     </p>
                     <p className="text-[7px] font-semibold text-slate-500 truncate leading-tight">
-                      TA {academicYear} • SEMESTER {semester.toUpperCase()} • CIAMPEA BOGOR
+                      TA {academicYear} • SEMESTER {semester.toUpperCase()} • {isSMP ? 'CIAMPEA BOGOR' : 'BOGOR JAWA BARAT'}
                     </p>
                   </div>
                 </div>
@@ -599,17 +604,16 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
                     <p className="text-slate-600">Mengetahui,</p>
                     <p className="font-bold text-slate-900">Kepala Sekolah</p>
                     <div className="h-6 relative">
-                      <img
-                        src="/stempel-ttd-kepsek-as-salaam.png"
-                        alt="Tanda Tangan & Stempel Kepala Sekolah"
-                        className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-16 h-12 object-contain pointer-events-none opacity-95 z-10"
-                      />
+                      {!isSMP && (
+                        <img
+                          src="/stempel-ttd-kepsek-as-salaam.png"
+                          alt="Tanda Tangan & Stempel Kepala Sekolah"
+                          className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-16 h-12 object-contain pointer-events-none opacity-95 z-10"
+                        />
+                      )}
                     </div>
                     <p className="font-black text-slate-900 underline truncate relative z-20">
                       {SIGNATORY_OFFICIALS.KEPSEK_NAME}
-                    </p>
-                    <p className="text-[5.5px] text-slate-500 font-mono relative z-20">
-                      NPP. 197605122005011004
                     </p>
                   </div>
                 </div>

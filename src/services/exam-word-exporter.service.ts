@@ -7,6 +7,7 @@
 import type { ExamInvigilationMatrix } from './exam-matrix-builder.service';
 import { SIGNATORY_OFFICIALS } from '../lib/excel-generator.lib';
 import { exportHtmlToPdf } from '../lib/pdf-export.lib';
+import { escapeHtml, openHtmlBlobPrintWindow, sanitizeNpp, triggerBlobDownload } from '../utils/html.utils';
 
 export class ExamWordExporterService {
   /**
@@ -19,7 +20,7 @@ export class ExamWordExporterService {
     // Header Row 1: No, Hari/Tanggal, Waktu, Mata Pelajaran, Kode Pengawas (colspan = rooms.length)
     // Header Row 2: subheaders for each room (R 01, R 02, ...)
     const roomSubHeaders = rooms
-      .map((r) => `<th class="text-center room-col" style="white-space: nowrap; width: 48px; min-width: 48px;">${r.label}</th>`)
+      .map((r) => `<th class="text-center room-col" style="white-space: nowrap; width: 48px; min-width: 48px;">${escapeHtml(r.label)}</th>`)
       .join('');
 
     // Build Table 1 Body Rows
@@ -30,24 +31,24 @@ export class ExamWordExporterService {
       day.sessions.forEach((sess, sIdx) => {
         const isFirstInDay = sIdx === 0;
         const roomTds = rooms
-          .map((r) => `<td class="text-center font-bold font-code" style="white-space: nowrap;">${sess.roomCodes[r.key] || '-'}</td>`)
+          .map((r) => `<td class="text-center font-bold font-code" style="white-space: nowrap;">${escapeHtml(sess.roomCodes[r.key] || '-')}</td>`)
           .join('');
 
         if (isFirstInDay) {
           matrixBodyRows += `
             <tr>
               <td class="text-center" rowspan="${rowSpan}">${day.dayNumber}</td>
-              <td class="day-col font-bold" rowspan="${rowSpan}">${day.dayFormatted}</td>
-              <td class="text-center">${sess.timeRange}</td>
-              <td class="subject-col">${sess.subjectNumber}. ${sess.subjectTitle}</td>
+              <td class="day-col font-bold" rowspan="${rowSpan}">${escapeHtml(day.dayFormatted)}</td>
+              <td class="text-center">${escapeHtml(sess.timeRange)}</td>
+              <td class="subject-col">${sess.subjectNumber}. ${escapeHtml(sess.subjectTitle)}</td>
               ${roomTds}
             </tr>
           `;
         } else {
           matrixBodyRows += `
             <tr>
-              <td class="text-center">${sess.timeRange}</td>
-              <td class="subject-col">${sess.subjectNumber}. ${sess.subjectTitle}</td>
+              <td class="text-center">${escapeHtml(sess.timeRange)}</td>
+              <td class="subject-col">${sess.subjectNumber}. ${escapeHtml(sess.subjectTitle)}</td>
               ${roomTds}
             </tr>
           `;
@@ -61,9 +62,9 @@ export class ExamWordExporterService {
         (t) => `
           <tr>
             <td class="text-center">${t.no}</td>
-            <td class="teacher-col font-bold">${t.fullName.toUpperCase()}</td>
-            <td class="subject-col">${t.subject}</td>
-            <td class="text-center font-bold font-code">${t.code}</td>
+            <td class="teacher-col font-bold">${escapeHtml(t.fullName.toUpperCase())}</td>
+            <td class="subject-col">${escapeHtml(t.subject)}</td>
+            <td class="text-center font-bold font-code">${escapeHtml(t.code)}</td>
           </tr>
         `
       )
@@ -82,7 +83,7 @@ export class ExamWordExporterService {
           </w:WordDocument>
         </xml>
         <![endif]-->
-        <title>${title} - ${institutionName}</title>
+        <title>${escapeHtml(title)} - ${escapeHtml(institutionName)}</title>
         <style>
           @page Section1 {
             size: 210mm 297mm; /* A4 Portrait */
@@ -157,9 +158,9 @@ export class ExamWordExporterService {
         <div class="Section1">
           <!-- Document Header -->
           <div class="header-container">
-            <h1 class="header-title">${title}</h1>
-            <h2 class="header-subtitle">${subTitle}</h2>
-            <h2 class="header-school">${institutionName.toUpperCase()}</h2>
+            <h1 class="header-title">${escapeHtml(title)}</h1>
+            <h2 class="header-subtitle">${escapeHtml(subTitle)}</h2>
+            <h2 class="header-school">${escapeHtml(institutionName.toUpperCase())}</h2>
           </div>
 
           <!-- Table 1: Matrix Jadwal Pengawas -->
@@ -216,16 +217,7 @@ export class ExamWordExporterService {
     const defaultFileName = `Jadwal_Pengawas_${matrix.subTitle.replace(/[^\w]/g, '_')}.doc`;
     const fileName = fileNameOverride || defaultFileName;
 
-    if (typeof window !== 'undefined') {
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }
+    triggerBlobDownload(blob, fileName);
   }
 
   /**
@@ -246,7 +238,7 @@ export class ExamWordExporterService {
     void options; // Signatures are omitted from official invigilation matrix per requirements
 
     const roomSubHeaders = rooms
-      .map((r) => `<th class="text-center room-col" style="white-space: nowrap; width: 48px; min-width: 48px;">${r.label}</th>`)
+      .map((r) => `<th class="text-center room-col" style="white-space: nowrap; width: 48px; min-width: 48px;">${escapeHtml(r.label)}</th>`)
       .join('');
 
     let matrixBodyRows = '';
@@ -255,24 +247,24 @@ export class ExamWordExporterService {
       day.sessions.forEach((sess, sIdx) => {
         const isFirstInDay = sIdx === 0;
         const roomTds = rooms
-          .map((r) => `<td class="text-center font-code font-bold" style="white-space: nowrap;">${sess.roomCodes[r.key] || '-'}</td>`)
+          .map((r) => `<td class="text-center font-code font-bold" style="white-space: nowrap;">${escapeHtml(sess.roomCodes[r.key] || '-')}</td>`)
           .join('');
 
         if (isFirstInDay) {
           matrixBodyRows += `
             <tr>
               <td class="text-center" rowspan="${rowSpan}">${day.dayNumber}</td>
-              <td class="day-col font-bold" rowspan="${rowSpan}">${day.dayFormatted}</td>
-              <td class="text-center" style="white-space: nowrap;">${sess.timeRange}</td>
-              <td class="subject-col">${sess.subjectNumber}. ${sess.subjectTitle}</td>
+              <td class="day-col font-bold" rowspan="${rowSpan}">${escapeHtml(day.dayFormatted)}</td>
+              <td class="text-center" style="white-space: nowrap;">${escapeHtml(sess.timeRange)}</td>
+              <td class="subject-col">${sess.subjectNumber}. ${escapeHtml(sess.subjectTitle)}</td>
               ${roomTds}
             </tr>
           `;
         } else {
           matrixBodyRows += `
             <tr>
-              <td class="text-center" style="white-space: nowrap;">${sess.timeRange}</td>
-              <td class="subject-col">${sess.subjectNumber}. ${sess.subjectTitle}</td>
+              <td class="text-center" style="white-space: nowrap;">${escapeHtml(sess.timeRange)}</td>
+              <td class="subject-col">${sess.subjectNumber}. ${escapeHtml(sess.subjectTitle)}</td>
               ${roomTds}
             </tr>
           `;
@@ -285,9 +277,9 @@ export class ExamWordExporterService {
         (t) => `
           <tr>
             <td class="text-center">${t.no}</td>
-            <td class="teacher-col font-bold">${t.fullName}</td>
-            <td class="subject-col">${t.subject}</td>
-            <td class="text-center font-bold font-code" style="white-space: nowrap;">${t.code}</td>
+            <td class="teacher-col font-bold">${escapeHtml(t.fullName)}</td>
+            <td class="subject-col">${escapeHtml(t.subject)}</td>
+            <td class="text-center font-bold font-code" style="white-space: nowrap;">${escapeHtml(t.code)}</td>
           </tr>
         `
       )
@@ -300,7 +292,7 @@ export class ExamWordExporterService {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} - ${institutionName}</title>
+  <title>${escapeHtml(title)} - ${escapeHtml(institutionName)}</title>
   <style>
     @page {
       size: A4 portrait;
@@ -492,7 +484,7 @@ export class ExamWordExporterService {
   <div class="no-print-bar">
     <div style="display: flex; align-items: center; gap: 8px;">
       <span style="font-size: 16px;">📄</span>
-      <span style="font-weight: 800; font-size: 13px;">Format Cetak Resmi A4 — ${institutionName}</span>
+      <span style="font-weight: 800; font-size: 13px;">Format Cetak Resmi A4 — ${escapeHtml(institutionName)}</span>
     </div>
     <div style="display: flex; gap: 8px;">
       <button type="button" class="btn-action btn-print" onclick="window.print()">
@@ -510,9 +502,9 @@ export class ExamWordExporterService {
   <!-- Lembar Kertas A4 Resmi -->
   <div class="paper-page">
     <div class="doc-header">
-      <h1>${title}</h1>
-      <h2>${subTitle}</h2>
-      <h3>${institutionName.toUpperCase()}</h3>
+      <h1>${escapeHtml(title)}</h1>
+      <h2>${escapeHtml(subTitle)}</h2>
+      <h3>${escapeHtml(institutionName.toUpperCase())}</h3>
     </div>
 
     <!-- Tabel 1: Matriks Jadwal Pengawas Ruang -->
@@ -557,7 +549,7 @@ export class ExamWordExporterService {
     function downloadMatrixA4File() {
       if (window.opener && window.opener.__exportHtmlToPdf) {
         window.opener.__exportHtmlToPdf(document.documentElement.outerHTML, {
-          filename: 'Jadwal_Pengawas_' + '${cleanSubTitle}' + '_A4.pdf',
+          filename: ${JSON.stringify(`Jadwal_Pengawas_${cleanSubTitle}_A4.pdf`)},
           orientation: 'portrait'
         });
       } else {
@@ -569,12 +561,9 @@ export class ExamWordExporterService {
 </html>`;
   }
 
-  /**
-   * Generates and opens a printable personal invigilation duty card on A4 paper for an individual teacher.
-   */
-  public static printTeacherDutySlip(
+  private static buildTeacherDutySlipHtml(
     teacherName: string,
-    teacherCode: string | undefined = '-',
+    teacherCode: string | undefined,
     duties: Array<{
       date: string;
       dayName: string;
@@ -586,56 +575,55 @@ export class ExamWordExporterService {
       educationLevel?: 'SMP' | 'SMA';
       teacherCode?: string;
     }>,
-    institutionName = 'SMA TERPADU AS SALAAM',
-    examTitle = 'ASESMEN SUMATIF TENGAH SEMESTER (ASTS)',
+    institutionName: string,
+    examTitle: string,
     kepsekName?: string,
-    kepsekNpp?: string
-  ): void {
-    if (typeof window === 'undefined') return;
-
+    kepsekNpp?: string,
+    includeActionBar = true
+  ): string {
     const safeCode = teacherCode || '-';
     const cleanTeacherName = teacherName.replace(/[^\w]/g, '_');
     const actualKepsekName = kepsekName || SIGNATORY_OFFICIALS.KEPSEK_NAME || 'Farhan Sopian Sahid, S.Pd.I';
-    const formattedKepsekNpp = kepsekNpp && kepsekNpp !== '-'
-      ? (kepsekNpp.startsWith('NPP') ? kepsekNpp : `NPP. ${kepsekNpp}`)
-      : 'NPP. -';
+    const cleanKepsekNpp = sanitizeNpp(kepsekNpp);
+    const kepsekNppDiv = cleanKepsekNpp
+      ? `<div style="font-size: 8.5pt; color: #333333;">NPP. ${escapeHtml(cleanKepsekNpp)}</div>`
+      : '';
+
+    let signMonthYear = new Date().toLocaleDateString('id-ID', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'Asia/Jakarta',
+    });
+    if (duties[0]?.date && /^\d{4}-\d{2}-\d{2}/.test(duties[0].date)) {
+      const parsed = new Date(`${duties[0].date.slice(0, 10)}T12:00:00+07:00`);
+      if (!isNaN(parsed.getTime())) {
+        signMonthYear = parsed.toLocaleDateString('id-ID', {
+          month: 'long',
+          year: 'numeric',
+          timeZone: 'Asia/Jakarta',
+        });
+      }
+    }
 
     const dutyRows = duties
       .map(
         (d, idx) => `
           <tr>
             <td class="text-center">${idx + 1}</td>
-            <td class="font-bold">${d.dayName}, ${d.date}</td>
-            <td class="text-center font-code">${(d.startTime || '08:00').replace(':', '.')} - ${(d.endTime || '09:30').replace(':', '.')} (Sesi ${d.sessionNumber})</td>
-            <td>${d.subject}</td>
+            <td class="font-bold">${escapeHtml(d.dayName)}, ${escapeHtml(d.date)}</td>
+            <td class="text-center font-code">${escapeHtml((d.startTime || '08:00').replace(':', '.'))} - ${escapeHtml((d.endTime || '09:30').replace(':', '.'))} (Sesi ${d.sessionNumber})</td>
+            <td>${escapeHtml(d.subject)}</td>
             <td class="text-center font-bold" style="background-color: #f8fafc;">
-              ${d.educationLevel ? `<span style="display:inline-block; font-size:7.5pt; font-weight:bold; padding:1px 5px; border-radius:3px; border: 1px solid #000000; margin-right:4px;">${d.educationLevel}</span>` : ''}${d.roomName}
+              ${d.educationLevel ? `<span style="display:inline-block; font-size:7.5pt; font-weight:bold; padding:1px 5px; border-radius:3px; border: 1px solid #000000; margin-right:4px;">${escapeHtml(d.educationLevel)}</span>` : ''}${escapeHtml(d.roomName)}
             </td>
-            <td class="text-center font-code font-bold">${d.teacherCode || safeCode}</td>
+            <td class="text-center font-code font-bold">${escapeHtml(d.teacherCode || safeCode)}</td>
           </tr>
         `
       )
       .join('');
 
-    const html = `<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="utf-8">
-  <title>Kartu Tugas Mengawas - ${teacherName}</title>
-  <style>
-    @page { size: A4 portrait; margin: 10mm 12mm; }
-    * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    body, .paper-page, table, th, td, div, p, span, h1, h2, h3, h4, ol, li, strong, b, .font-code, .rules-box, .sig-area, .teacher-badge {
-      font-family: 'Times New Roman', Times, Georgia, serif !important;
-    }
-    body {
-      font-size: 10pt;
-      line-height: 1.25;
-      color: #000000;
-      margin: 0;
-      padding: 0;
-      background: #f8fafc;
-    }
+    const actionBarStyles = includeActionBar
+      ? `
     .no-print-bar {
       position: sticky;
       top: 0;
@@ -658,14 +646,65 @@ export class ExamWordExporterService {
     }
     .btn-print { background: #059669; color: white; }
     .btn-close { background: rgba(255,255,255,0.15); color: white; }
+    `
+      : '';
+
+    const actionBarHtml = includeActionBar
+      ? `
+  <div class="no-print-bar">
+    <div><strong>Pratinjau Kartu Tugas Mengawas</strong> • ${escapeHtml(teacherName)}</div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn-action btn-print" onclick="window.print()">🖨️ Cetak Kartu Tugas</button>
+      <button class="btn-action btn-download" style="background: #0284c7; color: white;" onclick="downloadDutySlipFile()">📥 Unduh Surat Tugas</button>
+      <button class="btn-action btn-close" onclick="window.close()">Tutup</button>
+    </div>
+  </div>`
+      : '';
+
+    const downloadScriptHtml = includeActionBar
+      ? `
+  <script>
+    function downloadDutySlipFile() {
+      if (window.opener && window.opener.__exportHtmlToPdf) {
+        window.opener.__exportHtmlToPdf(document.documentElement.outerHTML, {
+          filename: ${JSON.stringify(`Surat_Tugas_Mengawas_${cleanTeacherName}.pdf`)},
+          orientation: 'portrait'
+        });
+      } else {
+        window.print();
+      }
+    }
+  </script>`
+      : '';
+
+    return `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Surat Tugas Mengawas - ${escapeHtml(teacherName)}</title>
+  <style>
+    @page { size: A4 portrait; margin: 10mm 12mm; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body, .paper-page, table, th, td, div, p, span, h1, h2, h3, h4, ol, li, strong, b, .font-code, .rules-box, .sig-area, .teacher-badge {
+      font-family: 'Times New Roman', Times, Georgia, serif !important;
+    }
+    body {
+      font-size: 10pt;
+      line-height: 1.25;
+      color: #000000;
+      margin: 0;
+      padding: 0;
+      background: ${includeActionBar ? '#f8fafc' : '#ffffff'};
+    }
+    ${actionBarStyles}
     .paper-page {
       background: white;
       width: 210mm;
       min-height: 297mm;
-      margin: 20px auto;
+      margin: ${includeActionBar ? '20px auto' : '0 auto'};
       padding: 12mm 14mm;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-      position: relative;
+      box-sizing: border-box;
+      ${includeActionBar ? 'box-shadow: 0 4px 15px rgba(0,0,0,0.08); position: relative;' : ''}
       font-family: 'Times New Roman', Times, Georgia, serif !important;
     }
     .doc-header {
@@ -751,37 +790,25 @@ export class ExamWordExporterService {
     @media print {
       body { background: white !important; }
       .no-print-bar { display: none !important; }
-      .paper-page {
-        margin: 0 !important;
-        padding: 0 !important;
-        box-shadow: none !important;
-        width: 100% !important;
-      }
+      .paper-page { margin: 0 !important; padding: 0 !important; box-shadow: none !important; width: 100% !important; }
     }
   </style>
 </head>
 <body>
-  <div class="no-print-bar">
-    <div><strong>Pratinjau Kartu Tugas Mengawas</strong> • ${teacherName}</div>
-    <div style="display: flex; gap: 8px;">
-      <button class="btn-action btn-print" onclick="window.print()">🖨️ Cetak Kartu Tugas</button>
-      <button class="btn-action btn-download" style="background: #0284c7; color: white;" onclick="downloadDutySlipFile()">📥 Unduh Surat Tugas</button>
-      <button class="btn-action btn-close" onclick="window.close()">Tutup</button>
-    </div>
-  </div>
+  ${actionBarHtml}
   <div class="paper-page">
     <div class="doc-header">
       <h1>SURAT TUGAS MENGAWAS ASESMEN SEKOLAH</h1>
-      <h2>${institutionName}</h2>
-      <h3>${examTitle}</h3>
+      <h2>${escapeHtml(institutionName)}</h2>
+      <h3>${escapeHtml(examTitle)}</h3>
     </div>
     <div class="teacher-badge">
       <div>
-        <div style="font-size: 12pt; font-weight: bold; color: #000000;">${teacherName}</div>
+        <div style="font-size: 12pt; font-weight: bold; color: #000000;">${escapeHtml(teacherName)}</div>
         <div style="color: #333333; font-size: 9pt;">Pendidik / Pengawas Ruangan Ujian</div>
       </div>
       <div style="text-align: right;">
-        <div style="font-size: 11pt; font-weight: bold; color: #000000;">Kode Pengawas: ${safeCode}</div>
+        <div style="font-size: 11pt; font-weight: bold; color: #000000;">Kode Pengawas: ${escapeHtml(safeCode)}</div>
         <div style="color: #333333; font-size: 9pt;">Total Tugas: ${duties.length} Sesi</div>
       </div>
     </div>
@@ -813,38 +840,72 @@ export class ExamWordExporterService {
         <div>Mengetahui,</div>
         <div style="font-weight: bold;">Kepala Sekolah</div>
         <div style="height: 50px;"></div>
-        <div style="font-weight: bold; text-decoration: underline; white-space: nowrap;">${actualKepsekName}</div>
-        <div style="font-size: 8.5pt; color: #333333;">${formattedKepsekNpp}</div>
+        <div style="font-weight: bold; text-decoration: underline; white-space: nowrap;">${escapeHtml(actualKepsekName)}</div>
+        ${kepsekNppDiv}
       </div>
       <div style="text-align: center; min-width: 240px;">
-        <div>Bogor, September 2026</div>
+        <div>Bogor, ${escapeHtml(signMonthYear)}</div>
         <div style="font-weight: bold;">Guru Pengawas,</div>
         <div style="height: 50px;"></div>
-        <div style="font-weight: bold; text-decoration: underline; white-space: nowrap;">${teacherName}</div>
-        <div style="font-size: 8.5pt; color: #333333;">Kode Pengawas: ${safeCode}</div>
+        <div style="font-weight: bold; text-decoration: underline; white-space: nowrap;">${escapeHtml(teacherName)}</div>
+        <div style="font-size: 8.5pt; color: #333333;">Kode Pengawas: ${escapeHtml(safeCode)}</div>
       </div>
     </div>
   </div>
-  <script>
-    function downloadDutySlipFile() {
-      if (window.opener && window.opener.__exportHtmlToPdf) {
-        window.opener.__exportHtmlToPdf(document.documentElement.outerHTML, {
-          filename: 'Surat_Tugas_Mengawas_' + '${cleanTeacherName}' + '.pdf',
-          orientation: 'portrait'
-        });
-      } else {
-        window.print();
-      }
-    }
-  </script>
+  ${downloadScriptHtml}
 </body>
 </html>`;
+  }
 
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const win = window.open(url, '_blank');
+  /**
+   * Generates and opens a printable personal invigilation duty card on A4 paper for an individual teacher.
+   */
+  public static printTeacherDutySlip(
+    teacherName: string,
+    teacherCode: string | undefined = '-',
+    duties: Array<{
+      date: string;
+      dayName: string;
+      sessionNumber: number;
+      startTime: string;
+      endTime: string;
+      roomName: string;
+      subject: string;
+      educationLevel?: 'SMP' | 'SMA';
+      teacherCode?: string;
+    }>,
+    institutionName = 'SMA TERPADU AS SALAAM',
+    examTitle = 'ASESMEN SUMATIF TENGAH SEMESTER (ASTS)',
+    kepsekName?: string,
+    kepsekNpp?: string
+  ): void {
+    if (typeof window === 'undefined') return;
+
+    const html = this.buildTeacherDutySlipHtml(
+      teacherName,
+      teacherCode,
+      duties,
+      institutionName,
+      examTitle,
+      kepsekName,
+      kepsekNpp,
+      true
+    );
+
+    const win = openHtmlBlobPrintWindow(html, { autoPrint: false });
     if (!win) {
-      alert('Pop-up terblokir oleh browser. Izinkan pop-up untuk mencetak kartu tugas mengawas.');
+      const cleanFileName = `Surat_Tugas_Mengawas_${teacherName.replace(/[^\w]/g, '_')}.pdf`;
+      const pdfHtml = this.buildTeacherDutySlipHtml(
+        teacherName,
+        teacherCode,
+        duties,
+        institutionName,
+        examTitle,
+        kepsekName,
+        kepsekNpp,
+        false
+      );
+      void exportHtmlToPdf(pdfHtml, { filename: cleanFileName, orientation: 'portrait' });
     }
   }
 
@@ -872,202 +933,16 @@ export class ExamWordExporterService {
   ): Promise<void> {
     if (typeof window === 'undefined') return;
 
-    const safeCode = teacherCode || '-';
-    const actualKepsekName = kepsekName || SIGNATORY_OFFICIALS.KEPSEK_NAME || 'Farhan Sopian Sahid, S.Pd.I';
-    const formattedKepsekNpp = kepsekNpp && kepsekNpp !== '-'
-      ? (kepsekNpp.startsWith('NPP') ? kepsekNpp : `NPP. ${kepsekNpp}`)
-      : 'NPP. -';
-
-    const dutyRows = duties
-      .map(
-        (d, idx) => `
-          <tr>
-            <td class="text-center">${idx + 1}</td>
-            <td class="font-bold">${d.dayName}, ${d.date}</td>
-            <td class="text-center font-code">${(d.startTime || '08:00').replace(':', '.')} - ${(d.endTime || '09:30').replace(':', '.')} (Sesi ${d.sessionNumber})</td>
-            <td>${d.subject}</td>
-            <td class="text-center font-bold" style="background-color: #f8fafc;">
-              ${d.educationLevel ? `<span style="display:inline-block; font-size:7.5pt; font-weight:bold; padding:1px 5px; border-radius:3px; border: 1px solid #000000; margin-right:4px;">${d.educationLevel}</span>` : ''}${d.roomName}
-            </td>
-            <td class="text-center font-code font-bold">${d.teacherCode || safeCode}</td>
-          </tr>
-        `
-      )
-      .join('');
-
-    const html = `<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="utf-8">
-  <title>Surat Tugas Mengawas - ${teacherName}</title>
-  <style>
-    @page { size: A4 portrait; margin: 10mm 12mm; }
-    * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    body, .paper-page, table, th, td, div, p, span, h1, h2, h3, h4, ol, li, strong, b, .font-code, .rules-box, .sig-area, .teacher-badge {
-      font-family: 'Times New Roman', Times, Georgia, serif !important;
-    }
-    body {
-      font-size: 10pt;
-      line-height: 1.25;
-      color: #000000;
-      margin: 0;
-      padding: 0;
-      background: #ffffff;
-    }
-    .paper-page {
-      background: white;
-      width: 210mm;
-      min-height: 297mm;
-      margin: 0 auto;
-      padding: 12mm 14mm;
-      box-sizing: border-box;
-      font-family: 'Times New Roman', Times, Georgia, serif !important;
-    }
-    .doc-header {
-      text-align: center;
-      border-bottom: 2px solid #000000;
-      padding-bottom: 8px;
-      margin-bottom: 14px;
-    }
-    .doc-header h1 {
-      font-size: 13pt;
-      margin: 0;
-      font-weight: bold;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      color: #000000;
-    }
-    .doc-header h2 {
-      font-size: 11pt;
-      margin: 2px 0;
-      font-weight: bold;
-      text-transform: uppercase;
-      color: #000000;
-    }
-    .doc-header h3 {
-      font-size: 12pt;
-      margin: 0;
-      font-weight: bold;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      color: #000000;
-    }
-    .teacher-badge {
-      background: #ffffff;
-      border: 1px solid #000000;
-      border-radius: 4px;
-      padding: 10px 14px;
-      margin-bottom: 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-      margin-bottom: 16px;
-    }
-    table, th, td {
-      border: 1px solid #000000;
-    }
-    th, td {
-      padding: 5px 8px;
-      font-size: 9.5pt;
-      vertical-align: middle;
-      color: #000000;
-    }
-    th {
-      background: #f8fafc;
-      font-weight: bold;
-      text-align: center;
-      color: #000000;
-    }
-    .text-center { text-align: center; }
-    .font-bold { font-weight: bold; }
-    .font-code { font-size: 10pt; font-weight: bold; }
-    .rules-box {
-      background: #ffffff;
-      border: 1px solid #000000;
-      border-radius: 4px;
-      padding: 10px 14px;
-      font-size: 9pt;
-      margin-top: 14px;
-      line-height: 1.4;
-      color: #000000;
-    }
-    .sig-area {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 24px;
-      font-size: 9.5pt;
-      color: #000000;
-    }
-    @media print {
-      body { background: white !important; }
-      .paper-page { margin: 0 !important; padding: 0 !important; box-shadow: none !important; width: 100% !important; }
-    }
-  </style>
-</head>
-<body>
-  <div class="paper-page">
-    <div class="doc-header">
-      <h1>SURAT TUGAS MENGAWAS ASESMEN SEKOLAH</h1>
-      <h2>${institutionName}</h2>
-      <h3>${examTitle}</h3>
-    </div>
-    <div class="teacher-badge">
-      <div>
-        <div style="font-size: 12pt; font-weight: bold; color: #000000;">${teacherName}</div>
-        <div style="color: #333333; font-size: 9pt;">Pendidik / Pengawas Ruangan Ujian</div>
-      </div>
-      <div style="text-align: right;">
-        <div style="font-size: 11pt; font-weight: bold; color: #000000;">Kode Pengawas: ${safeCode}</div>
-        <div style="color: #333333; font-size: 9pt;">Total Tugas: ${duties.length} Sesi</div>
-      </div>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th style="width: 30px;">No</th>
-          <th style="width: 130px;">Hari / Tanggal</th>
-          <th style="width: 120px;">Waktu / Sesi</th>
-          <th>Mata Pelajaran</th>
-          <th style="width: 80px;">Ruangan</th>
-          <th style="width: 65px;">Kode</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${dutyRows}
-      </tbody>
-    </table>
-    <div class="rules-box">
-      <strong>Tata Tertib Pengawas:</strong>
-      <ol style="margin: 4px 0 0 16px; padding: 0;">
-        <li>Hadir di ruang sekretariat panitia minimal 15 menit sebelum waktu asesmen dimulai.</li>
-        <li>Memastikan ketertiban ruang ujian dan memverifikasi kehadiran peserta didik.</li>
-        <li>Menandatangani berita acara pelaksanaan asesmen setelah sesi berakhir.</li>
-      </ol>
-    </div>
-    <div class="sig-area">
-      <div style="text-align: center; min-width: 240px;">
-        <div>Mengetahui,</div>
-        <div style="font-weight: bold;">Kepala Sekolah</div>
-        <div style="height: 50px;"></div>
-        <div style="font-weight: bold; text-decoration: underline; white-space: nowrap;">${actualKepsekName}</div>
-        <div style="font-size: 8.5pt; color: #333333;">${formattedKepsekNpp}</div>
-      </div>
-      <div style="text-align: center; min-width: 240px;">
-        <div>Bogor, September 2026</div>
-        <div style="font-weight: bold;">Guru Pengawas,</div>
-        <div style="height: 50px;"></div>
-        <div style="font-weight: bold; text-decoration: underline; white-space: nowrap;">${teacherName}</div>
-        <div style="font-size: 8.5pt; color: #333333;">Kode Pengawas: ${safeCode}</div>
-      </div>
-    </div>
-  </div>
-</body>
-</html>`;
+    const html = this.buildTeacherDutySlipHtml(
+      teacherName,
+      teacherCode,
+      duties,
+      institutionName,
+      examTitle,
+      kepsekName,
+      kepsekNpp,
+      false
+    );
 
     const cleanFileName = `Surat_Tugas_Mengawas_${teacherName.replace(/[^\w]/g, '_')}.pdf`;
     await exportHtmlToPdf(html, {
@@ -1112,12 +987,10 @@ export class ExamWordExporterService {
     if (typeof window === 'undefined') return;
 
     const htmlContent = this.generateOfficialA4PrintHtml(matrix, options);
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const printWindow = window.open(url, '_blank');
+    const printWindow = openHtmlBlobPrintWindow(htmlContent, { autoPrint: false });
 
     if (!printWindow) {
-      alert('Jendela pop-up pratinjau cetak diblokir oleh browser. Mohon izinkan pop-up untuk mencetak jadwal A4.');
+      void this.downloadOfficialA4Html(matrix);
     }
   }
 }

@@ -10,6 +10,7 @@ import type {
   SmartReassignCandidate,
 } from '../types/exam-schedule.types';
 import type { UserProfile } from '../types/database.types';
+import { getTodayDateInJakarta } from '../utils/time.utils';
 
 const INDONESIAN_DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
@@ -127,28 +128,47 @@ export class ExamSchedulerService {
     endDateStr: string,
     includeSaturday = false
   ): Array<{ date: string; dayName: string }> {
-    const dates: Array<{ date: string; dayName: string }> = [];
-    const current = new Date(startDateStr);
-    const end = new Date(endDateStr);
+    const parseIsoDateUtcNoon = (str: string): Date | null => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((str || '').trim());
+      if (!m) {
+        const parsed = new Date(str);
+        if (isNaN(parsed.getTime())) return null;
+        return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate(), 12, 0, 0));
+      }
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      const d = Number(m[3]);
+      return new Date(Date.UTC(y, mo - 1, d, 12, 0, 0));
+    };
 
-    // Guard against invalid ranges
-    if (isNaN(current.getTime()) || isNaN(end.getTime()) || current > end) {
-      // Default to 5 business days starting upcoming Monday
-      const now = new Date();
-      const day = now.getDay();
+    const formatUtcDate = (d: Date): string => {
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const dates: Array<{ date: string; dayName: string }> = [];
+    const current = parseIsoDateUtcNoon(startDateStr);
+    const end = parseIsoDateUtcNoon(endDateStr);
+
+    // Guard against invalid ranges (default to 5 business days starting upcoming Monday in WIB)
+    if (!current || !end || current.getTime() > end.getTime()) {
+      const todayWib = parseIsoDateUtcNoon(getTodayDateInJakarta())!;
+      const day = todayWib.getUTCDay();
       const diff = day === 1 ? 0 : (8 - day) % 7;
-      const startMonday = new Date(now);
-      startMonday.setDate(now.getDate() + diff);
+      const startMonday = new Date(todayWib.getTime());
+      startMonday.setUTCDate(startMonday.getUTCDate() + diff);
 
       for (let i = 0; i < 7 && dates.length < 5; i++) {
-        const d = new Date(startMonday);
-        d.setDate(startMonday.getDate() + i);
-        const dayOfWeek = d.getDay();
+        const d = new Date(startMonday.getTime());
+        d.setUTCDate(d.getUTCDate() + i);
+        const dayOfWeek = d.getUTCDay();
         const isSunday = dayOfWeek === 0;
         const isSaturday = dayOfWeek === 6;
         if (!isSunday && (includeSaturday || !isSaturday)) {
           dates.push({
-            date: d.toISOString().split('T')[0],
+            date: formatUtcDate(d),
             dayName: INDONESIAN_DAYS[dayOfWeek],
           });
         }
@@ -157,19 +177,18 @@ export class ExamSchedulerService {
     }
 
     let iterations = 0;
-    while (current <= end && iterations < 30) {
+    while (current.getTime() <= end.getTime() && iterations < 30) {
       iterations++;
-      const dayOfWeek = current.getDay();
+      const dayOfWeek = current.getUTCDay();
       const isSunday = dayOfWeek === 0;
       const isSaturday = dayOfWeek === 6;
       if (!isSunday && (includeSaturday || !isSaturday)) {
-        const dateStr = current.toISOString().split('T')[0];
         dates.push({
-          date: dateStr,
+          date: formatUtcDate(current),
           dayName: INDONESIAN_DAYS[dayOfWeek],
         });
       }
-      current.setDate(current.getDate() + 1);
+      current.setUTCDate(current.getUTCDate() + 1);
     }
 
     return dates;

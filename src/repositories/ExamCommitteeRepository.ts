@@ -70,8 +70,8 @@ export class ExamCommitteeRepository {
   ): Promise<boolean> {
     const targetYear = academicYear || AdministrationRepository.getActiveAcademicYear();
     try {
-      const raw = safeGetStorage(EXAM_COMMITTEE_STORAGE_KEY);
-      let allMembers: ExamCommitteeMember[] = raw ? JSON.parse(raw) : [];
+      const prevRaw = safeGetStorage(EXAM_COMMITTEE_STORAGE_KEY);
+      let allMembers: ExamCommitteeMember[] = prevRaw ? JSON.parse(prevRaw) : [];
       if (!Array.isArray(allMembers)) allMembers = [];
 
       // Remove current year members and append new ones
@@ -81,11 +81,25 @@ export class ExamCommitteeRepository {
       safeSetStorage(EXAM_COMMITTEE_STORAGE_KEY, JSON.stringify(allMembers));
 
       // Persist to Supabase Cloud Provider
+      let cloudOk = false;
       try {
         const provider = ProviderFactory.getProvider();
-        await provider.saveExamCommitteeMembers(membersForYear, targetYear);
+        cloudOk = await provider.saveExamCommitteeMembers(membersForYear, targetYear);
       } catch (cloudErr) {
         logger.warn('ExamCommitteeRepository', 'Failed to push committee to cloud provider:', cloudErr);
+        cloudOk = false;
+      }
+
+      if (!cloudOk) {
+        if (prevRaw !== null) {
+          safeSetStorage(EXAM_COMMITTEE_STORAGE_KEY, prevRaw);
+        } else {
+          memoryCommitteeStore.delete(EXAM_COMMITTEE_STORAGE_KEY);
+          if (typeof localStorage !== 'undefined' && localStorage) {
+            try { localStorage.removeItem(EXAM_COMMITTEE_STORAGE_KEY); } catch {}
+          }
+        }
+        return false;
       }
 
       if (typeof window !== 'undefined') {

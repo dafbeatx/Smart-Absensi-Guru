@@ -7,6 +7,13 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import QRCode from 'qrcode';
 import { SIGNATORY_OFFICIALS, getDynamicBranding, type MultiSheetReportPayload } from './excel-generator.lib';
+import {
+  buildVerifyDocumentUrl,
+  DocumentVerificationService,
+  resolveReportBaseUrl,
+  type SignedDocumentTokenResult,
+} from '../services/document-verification.service';
+import { resolveSignatoryNpp, triggerBlobDownload } from '../utils/html.utils';
 
 export interface DocumentVerificationMetadata {
   docId: string;
@@ -24,14 +31,29 @@ export class PdfStamperService {
   /**
    * Generates a deterministic document verification metadata payload
    */
-  public static generateVerificationMetadata(month: string, year: string): DocumentVerificationMetadata {
-    const cleanMonth = (month || 'September').toUpperCase();
+  public static generateVerificationMetadata(
+    month: string,
+    year: string,
+    signedToken?: SignedDocumentTokenResult | null
+  ): DocumentVerificationMetadata {
+    const rawMonth = month || 'September';
+    const cleanMonth = rawMonth.toUpperCase();
     const cleanYear = year || String(new Date().getFullYear());
     const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
     const docId = `DOC-SAG-${cleanYear}-${cleanMonth.slice(0, 3)}-${randomHex}`;
-    const docCode = `421.3/SAG-BOGOR/${cleanMonth.slice(0, 3)}/${cleanYear}/${randomHex}`;
+    const docCode = signedToken?.docNo || `421.3/SAG-BOGOR/${cleanMonth.slice(0, 3)}/${cleanYear}/${randomHex}`;
     const verifiedAt = new Date().toISOString();
-    const verifyUrl = `https://smart-absensi.sch.id/verify-document?docId=${docId}&code=${encodeURIComponent(docCode)}`;
+    const baseUrl = resolveReportBaseUrl();
+    const verifyUrl =
+      signedToken?.verifyUrl ||
+      `${buildVerifyDocumentUrl(baseUrl, {
+        docNo: docCode,
+        type: 'REKAP_PRESENSI',
+        month: rawMonth,
+        year: cleanYear,
+        school: getDynamicBranding().institutionName,
+        signatory: SIGNATORY_OFFICIALS.KEPSEK_NAME,
+      })}&docId=${encodeURIComponent(docId)}`;
 
     return {
       docId,
@@ -42,29 +64,16 @@ export class PdfStamperService {
       signatoryTU: SIGNATORY_OFFICIALS.TU_NAME,
       verifiedAt,
       verifyUrl,
-      docHash: `SHA256-${randomHex}-${Date.now().toString(36).toUpperCase()}`,
+      docHash: signedToken?.docHash || `SHA256-${randomHex}-${Date.now().toString(36).toUpperCase()}`,
     };
   }
 
   /**
-   * Generates a base64 PNG data URL of the verification QR code
+   * Generates a base64 PNG data URL of the verification QR code (directly scannable URL)
    */
   public static async generateVerificationQRCodeDataURL(metadata: DocumentVerificationMetadata): Promise<string> {
-    const branding = getDynamicBranding();
-    const qrPayload = JSON.stringify({
-      app: branding.appName,
-      institution: branding.institutionName,
-      docId: metadata.docId,
-      docCode: metadata.docCode,
-      signatory: metadata.signatoryKepsek,
-      month: metadata.month,
-      year: metadata.year,
-      verifiedAt: metadata.verifiedAt,
-      verifyUrl: metadata.verifyUrl,
-    });
-
     try {
-      return await QRCode.toDataURL(qrPayload, {
+      return await QRCode.toDataURL(metadata.verifyUrl, {
         errorCorrectionLevel: 'M',
         margin: 1,
         width: 256,
@@ -74,8 +83,8 @@ export class PdfStamperService {
         },
       });
     } catch {
-      // Fallback simple payload if stringify fails
-      return await QRCode.toDataURL(metadata.verifyUrl, {
+      const fallbackUrl = `${resolveReportBaseUrl()}/verify-document?docId=${encodeURIComponent(metadata.docId)}`;
+      return await QRCode.toDataURL(fallbackUrl, {
         margin: 1,
         width: 256,
       });
@@ -174,12 +183,15 @@ export class PdfStamperService {
    * 4. Lembar Pengesahan with Official Wet Ink Stamp & Embedded QR Verification
    * 5. Document Security Watermark & Verification Metadata
    */
-  public static async generateCertifiedSchoolReportPDF(payload: MultiSheetReportPayload): Promise<Uint8Array> {
+  public static async generateCertifiedSchoolReportPDF(
+    payload: MultiSheetReportPayload,
+    signedToken?: SignedDocumentTokenResult | null
+  ): Promise<Uint8Array> {
     const pdfDoc = await PDFDocument.create();
     const branding = getDynamicBranding();
 
     // Set Document Metadata
-    const metadata = this.generateVerificationMetadata(payload.month, payload.year);
+    const metadata = this.generateVerificationMetadata(payload.month, payload.year, signedToken);
     pdfDoc.setTitle(`Laporan Presensi ${payload.month} ${payload.year} - ${branding.institutionName}`);
     pdfDoc.setAuthor(SIGNATORY_OFFICIALS.KEPSEK_NAME);
     pdfDoc.setSubject('Laporan Kehadiran Guru Resmi Terverifikasi Digital');
@@ -357,19 +369,25 @@ export class PdfStamperService {
 
     // ── 6. LEMBAR PENGESAHAN, STEMPEL BASAH & QR CODE VALIDASI ───────────────
     const sigY = Math.min(currentY - 30, 220);
+    const tuNpp = resolveSignatoryNpp(payload.teachers, SIGNATORY_OFFICIALS.TU_NAME);
+    const kepsekNpp = resolveSignatoryNpp(payload.teachers, SIGNATORY_OFFICIALS.KEPSEK_NAME);
 
     // Left Column: TU / Operator
     page.drawText('Diperiksa Oleh:', { x: 70, y: sigY, size: 8.5, font: fontRegular, color: primaryColor });
     page.drawText(SIGNATORY_OFFICIALS.TU_TITLE, { x: 70, y: sigY - 12, size: 9, font: fontBold, color: primaryColor });
     page.drawText(SIGNATORY_OFFICIALS.TU_NAME, { x: 70, y: sigY - 70, size: 9, font: fontBold, color: primaryColor });
-    page.drawText('NPP. 199208152020122003', { x: 70, y: sigY - 82, size: 7.5, font: fontRegular, color: slateColor });
+    if (tuNpp) {
+      page.drawText(`NPP. ${tuNpp}`, { x: 70, y: sigY - 82, size: 7.5, font: fontRegular, color: slateColor });
+    }
 
     // Right Column: Kepala Sekolah
     const kepsekX = 350;
     page.drawText('Mengetahui / Mengesahkan:', { x: kepsekX, y: sigY, size: 8.5, font: fontRegular, color: primaryColor });
     page.drawText(SIGNATORY_OFFICIALS.KEPSEK_TITLE, { x: kepsekX, y: sigY - 12, size: 9, font: fontBold, color: primaryColor });
     page.drawText(SIGNATORY_OFFICIALS.KEPSEK_NAME, { x: kepsekX, y: sigY - 70, size: 9, font: fontBold, color: primaryColor });
-    page.drawText('NPP. 198205122008011004', { x: kepsekX, y: sigY - 82, size: 7.5, font: fontRegular, color: slateColor });
+    if (kepsekNpp) {
+      page.drawText(`NPP. ${kepsekNpp}`, { x: kepsekX, y: sigY - 82, size: 7.5, font: fontRegular, color: slateColor });
+    }
 
     // ── CAP STEMPEL BASAH RESMI ELEKTRONIK (VECTOR EMBEDDING) ───────────────
     // Draw Circular Wet Stamp over Kepala Sekolah signature area
@@ -484,19 +502,28 @@ export class PdfStamperService {
     payload: MultiSheetReportPayload,
     filename?: string
   ): Promise<void> {
-    const pdfBytes = await this.generateCertifiedSchoolReportPDF(payload);
+    const cleanMonth = (payload.month || 'September').toUpperCase();
+    const cleanYear = payload.year || String(new Date().getFullYear());
+    const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const docNo = `421.3/SAG-BOGOR/${cleanMonth.slice(0, 3)}/${cleanYear}/${randomHex}`;
+    const docId = `DOC-SAG-${cleanYear}-${cleanMonth.slice(0, 3)}-${randomHex}`;
+    const signedToken = await DocumentVerificationService.issueDocumentSignature({
+      docNo,
+      docCode: docNo,
+      docId,
+      type: 'REKAP_PRESENSI',
+      month: payload.month,
+      year: cleanYear,
+      school: getDynamicBranding().institutionName,
+      signatory: SIGNATORY_OFFICIALS.KEPSEK_NAME,
+    });
+
+    const pdfBytes = await this.generateCertifiedSchoolReportPDF(payload, signedToken);
 
     if (typeof window !== 'undefined') {
       const finalName = filename || `Laporan_Presensi_Resmi_${payload.month}_${payload.year}.pdf`;
       const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = finalName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(blob, finalName);
     }
   }
 }

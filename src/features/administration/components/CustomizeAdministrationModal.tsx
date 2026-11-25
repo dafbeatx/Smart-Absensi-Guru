@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Settings2,
@@ -37,6 +37,25 @@ export const CustomizeAdministrationModal: React.FC<CustomizeAdministrationModal
   const [customUrl, setCustomUrl] = useState('');
   const [customCategory, setCustomCategory] = useState<AdministrationCategory>('UJIAN');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [errorFeedback, setErrorFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setItems(modules);
+      setFeedback(null);
+      setErrorFeedback(null);
+      setIsAddingCustom(false);
+    }
+  }, [isOpen, modules]);
 
   if (!isOpen) return null;
 
@@ -62,6 +81,13 @@ export const CustomizeAdministrationModal: React.FC<CustomizeAdministrationModal
   const handleAddCustom = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customTitle.trim()) return;
+    setErrorFeedback(null);
+
+    const trimmedUrl = customUrl.trim();
+    if (trimmedUrl && !/^https?:\/\//i.test(trimmedUrl)) {
+      setErrorFeedback('URL tautan eksternal wajib menggunakan protokol http:// atau https://');
+      return;
+    }
 
     const newMod = {
       title: customTitle.trim(),
@@ -71,7 +97,7 @@ export const CustomizeAdministrationModal: React.FC<CustomizeAdministrationModal
       category: customCategory,
       badge: 'Kustom',
       actionId: 'custom_link',
-      customUrl: customUrl.trim() || undefined,
+      customUrl: trimmedUrl || undefined,
       isEnabled: true,
     };
 
@@ -103,10 +129,10 @@ export const CustomizeAdministrationModal: React.FC<CustomizeAdministrationModal
   ];
 
   return (
-    <div className="fixed inset-0 z-60 bg-slate-900/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-      <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-60 bg-slate-900/80 backdrop-blur-xs flex items-stretch sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+      <div className="bg-white w-full max-w-lg h-dvh sm:h-auto sm:max-h-[90dvh] rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border sm:border-slate-200 overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-[#023246] text-white p-4 px-5 flex items-center justify-between shrink-0">
+        <div className="bg-[#023246] text-white pt-[max(14px,env(safe-area-inset-top))] pb-3.5 sm:p-4 px-5 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0 border border-white/15">
               <Settings2 className="w-5 h-5 text-cyan-300" />
@@ -123,7 +149,7 @@ export const CustomizeAdministrationModal: React.FC<CustomizeAdministrationModal
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
           >
             <X className="w-5 h-5" />
           </button>
@@ -319,10 +345,19 @@ export const CustomizeAdministrationModal: React.FC<CustomizeAdministrationModal
                 />
               </div>
 
+              {errorFeedback && (
+                <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-bold">
+                  {errorFeedback}
+                </div>
+              )}
+
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => setIsAddingCustom(false)}
+                  onClick={() => {
+                    setErrorFeedback(null);
+                    setIsAddingCustom(false);
+                  }}
                   className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-200/60 rounded-xl cursor-pointer"
                 >
                   Batal
@@ -348,11 +383,11 @@ export const CustomizeAdministrationModal: React.FC<CustomizeAdministrationModal
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+        <div className="p-4 pb-[max(16px,env(safe-area-inset-bottom))] bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
           <button
             type="button"
             onClick={handleReset}
-            className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer hover:underline"
+            className="min-h-11 sm:min-h-0 text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer hover:underline"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset ke Standar</span>
@@ -360,7 +395,7 @@ export const CustomizeAdministrationModal: React.FC<CustomizeAdministrationModal
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-bold text-white bg-[#023246] hover:bg-[#18536B] rounded-xl cursor-pointer shadow-xs"
+            className="min-h-11 sm:min-h-0 px-4 py-2 text-xs font-bold text-white bg-[#023246] hover:bg-[#18536B] rounded-xl cursor-pointer shadow-xs"
           >
             Selesai
           </button>

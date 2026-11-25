@@ -148,6 +148,10 @@ export const App: React.FC = () => {
     teacher?: string;
     school?: string;
     signatory?: string;
+    iat?: string;
+    sig?: string;
+    docId?: string;
+    code?: string;
   } | null>(null);
 
   const userId = user?.id;
@@ -247,13 +251,17 @@ export const App: React.FC = () => {
       if (isVerifyRoute || docNo) {
         setVerificationDocInfo({
           isOpen: true,
-          docNo: docNo || '421.3/SAG-BOGOR/9/2026',
+          docNo: docNo || '',
           type: params.get('type') || 'REKAP_PRESENSI',
-          month: params.get('month') || 'September',
-          year: params.get('year') || '2026',
+          month: params.get('month') || '',
+          year: params.get('year') || '',
           teacher: params.get('teacher') || undefined,
           school: params.get('school') || undefined,
           signatory: params.get('signatory') || undefined,
+          iat: params.get('iat') || undefined,
+          sig: params.get('sig') || undefined,
+          docId: params.get('docId') || undefined,
+          code: params.get('code') || undefined,
         });
       }
     }
@@ -510,6 +518,10 @@ export const App: React.FC = () => {
               teacherName={verificationDocInfo.teacher}
               schoolName={verificationDocInfo.school}
               signatoryName={verificationDocInfo.signatory}
+              iat={verificationDocInfo.iat}
+              sig={verificationDocInfo.sig}
+              docId={verificationDocInfo.docId}
+              code={verificationDocInfo.code}
             />
           </Suspense>
         )}
@@ -695,6 +707,10 @@ export const App: React.FC = () => {
             teacherName={verificationDocInfo.teacher}
             schoolName={verificationDocInfo.school}
             signatoryName={verificationDocInfo.signatory}
+            iat={verificationDocInfo.iat}
+            sig={verificationDocInfo.sig}
+            docId={verificationDocInfo.docId}
+            code={verificationDocInfo.code}
           />
         </Suspense>
       )}

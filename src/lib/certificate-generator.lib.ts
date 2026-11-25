@@ -7,6 +7,7 @@
 import { APP_CONFIG } from '../config/app.config';
 import { SIGNATORY_OFFICIALS, getDynamicBranding } from './excel-generator.lib';
 import { exportHtmlToPdf } from './pdf-export.lib';
+import { openHtmlBlobPrintWindow } from '../utils/html.utils';
 
 export interface CertificatePayload {
   recipientName: string;
@@ -630,11 +631,9 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
  */
 export const openPrintableCertificate = (payload: CertificatePayload): void => {
   const html = generateExcellenceCertificateHTML(payload);
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const printWindow = window.open(url, '_blank');
+  const printWindow = openHtmlBlobPrintWindow(html, { autoPrint: false });
   if (!printWindow) {
-    alert('Pop-up terblokir oleh browser. Izinkan pop-up untuk mencetak Piagam Penghargaan Resmi.');
+    void downloadPrintableCertificate(payload);
   }
 };
 

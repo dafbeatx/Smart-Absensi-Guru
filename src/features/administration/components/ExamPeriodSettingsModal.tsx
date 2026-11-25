@@ -8,26 +8,43 @@ import {
   Eye,
   SlidersHorizontal,
   Save,
+  AlertTriangle,
 } from 'lucide-react';
 import type { ExamPeriodSettings, ExamPeriodStatus } from '../../../types/exam-schedule.types';
 import { ExamPeriodRepository } from '../../../repositories/ExamPeriodRepository';
 import { ExamScheduleRepository } from '../../../repositories/ExamScheduleRepository';
 import { AdministrationRepository } from '../../../repositories/AdministrationRepository';
-import { formatTimeForInput } from '../../../utils/time.utils';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { formatTimeForInput, getTodayDateInJakarta } from '../../../utils/time.utils';
 
 interface ExamPeriodSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   academicYear?: string;
+  userRole?: string;
+  isAuthorized?: boolean;
   onSettingsSaved?: (newSettings: ExamPeriodSettings, newStatus: ExamPeriodStatus) => void;
 }
+
+const getJakartaDateWithOffset = (offsetDays = 0): string => {
+  const todayStr = getTodayDateInJakarta();
+  if (offsetDays === 0) return todayStr;
+  const [y, m, d] = todayStr.split('-').map(Number);
+  return getTodayDateInJakarta(new Date(Date.UTC(y, m - 1, d + offsetDays, 12, 0, 0)));
+};
 
 export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = ({
   isOpen,
   onClose,
   academicYear,
+  userRole,
+  isAuthorized = false,
   onSettingsSaved,
 }) => {
+  const storeRole = useAuthStore((s) => s.user?.role);
+  const effectiveRole = (userRole || storeRole || '').toUpperCase();
+  const canManagePeriod = isAuthorized || effectiveRole === 'ADMIN' || effectiveRole === 'OPERATOR';
+
   const activeYear = useMemo(
     () => academicYear || AdministrationRepository.getActiveAcademicYear(),
     [academicYear]
@@ -36,6 +53,7 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
 
   // Form states
   const [isEnabled, setIsEnabled] = useState(true);
@@ -50,12 +68,24 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
   // Schedule detected info
   const [detectedScheduleEndDate, setDetectedScheduleEndDate] = useState<string | null>(null);
 
+  // Body scroll lock for mobile fullscreen compliance
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+
   // Load existing settings
   useEffect(() => {
     if (!isOpen) return;
 
     let isMounted = true;
     setIsLoading(true);
+    setErrorToast(null);
+    setSuccessToast(null);
 
     const loadData = async () => {
       try {
@@ -129,7 +159,12 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
   if (!isOpen) return null;
 
   const handleSave = async () => {
+    if (!canManagePeriod) {
+      setErrorToast('Akses ditolak: Hanya Admin atau Operator yang dapat mengubah pengaturan masa ujian.');
+      return;
+    }
     setIsSaving(true);
+    setErrorToast(null);
     try {
       const payload: ExamPeriodSettings = {
         isEnabled,
@@ -145,32 +180,40 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
       };
 
       const ok = await ExamPeriodRepository.savePeriodSettings(payload);
-      if (ok) {
-        const computedStatus = ExamPeriodRepository.computePeriodStatus(payload, new Date());
-        setSuccessToast('Pengaturan periode ujian & kepanitiaan berhasil disimpan! ✨');
-        if (onSettingsSaved) {
-          onSettingsSaved(payload, computedStatus);
-        }
-        setTimeout(() => {
-          setSuccessToast(null);
-          onClose();
-        }, 800);
+      if (!ok) {
+        setErrorToast('Gagal menyimpan pengaturan periode ujian ke server. Periksa koneksi Anda lalu coba lagi.');
+        return;
       }
+
+      const computedStatus = ExamPeriodRepository.computePeriodStatus(payload, new Date());
+      setSuccessToast('Pengaturan periode ujian & kepanitiaan berhasil disimpan! ✨');
+      if (onSettingsSaved) {
+        onSettingsSaved(payload, computedStatus);
+      }
+      setTimeout(() => {
+        setSuccessToast(null);
+        onClose();
+      }, 800);
     } catch (err) {
       console.error('Failed to save period settings:', err);
+      setErrorToast('Terjadi kesalahan saat menyimpan pengaturan masa ujian.');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleMarkAsEndedImmediately = async () => {
-    setIsEnabled(false);
+    if (!canManagePeriod) {
+      setErrorToast('Akses ditolak: Hanya Admin atau Operator yang dapat menonaktifkan masa ujian.');
+      return;
+    }
     setIsSaving(true);
+    setErrorToast(null);
     try {
       const payload: ExamPeriodSettings = {
         isEnabled: false,
         autoDeactivateEnabled,
-        endDate: endDate || new Date().toISOString().slice(0, 10),
+        endDate: endDate || getJakartaDateWithOffset(0),
         endTime: formatTimeForInput(endTime || '17:00'),
         examTitle: examTitle.trim() || 'Asesmen Sekolah (ASTS/ASAS)',
         academicYear: activeYear,
@@ -180,7 +223,12 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
         updatedAt: new Date().toISOString(),
       };
 
-      await ExamPeriodRepository.savePeriodSettings(payload);
+      const ok = await ExamPeriodRepository.savePeriodSettings(payload);
+      if (!ok) {
+        setErrorToast('Gagal menonaktifkan masa ujian di server. Silakan coba lagi.');
+        return;
+      }
+      setIsEnabled(false);
       const computedStatus = ExamPeriodRepository.computePeriodStatus(payload, new Date());
       setSuccessToast('Ujian resmi ditandai selesai! Bagian ujian & kepanitiaan disembunyikan. 🔒');
       if (onSettingsSaved) {
@@ -190,6 +238,9 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
         setSuccessToast(null);
         onClose();
       }, 900);
+    } catch (err) {
+      console.error('Failed to mark exam ended immediately:', err);
+      setErrorToast('Terjadi kesalahan saat menutup masa ujian.');
     } finally {
       setIsSaving(false);
     }
@@ -200,11 +251,11 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
       role="dialog"
       aria-modal="true"
       aria-labelledby="exam-period-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-fadeIn"
     >
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/90 w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh] animate-scaleUp">
+      <div className="bg-white rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border sm:border-slate-200/90 w-full max-w-lg overflow-hidden flex flex-col h-dvh sm:h-auto sm:max-h-[92dvh] animate-scaleUp">
         {/* ── MODAL HEADER ── */}
-        <div className="p-4 sm:p-5 bg-linear-to-r from-[#023246] to-[#18536B] text-white flex items-center justify-between gap-3 shrink-0">
+        <div className="p-4 pt-[max(16px,env(safe-area-inset-top))] sm:p-5 bg-linear-to-r from-[#023246] to-[#18536B] text-white flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0 shadow-2xs">
               <SlidersHorizontal className="w-5 h-5 text-cyan-300" />
@@ -227,7 +278,7 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center text-cyan-100 hover:text-white transition-all cursor-pointer"
+            className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center text-cyan-100 hover:text-white transition-all cursor-pointer"
             aria-label="Tutup modal"
           >
             <X className="w-5 h-5" />
@@ -235,7 +286,7 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
         </div>
 
         {/* ── MODAL BODY ── */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 text-slate-800">
+        <div className="p-4 sm:p-5 flex-1 overflow-y-auto space-y-4 sm:space-y-5 text-slate-800">
           {isLoading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
               <div className="w-8 h-8 rounded-full border-2 border-slate-300 border-t-[#023246] animate-spin" />
@@ -244,6 +295,18 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
           ) : (
             <>
               {/* Toast Feedback */}
+              {!canManagePeriod && (
+                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs font-bold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Mode baca saja: Hanya Admin atau Operator yang dapat mengubah status masa ujian.</span>
+                </div>
+              )}
+              {errorToast && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-bold flex items-center gap-2 animate-fadeIn shadow-2xs">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{errorToast}</span>
+                </div>
+              )}
               {successToast && (
                 <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold flex items-center gap-2 animate-fadeIn shadow-2xs">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -432,7 +495,7 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
                       <button
                         type="button"
                         onClick={() => {
-                          const today = new Date().toISOString().slice(0, 10);
+                          const today = getJakartaDateWithOffset(0);
                           setEndDate(today);
                           setEndTime('17:00');
                         }}
@@ -443,7 +506,7 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
                       <button
                         type="button"
                         onClick={() => {
-                          const tmr = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+                          const tmr = getJakartaDateWithOffset(1);
                           setEndDate(tmr);
                           setEndTime('17:00');
                         }}
@@ -496,9 +559,9 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
         </div>
 
         {/* ── MODAL FOOTER ── */}
-        <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
+        <div className="p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:p-5 bg-slate-50 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
           <div>
-            {isEnabled && (
+            {isEnabled && canManagePeriod && (
               <button
                 type="button"
                 onClick={handleMarkAsEndedImmediately}
@@ -521,12 +584,13 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
             >
               Batal
             </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="h-11 px-5 rounded-xl bg-[#023246] hover:bg-[#03445e] text-white text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 flex-1 sm:flex-none disabled:opacity-50"
-            >
+            {canManagePeriod && (
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="h-11 px-5 rounded-xl bg-[#023246] hover:bg-[#03445e] text-white text-xs font-black shadow-xs transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 flex-1 sm:flex-none disabled:opacity-50"
+              >
               {isSaving ? (
                 <>
                   <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
@@ -538,7 +602,8 @@ export const ExamPeriodSettingsModal: React.FC<ExamPeriodSettingsModalProps> = (
                   <span>Simpan Pengaturan</span>
                 </>
               )}
-            </button>
+              </button>
+            )}
           </div>
         </div>
       </div>

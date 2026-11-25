@@ -3,7 +3,22 @@
 // Enforces session authentication, role checks (admin/superadmin/kepsek),
 // and performs mutations via serverSupabase (service_role) to protect RLS boundaries.
 
-import { serverSupabase, authenticateUser } from '../_shared/session-auth.js';
+import {
+  serverSupabase,
+  authenticateUser,
+  applyAuthCorsHeaders,
+  isAllowedAuthOrigin,
+} from '../_shared/session-auth.js';
+import {
+  handleSaveExamCommittee,
+  handleSaveExamSchedule,
+  handleDeleteExamSchedule,
+  handleSaveExamPeriod,
+} from '../_shared/exam-admin-settings.js';
+import {
+  issueOfficialDocumentToken,
+  verifyOfficialDocumentRequest,
+} from '../_shared/doc-verification.js';
 
 function normalizeDayOfWeek(day: any): number {
   if (typeof day === 'number' && day >= 1 && day <= 6) return day;
@@ -23,14 +38,25 @@ function normalizeDayOfWeek(day: any): number {
 }
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-session-token');
+  applyAuthCorsHeaders(req, res, 'GET, POST, PUT, DELETE, OPTIONS');
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method === 'OPTIONS') {
+    const origin = typeof req?.headers?.origin === 'string' ? req.headers.origin.trim() : '';
+    if (origin && !isAllowedAuthOrigin(origin, req)) {
+      return res.status(403).end();
+    }
+    return res.status(200).end();
+  }
 
-  // ── GET: Read Teaching Schedules (Public Read-Only per Schema 44) ──────────
+  const action = String(req.query?.action || req.body?.action || '').trim();
+
+  // ── GET: Public Read Teaching Schedules OR Fail-Closed Document Verification ─
   if (req.method === 'GET') {
+    if (action === 'verify_document') {
+      const verifyResult = await verifyOfficialDocumentRequest(req.query || {});
+      return res.status(verifyResult.status).json(verifyResult.body);
+    }
+
     try {
       const { teacher_user_id, academic_year, day_of_week } = req.query || {};
 
@@ -55,98 +81,8 @@ export default async function handler(req: any, res: any) {
     }
   }
 
-  // 1. Session Authentication & Tolerant Fallback for Mutations (POST, PUT, DELETE)
-  let auth = await authenticateUser(req);
-  if (!auth.ok) {
-    const authHeader = req.headers?.authorization || req.headers?.['x-session-token'];
-    const rawToken = typeof authHeader === 'string' ? authHeader.replace(/^Bearer\s+/i, '').trim() : '';
-
-    if (rawToken.startsWith('SB_JWT_')) {
-      const withoutPrefix = rawToken.substring(7);
-      const lastUnderscore = withoutPrefix.lastIndexOf('_');
-      const fallbackUserId = lastUnderscore !== -1 ? withoutPrefix.substring(0, lastUnderscore) : withoutPrefix;
-      if (fallbackUserId) {
-        try {
-          const { data: user, error: uErr } = await serverSupabase
-            .from('users')
-            .select('id, nip, full_name, role, position, account_status, avatar_url, phone_number')
-            .eq('id', fallbackUserId)
-            .maybeSingle();
-
-          if (!uErr && user && user.account_status === 'ACTIVE') {
-            auth = {
-              ok: true,
-              userId: user.id,
-              user: {
-                id: user.id,
-                nip: user.nip || null,
-                full_name: user.full_name,
-                role: user.role,
-                position: user.position || null,
-                avatar_url: user.avatar_url || null,
-                phone_number: user.phone_number || null,
-              },
-              role: user.role,
-              sessionId: `fallback_${user.id}`,
-            };
-          }
-        } catch (e) {
-          console.warn('[teaching-schedules] SB_JWT_ fallback auth error:', e);
-        }
-      }
-    } else if (rawToken === 'mock_token' || rawToken.startsWith('MOCK_') || rawToken.startsWith('mock_')) {
-      try {
-        const { data: adminUser } = await serverSupabase
-          .from('users')
-          .select('id, nip, full_name, role, position, account_status, avatar_url, phone_number')
-          .in('role', ['ADMIN', 'OPERATOR', 'KEPSEK', 'SUPERADMIN'])
-          .eq('account_status', 'ACTIVE')
-          .limit(1)
-          .maybeSingle();
-
-        const resolvedUser = adminUser || {
-          id: 'usr_admin',
-          nip: '198001012005011001',
-          full_name: 'Administrator Sekolah',
-          role: 'ADMIN',
-          position: 'Admin Sistem',
-          avatar_url: null,
-          phone_number: '081234567890',
-          account_status: 'ACTIVE',
-        };
-
-        auth = {
-          ok: true,
-          userId: resolvedUser.id,
-          user: resolvedUser,
-          role: resolvedUser.role,
-          sessionId: 'mock_sess_admin',
-        };
-      } catch {
-        // ignore
-      }
-    } else if (rawToken.startsWith('usr_')) {
-      try {
-        const { data: directUser, error: dErr } = await serverSupabase
-          .from('users')
-          .select('id, nip, full_name, role, position, account_status, avatar_url, phone_number')
-          .eq('id', rawToken)
-          .maybeSingle();
-
-        if (!dErr && directUser && directUser.account_status === 'ACTIVE') {
-          auth = {
-            ok: true,
-            userId: directUser.id,
-            user: directUser,
-            role: directUser.role,
-            sessionId: `direct_${directUser.id}`,
-          };
-        }
-      } catch (e) {
-        console.warn('[teaching-schedules] Direct user fallback error:', e);
-      }
-    }
-  }
+  // 1. Strict Session Authentication (zero mock_token / SB_JWT_ / usr_ bypasses)
+  const auth = await authenticateUser(req);
 
   if (!auth.ok) {
     return res.status(auth.status).json({
@@ -156,10 +92,37 @@ export default async function handler(req: any, res: any) {
     });
   }
 
+  // Action-based administrative endpoints (consolidated under Vercel 12-function limit)
+  if (action === 'issue_document_token' && req.method === 'POST') {
+    const issueResult = await issueOfficialDocumentToken(req.body || {}, auth);
+    return res.status(issueResult.status).json(issueResult.body);
+  }
+
+  if (action === 'save_exam_committee' && ['POST', 'PUT'].includes(req.method)) {
+    const result = await handleSaveExamCommittee(req.body || {}, auth);
+    return res.status(result.status).json(result.body);
+  }
+
+  if (action === 'save_exam_schedule' && ['POST', 'PUT'].includes(req.method)) {
+    const result = await handleSaveExamSchedule(req.body || {}, auth);
+    return res.status(result.status).json(result.body);
+  }
+
+  if (action === 'delete_exam_schedule' && ['POST', 'DELETE'].includes(req.method)) {
+    const params = req.method === 'DELETE' ? { ...(req.body || {}), ...(req.query || {}) } : req.body || {};
+    const result = await handleDeleteExamSchedule(params, auth);
+    return res.status(result.status).json(result.body);
+  }
+
+  if (action === 'save_exam_period' && ['POST', 'PUT'].includes(req.method)) {
+    const result = await handleSaveExamPeriod(req.body || {}, auth);
+    return res.status(result.status).json(result.body);
+  }
+
   const role = (auth.user?.role || auth.role || '').toLowerCase();
   const isAdminOrKepsek = ['admin', 'superadmin', 'kepsek', 'operator'].includes(role);
 
-  // 2. Role Enforcement for Mutations
+  // 2. Role Enforcement for Default Teaching Schedule Mutations
   if (['POST', 'PUT', 'DELETE'].includes(req.method) && !isAdminOrKepsek) {
     return res.status(403).json({
       success: false,

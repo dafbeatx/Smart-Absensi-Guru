@@ -131,6 +131,7 @@ import {
 } from '../utils/student-dedup.utils';
 import { getSafeInitialTeacherPointLogs } from '../utils/teacher-point-seed.utils';
 import { resolveBehaviorLogType } from '../utils/student-behavior.utils';
+import { buildAuthenticatedFetchOptions, detectClientPlatformHeader, resolveClientAuthToken } from '../utils/api-auth.utils';
 
 export class SupabaseProvider implements IDataProvider {
   private client: SupabaseClient;
@@ -4192,7 +4193,11 @@ export class SupabaseProvider implements IDataProvider {
               if (filter?.day_of_week !== undefined) qParams.set('day_of_week', String(filter.day_of_week));
 
               const ep = `/api/admin/teaching-schedules${qParams.toString() ? '?' + qParams.toString() : ''}`;
-              const sResp = await fetch(ep, { method: 'GET' });
+              const sResp = await fetch(ep, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'X-SAGA-Platform': detectClientPlatformHeader() },
+              });
               if (sResp.ok && sResp.headers.get('content-type')?.includes('application/json')) {
                 const sJson = await sResp.json().catch(() => null);
                 if (sJson?.success && Array.isArray(sJson?.data)) {
@@ -4309,31 +4314,22 @@ export class SupabaseProvider implements IDataProvider {
       };
 
       // Jalur Utama: Serverless Controlled Admin Endpoint (/api/admin/teaching-schedules)
-      const token =
-        _token ||
-        useAuthStore.getState().token ||
-        (typeof window !== 'undefined'
-          ? (() => {
-              try {
-                return JSON.parse(localStorage.getItem('smart_absensi_auth_storage') || '{}')?.state?.token;
-              } catch {
-                return null;
-              }
-            })()
-          : null) ||
-        (typeof localStorage !== 'undefined' ? localStorage.getItem('saga_auth_token') : '') ||
-        '';
+      const token = resolveClientAuthToken(_token);
+      const isDevMode = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV);
 
-      if (typeof window !== 'undefined' && typeof window.fetch === 'function' && token) {
+      if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+        if (!token) {
+          return {
+            success: false,
+            error: 'Sesi login tidak ditemukan atau telah berakhir. Silakan login kembali.',
+          };
+        }
+
         try {
-          const resp = await fetch('/api/admin/teaching-schedules', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(payload),
-          });
+          const resp = await fetch(
+            '/api/admin/teaching-schedules',
+            buildAuthenticatedFetchOptions('POST', payload, token)
+          );
           const resData = await resp.json().catch(() => null);
           if (resp.ok && resData?.success && resData?.data) {
             const created = this.mapDbRowToTeachingSlot(resData.data);
@@ -4347,12 +4343,18 @@ export class SupabaseProvider implements IDataProvider {
             this.teachingSchedulesCooldownUntil = 0;
             return { success: true, data: created };
           }
-          if (resp.status !== 401 && resp.status !== 403 && (!resp.ok || !resData?.success)) {
-            return { success: false, error: resData?.errorMessage || resData?.error || 'Gagal menambahkan jadwal' };
+          if (!(isDevMode && resp.status === 404)) {
+            return {
+              success: false,
+              error: resData?.errorMessage || resData?.error || 'Akses ditolak atau gagal menambahkan jadwal.',
+            };
           }
-          logger.warn('SupabaseProvider', `Serverless endpoint returned HTTP ${resp.status}, attempting direct client fallback...`);
+          logger.warn('SupabaseProvider', 'Dev local serverless endpoint 404, attempting direct client fallback...');
         } catch (fetchErr: any) {
-          logger.warn('SupabaseProvider', 'Serverless endpoint unavailable, attempting direct fallback:', fetchErr);
+          if (!isDevMode) {
+            return { success: false, error: fetchErr?.message || 'Gagal menghubungi server jadwal mengajar.' };
+          }
+          logger.warn('SupabaseProvider', 'Dev serverless endpoint unavailable, attempting direct fallback:', fetchErr);
         }
       }
 
@@ -4460,31 +4462,22 @@ export class SupabaseProvider implements IDataProvider {
       if (dto.effective_until !== undefined) updatePayload.effective_until = dto.effective_until;
 
       // Jalur Utama: Serverless Controlled Admin Endpoint (/api/admin/teaching-schedules)
-      const token =
-        _token ||
-        useAuthStore.getState().token ||
-        (typeof window !== 'undefined'
-          ? (() => {
-              try {
-                return JSON.parse(localStorage.getItem('smart_absensi_auth_storage') || '{}')?.state?.token;
-              } catch {
-                return null;
-              }
-            })()
-          : null) ||
-        (typeof localStorage !== 'undefined' ? localStorage.getItem('saga_auth_token') : '') ||
-        '';
+      const token = resolveClientAuthToken(_token);
+      const isDevMode = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV);
 
-      if (typeof window !== 'undefined' && typeof window.fetch === 'function' && token) {
+      if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+        if (!token) {
+          return {
+            success: false,
+            error: 'Sesi login tidak ditemukan atau telah berakhir. Silakan login kembali.',
+          };
+        }
+
         try {
-          const resp = await fetch('/api/admin/teaching-schedules', {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ ...updatePayload, id: dto.id }),
-          });
+          const resp = await fetch(
+            '/api/admin/teaching-schedules',
+            buildAuthenticatedFetchOptions('PUT', { ...updatePayload, id: dto.id, version: dto.version }, token)
+          );
           const resData = await resp.json().catch(() => null);
           if (resp.ok && resData?.success && resData?.data) {
             const updated = this.mapDbRowToTeachingSlot(resData.data);
@@ -4498,12 +4491,18 @@ export class SupabaseProvider implements IDataProvider {
             this.teachingSchedulesCooldownUntil = 0;
             return { success: true, data: updated };
           }
-          if (resp.status !== 401 && resp.status !== 403 && (!resp.ok || !resData?.success)) {
-            return { success: false, error: resData?.errorMessage || resData?.error || 'Gagal memperbarui jadwal' };
+          if (!(isDevMode && resp.status === 404)) {
+            return {
+              success: false,
+              error: resData?.errorMessage || resData?.error || 'Akses ditolak atau gagal memperbarui jadwal.',
+            };
           }
-          logger.warn('SupabaseProvider', `Serverless PUT endpoint returned HTTP ${resp.status}, attempting direct client fallback...`);
+          logger.warn('SupabaseProvider', 'Dev local serverless PUT 404, attempting direct client fallback...');
         } catch (fetchErr: any) {
-          logger.warn('SupabaseProvider', 'Serverless PUT endpoint unavailable, attempting direct fallback:', fetchErr);
+          if (!isDevMode) {
+            return { success: false, error: fetchErr?.message || 'Gagal menghubungi server jadwal mengajar.' };
+          }
+          logger.warn('SupabaseProvider', 'Dev serverless PUT endpoint unavailable, attempting direct fallback:', fetchErr);
         }
       }
 
@@ -4540,29 +4539,20 @@ export class SupabaseProvider implements IDataProvider {
   public async deleteTeachingSchedule(id: string, _token?: string): Promise<boolean> {
     try {
       // Jalur Utama: Serverless Controlled Admin Endpoint (/api/admin/teaching-schedules)
-      const token =
-        _token ||
-        useAuthStore.getState().token ||
-        (typeof window !== 'undefined'
-          ? (() => {
-              try {
-                return JSON.parse(localStorage.getItem('smart_absensi_auth_storage') || '{}')?.state?.token;
-              } catch {
-                return null;
-              }
-            })()
-          : null) ||
-        (typeof localStorage !== 'undefined' ? localStorage.getItem('saga_auth_token') : '') ||
-        '';
+      const token = resolveClientAuthToken(_token);
+      const isDevMode = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV);
 
-      if (typeof window !== 'undefined' && typeof window.fetch === 'function' && token) {
+      if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+        if (!token) {
+          logger.warn('SupabaseProvider', 'deleteTeachingSchedule aborted: no verifiable session token.');
+          return false;
+        }
+
         try {
-          const resp = await fetch(`/api/admin/teaching-schedules?id=${encodeURIComponent(id)}`, {
-            method: 'DELETE',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
+          const resp = await fetch(
+            `/api/admin/teaching-schedules?id=${encodeURIComponent(id)}`,
+            buildAuthenticatedFetchOptions('DELETE', undefined, token)
+          );
           const resData = await resp.json().catch(() => null);
           if (resp.ok && resData?.success) {
             try {
@@ -4575,9 +4565,16 @@ export class SupabaseProvider implements IDataProvider {
             this.teachingSchedulesCooldownUntil = 0;
             return true;
           }
-          logger.warn('SupabaseProvider', `Serverless DELETE endpoint returned HTTP ${resp.status}, attempting direct client fallback...`);
+          if (!(isDevMode && resp.status === 404)) {
+            logger.warn('SupabaseProvider', `deleteTeachingSchedule rejected by server (HTTP ${resp.status}):`, resData?.errorMessage);
+            return false;
+          }
+          logger.warn('SupabaseProvider', 'Dev local serverless DELETE 404, attempting direct client fallback...');
         } catch (fetchErr: any) {
-          logger.warn('SupabaseProvider', 'Serverless DELETE endpoint unavailable, attempting direct fallback:', fetchErr);
+          if (!isDevMode) {
+            return false;
+          }
+          logger.warn('SupabaseProvider', 'Dev serverless DELETE endpoint unavailable, attempting direct fallback:', fetchErr);
         }
       }
 
@@ -7114,195 +7111,82 @@ export class SupabaseProvider implements IDataProvider {
   public async saveGradedStudent(dto: SaveGradedStudentDTO, _token?: string): Promise<GradedStudentScoreRecord> {
     const studentUserId = dto.student_user_id || dto.id || `std_${Date.now()}`;
     const cleanName = dto.name.trim();
+    const isDevMode = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV);
 
-    // 1. Try atomic PostgreSQL RPC save_exam_grade_v2
-    try {
-      const { data, error } = await this.client.rpc('save_exam_grade_v2', {
-        p_session_id: dto.session_id,
-        p_student_user_id: studentUserId,
-        p_student_name: cleanName,
-        p_mcq_answers: dto.mcq_answers || {},
-        p_essay_scores: dto.essay_scores || [],
-        p_actor_user_id: dto.actor_user_id || null,
-        p_actor_name: dto.actor_name || 'Guru',
-        p_actor_role: dto.actor_role || 'GURU',
-        p_expected_revision: dto.expected_revision ?? null,
-        p_change_reason: dto.change_reason ?? null,
-        p_source: dto.source || 'MANUAL_ENTRY',
-      });
+    // 1. Primary Secure Server Path (/api/exam-correction)
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      const token = resolveClientAuthToken(_token);
+      if (!token && !isDevMode) {
+        throw new Error('AUTH_SESSION_MISSING: Sesi login Anda tidak valid. Silakan login kembali untuk menyimpan nilai.');
+      }
 
-      if (!error && data) {
-        const record = data as GradedStudentScoreRecord;
-        // GradeMaster OS portal visibility guarantees: is_deleted = false, original_score & remedial_status
-        const finalVal = dto.final_score !== undefined && dto.final_score !== null
-          ? Math.max(0, Math.min(100, Number(dto.final_score)))
-          : Number(record.final_score);
+      if (token) {
+        let shouldFallbackRpc = false;
         try {
-          await this.client.from('gm_students').update({
-            is_deleted: false,
-            original_score: finalVal,
-            final_score: finalVal,
-            mcq_score: dto.mcq_score ?? finalVal,
-            essay_score: dto.essay_score ?? 0,
-            remedial_status: finalVal >= 75 ? 'PASSED' : 'NONE',
-          }).eq('id', record.id);
-          await this.client.from('student_scores').update({
-            score: finalVal,
-          }).eq('student_id', studentUserId).eq('session_id', dto.session_id);
-          record.final_score = finalVal;
-          record.original_score = finalVal;
-          record.is_deleted = false;
-          record.mcq_score = dto.mcq_score ?? finalVal;
-          record.essay_score = dto.essay_score ?? 0;
-          record.remedial_status = finalVal >= 75 ? 'PASSED' : 'NONE';
-        } catch (patchErr) {
-          logger.warn('SupabaseProvider', 'Failed to patch GradeMaster student fields:', patchErr);
-        }
-        this.updateGradedStudentCache(dto.session_id, record);
-        return record;
-      }
-
-      if (error) {
-        if (error.message?.includes('CONCURRENCY_CONFLICT')) {
-          throw new Error(error.message);
-        }
-        logger.warn('SupabaseProvider', 'RPC save_exam_grade_v2 not available or errored, using fallback:', error.message);
-      }
-    } catch (rpcErr: any) {
-      if (rpcErr?.message?.includes('CONCURRENCY_CONFLICT')) {
-        throw rpcErr;
-      }
-      logger.warn('SupabaseProvider', 'RPC exception, using resilient fallback:', rpcErr?.message || rpcErr);
-    }
-
-    // 2. Resilient Direct Fallback (Safe & Atomic per student, zero dual write, zero answer deletion)
-    let existingRecord: any = null;
-    if (studentUserId) {
-      const { data } = await this.client
-        .from('gm_students')
-        .select('id, revision')
-        .eq('session_id', dto.session_id)
-        .eq('student_user_id', studentUserId)
-        .maybeSingle();
-      existingRecord = data;
-    }
-    if (!existingRecord && dto.id) {
-      const { data } = await this.client
-        .from('gm_students')
-        .select('id, revision')
-        .eq('id', dto.id)
-        .maybeSingle();
-      existingRecord = data;
-    }
-
-    if (existingRecord && dto.expected_revision !== undefined && existingRecord.revision !== undefined && existingRecord.revision !== dto.expected_revision) {
-      throw new Error(
-        `CONCURRENCY_CONFLICT: Data siswa ${cleanName} telah diperbarui oleh pengguna lain (revisi saat ini ${existingRecord.revision}, dikirim ${dto.expected_revision}). Silakan muat ulang.`
-      );
-    }
-
-    const currentRev = (existingRecord?.revision || 0) + 1;
-    const finalScore = Math.max(0, Math.min(100, dto.final_score));
-
-    const studentPayload: any = {
-      session_id: dto.session_id,
-      student_user_id: studentUserId,
-      name: cleanName,
-      mcq_answers: dto.mcq_answers || {},
-      essay_scores: dto.essay_scores || [],
-      mcq_score: Math.max(0, Math.min(100, dto.mcq_score || 0)),
-      essay_score: Math.max(0, Math.min(100, dto.essay_score || 0)),
-      final_score: finalScore,
-      original_score: finalScore,
-      csi: Math.max(0, Math.min(100, dto.csi || 0)),
-      lps: Math.max(0, Math.min(100, dto.lps || 0)),
-      correct: dto.correct || 0,
-      wrong: dto.wrong || 0,
-      remedial_status: finalScore >= 75 ? 'PASSED' : 'NONE',
-      is_deleted: false,
-      source: dto.source || 'MANUAL_ENTRY',
-      revision: currentRev,
-      updated_at: new Date().toISOString(),
-    };
-
-    let savedId = existingRecord?.id || dto.id;
-    if (existingRecord) {
-      const { error: updErr } = await this.client.from('gm_students').update(studentPayload).eq('id', savedId);
-      if (updErr) {
-        logger.error('SupabaseProvider', 'saveGradedStudent fallback update error:', updErr.message);
-        throw new Error(`Gagal menyimpan nilai ke cloud: ${updErr.message}`);
-      }
-    } else {
-      studentPayload.id = savedId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined);
-      const { data: insData, error: insErr } = await this.client
-        .from('gm_students')
-        .insert(studentPayload)
-        .select('id')
-        .single();
-      if (insErr) {
-        logger.error('SupabaseProvider', 'saveGradedStudent fallback insert error:', insErr.message);
-        throw new Error(`Gagal menyimpan nilai siswa ke cloud: ${insErr.message}`);
-      }
-      savedId = insData?.id || studentPayload.id;
-    }
-
-    // Atomic upsert gm_answers on conflict (student_id, question_number) - NEVER delete!
-    if (savedId && dto.answer_key && Array.isArray(dto.answer_key) && dto.mcq_answers) {
-      try {
-        const normalize = (v?: string) => (v ? v.trim().toUpperCase() : '');
-        const answerRows = Object.entries(dto.mcq_answers).map(([qNum, selected]) => ({
-          student_id: savedId,
-          question_number: parseInt(qNum, 10),
-          selected_answer: selected,
-          is_correct: normalize(dto.answer_key?.[parseInt(qNum, 10) - 1]) === normalize(selected),
-          updated_at: new Date().toISOString(),
-        }));
-        if (answerRows.length > 0) {
-          const { error: ansErr } = await this.client.from('gm_answers').upsert(answerRows, { onConflict: 'student_id,question_number' });
-          if (ansErr) {
-            logger.debug('SupabaseProvider', 'gm_answers upsert notice (resolves with migration 67):', ansErr.message);
+          const resp = await fetch(
+            '/api/exam-correction',
+            buildAuthenticatedFetchOptions(
+              'POST',
+              {
+                action: 'save_grade',
+                session_id: dto.session_id,
+                change_reason: dto.change_reason ?? null,
+                source: dto.source || 'MANUAL_ENTRY',
+                data: {
+                  ...dto,
+                  student_user_id: studentUserId,
+                  name: cleanName,
+                },
+              },
+              token
+            )
+          );
+          const json = await resp.json().catch(() => null);
+          if (resp.ok && json?.success && json?.result) {
+            const record = json.result as GradedStudentScoreRecord;
+            this.updateGradedStudentCache(dto.session_id, record);
+            return record;
+          }
+          if (isDevMode && resp.status === 404) {
+            shouldFallbackRpc = true;
+          } else {
+            throw new Error(json?.message || json?.errorMessage || `HTTP ${resp.status}: Gagal menyimpan nilai siswa.`);
+          }
+        } catch (err: any) {
+          if (isDevMode && (shouldFallbackRpc || err?.name === 'TypeError')) {
+            shouldFallbackRpc = true;
+          } else {
+            throw err;
           }
         }
-      } catch (ansErr) {
-        logger.debug('SupabaseProvider', 'gm_answers upsert note:', ansErr);
+        if (!shouldFallbackRpc) {
+          throw new Error('Gagal menyimpan nilai ke server koreksi ujian.');
+        }
       }
     }
 
-    // Upsert student_scores on conflict (student_id, session_id) - NEVER duplicate!
-    try {
-      const { error: scoreErr } = await this.client.from('student_scores').upsert({
-        student_id: studentUserId,
-        session_id: dto.session_id,
-        score: finalScore,
-        answers: {
-          session_id: dto.session_id,
-          name: cleanName,
-          mcq_answers: dto.mcq_answers,
-          essay_scores: dto.essay_scores,
-          csi: dto.csi,
-          lps: dto.lps,
-          correct: dto.correct,
-          wrong: dto.wrong,
-        },
-        is_completed: true,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'student_id,session_id' });
-      if (scoreErr) {
-        logger.debug('SupabaseProvider', 'student_scores upsert notice (resolves with migration 67):', scoreErr.message);
-      }
-    } catch (scoreSyncErr) {
-      logger.debug('SupabaseProvider', 'student_scores upsert note:', scoreSyncErr);
+    // 2. SECURITY DEFINER PostgreSQL RPC fallback (only Vite local dev 404 or Node test runner)
+    const { data, error } = await this.client.rpc('save_exam_grade_v2', {
+      p_session_id: dto.session_id,
+      p_student_user_id: studentUserId,
+      p_student_name: cleanName,
+      p_mcq_answers: dto.mcq_answers || {},
+      p_essay_scores: dto.essay_scores || [],
+      p_actor_user_id: dto.actor_user_id || null,
+      p_actor_name: dto.actor_name || 'Guru',
+      p_actor_role: dto.actor_role || 'GURU',
+      p_expected_revision: dto.expected_revision ?? null,
+      p_change_reason: dto.change_reason ?? null,
+      p_source: dto.source || 'MANUAL_ENTRY',
+    });
+
+    if (error || !data) {
+      throw new Error(error?.message || 'Gagal menyimpan nilai melalui RPC server.');
     }
 
-    const result: GradedStudentScoreRecord = {
-      ...studentPayload,
-      id: savedId,
-      created_at: new Date().toISOString(),
-    };
-
-    this.updateGradedStudentCache(dto.session_id, result);
-    return result;
+    const record = data as GradedStudentScoreRecord;
+    this.updateGradedStudentCache(dto.session_id, record);
+    return record;
   }
 
   public async batchSaveGradedStudents(dto: BatchSaveGradesDTO, token?: string): Promise<BatchSaveGradesResult> {
@@ -7313,53 +7197,80 @@ export class SupabaseProvider implements IDataProvider {
       throw new Error(`BATCH_LIMIT_EXCEEDED: Maksimal 100 siswa per transaksi batch (diterima: ${dto.items.length}).`);
     }
 
-    // 1. Try batch atomic RPC batch_save_exam_grades_v2
-    try {
-      const { data, error } = await this.client.rpc('batch_save_exam_grades_v2', {
-        p_session_id: dto.session_id,
-        p_items: dto.items.map((it) => ({
-          student_user_id: it.student_user_id || it.id || `std_${Date.now()}`,
-          name: it.name.trim(),
-          mcq_answers: it.mcq_answers || {},
-          essay_scores: it.essay_scores || [],
-          source: it.source || dto.source || 'IMPORT_EXCEL',
-        })),
-        p_actor_user_id: dto.items[0]?.actor_user_id || null,
-        p_actor_name: dto.items[0]?.actor_name || 'Guru',
-        p_actor_role: dto.items[0]?.actor_role || 'GURU',
-        p_source: dto.source || 'IMPORT_EXCEL',
-      });
+    const isDevMode = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV);
 
-      if (!error && data && data.success) {
-        const results = (data.results || []) as GradedStudentScoreRecord[];
-        results.forEach((rec) => this.updateGradedStudentCache(dto.session_id, rec));
-        return {
-          success: true,
-          total_processed: data.total_processed || results.length,
-          results,
-        };
+    // 1. Primary Secure Server Path (/api/exam-correction)
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      const activeToken = resolveClientAuthToken(token);
+      if (!activeToken && !isDevMode) {
+        throw new Error('AUTH_SESSION_MISSING: Sesi login Anda tidak valid. Silakan login kembali.');
       }
-      if (error) {
-        logger.warn('SupabaseProvider', 'RPC batch_save_exam_grades_v2 error, fallback to individual saves:', error.message);
+
+      if (activeToken) {
+        try {
+          const resp = await fetch(
+            '/api/exam-correction',
+            buildAuthenticatedFetchOptions(
+              'POST',
+              {
+                action: 'batch_save_grades',
+                session_id: dto.session_id,
+                source: dto.source || 'IMPORT_EXCEL',
+                items: dto.items.map((it) => ({
+                  ...it,
+                  student_user_id: it.student_user_id || it.id || `std_${Date.now()}`,
+                  name: it.name.trim(),
+                })),
+              },
+              activeToken
+            )
+          );
+          const json = await resp.json().catch(() => null);
+          if (resp.ok && json?.success) {
+            const results = (json.results || []) as GradedStudentScoreRecord[];
+            results.forEach((rec) => this.updateGradedStudentCache(dto.session_id, rec));
+            return {
+              success: true,
+              total_processed: json.total_processed || results.length,
+              results,
+            };
+          }
+          if (!(isDevMode && resp.status === 404)) {
+            throw new Error(json?.message || json?.errorMessage || `HTTP ${resp.status}: Gagal melakukan batch import nilai.`);
+          }
+        } catch (err: any) {
+          if (!(isDevMode && err?.name === 'TypeError')) {
+            throw err;
+          }
+        }
       }
-    } catch (batchErr) {
-      logger.warn('SupabaseProvider', 'RPC batch exception, fallback:', batchErr);
     }
 
-    // Fallback if RPC is not present
-    const results: GradedStudentScoreRecord[] = [];
-    for (const item of dto.items) {
-      const saved = await this.saveGradedStudent({
-        ...item,
-        session_id: dto.session_id,
-        source: item.source || dto.source || 'IMPORT_EXCEL',
-      }, token);
-      results.push(saved);
+    // 2. SECURITY DEFINER PostgreSQL RPC fallback (only local dev 404 / Node test)
+    const { data, error } = await this.client.rpc('batch_save_exam_grades_v2', {
+      p_session_id: dto.session_id,
+      p_items: dto.items.map((it) => ({
+        student_user_id: it.student_user_id || it.id || `std_${Date.now()}`,
+        name: it.name.trim(),
+        mcq_answers: it.mcq_answers || {},
+        essay_scores: it.essay_scores || [],
+        source: it.source || dto.source || 'IMPORT_EXCEL',
+      })),
+      p_actor_user_id: dto.items[0]?.actor_user_id || null,
+      p_actor_name: dto.items[0]?.actor_name || 'Guru',
+      p_actor_role: dto.items[0]?.actor_role || 'GURU',
+      p_source: dto.source || 'IMPORT_EXCEL',
+    });
+
+    if (error || !data || !data.success) {
+      throw new Error(error?.message || 'Gagal menyimpan batch nilai siswa melalui RPC server.');
     }
 
+    const results = (data.results || []) as GradedStudentScoreRecord[];
+    results.forEach((rec) => this.updateGradedStudentCache(dto.session_id, rec));
     return {
       success: true,
-      total_processed: results.length,
+      total_processed: data.total_processed || results.length,
       results,
     };
   }
@@ -7384,6 +7295,23 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async deleteGradedStudent(studentId: string, _token?: string): Promise<boolean> {
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      const token = resolveClientAuthToken(_token);
+      if (!token) {
+        throw new Error('AUTH_SESSION_MISSING: Sesi login diperlukan untuk menghapus nilai siswa.');
+      }
+
+      const resp = await fetch(
+        '/api/exam-correction',
+        buildAuthenticatedFetchOptions('POST', { action: 'delete_student', student_id: studentId }, token)
+      );
+      const json = await resp.json().catch(() => null);
+      if (!resp.ok || !json?.success) {
+        throw new Error(json?.message || `Gagal menghapus nilai siswa (HTTP ${resp.status}).`);
+      }
+      return true;
+    }
+
     const { error } = await this.client.from('gm_students').delete().eq('id', studentId);
     if (error) {
       logger.error('SupabaseProvider', 'deleteGradedStudent error:', error.message);
@@ -7412,226 +7340,38 @@ export class SupabaseProvider implements IDataProvider {
       return { success: true, count: 0, message: 'Tidak ada data nilai yang dikirim.' };
     }
 
-    // 1. Fetch student accounts for exact casing/name synchronization with GradeMaster portal
-    const accountNamesMap = new Map<string, string>();
-    try {
-      const { data: accounts } = await this.client
-        .from('gm_student_accounts')
-        .select('student_name, class_name')
-        .eq('class_name', cleanClass);
-
-      (accounts || []).forEach((acc: any) => {
-        if (acc.student_name) {
-          accountNamesMap.set(acc.student_name.trim().toLowerCase(), acc.student_name.trim());
-        }
-      });
-    } catch (accErr) {
-      logger.debug('SupabaseProvider', 'Account name prefetch note:', accErr);
+    const token = resolveClientAuthToken(_token);
+    if (!token) {
+      throw new Error('AUTH_SESSION_MISSING: Sesi login diperlukan untuk menyinkronkan nilai ke GradeMaster.');
     }
 
-    // 2. Cari atau Buat Sesi di gm_sessions
-    let sessionId: string | null = null;
-    let existingStudentList: string[] = [];
-    const sessionName = `${examType} - ${cleanSubject} - ${cleanClass} (${cleanYear})`;
-
-    const { data: existingSession } = await this.client
-      .from('gm_sessions')
-      .select('id, student_list')
-      .eq('class_name', cleanClass)
-      .eq('subject', cleanSubject)
-      .eq('academic_year', cleanYear)
-      .eq('exam_type', examType)
-      .maybeSingle();
-
-    if (existingSession) {
-      sessionId = existingSession.id;
-      existingStudentList = Array.isArray(existingSession.student_list) ? existingSession.student_list : [];
-      // Guarantee is_public is true
-      await this.client
-        .from('gm_sessions')
-        .update({
-          is_public: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', sessionId);
-    } else {
-      // Check if session_name exists to prevent UNIQUE violation
-      const { data: sessionByName } = await this.client
-        .from('gm_sessions')
-        .select('id, student_list')
-        .eq('session_name', sessionName)
-        .maybeSingle();
-
-      if (sessionByName) {
-        sessionId = sessionByName.id;
-        existingStudentList = Array.isArray(sessionByName.student_list) ? sessionByName.student_list : [];
-        await this.client
-          .from('gm_sessions')
-          .update({
-            is_public: true,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', sessionId);
-      } else {
-        const studentNames = scores.map((s) => {
-          const raw = s.studentName.trim();
-          return accountNamesMap.get(raw.toLowerCase()) || raw;
-        });
-
-        const generatedId =
-          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-            ? crypto.randomUUID()
-            : undefined;
-
-        const newSessionPayload: any = {
-          session_name: sessionName,
-          teacher: teacherName,
+    const resp = await fetch(
+      '/api/exam-correction',
+      buildAuthenticatedFetchOptions(
+        'POST',
+        {
+          action: 'sync_scores',
+          className: cleanClass,
           subject: cleanSubject,
-          class_name: cleanClass,
-          class_code: normalizeClassCode(cleanClass),
-          academic_year: cleanYear,
-          exam_type: examType,
-          kkm: kkm,
-          is_public: true,
-          student_list: studentNames,
-          password_hash: 'system_synced',
-          scoring_config: { pgWeight: 1, essayWeight: 0, essayMaxScore: 0, essayCount: 0 },
-          updated_at: new Date().toISOString(),
-        };
-        if (generatedId) newSessionPayload.id = generatedId;
-
-        const { data: newSession, error: sessErr } = await this.client
-          .from('gm_sessions')
-          .insert(newSessionPayload)
-          .select('id')
-          .single();
-
-        if (sessErr) {
-          logger.error('SupabaseProvider', 'syncScoresToGradeMaster session insert error:', sessErr);
-          throw sessErr;
-        }
-
-        sessionId = newSession?.id || generatedId;
-        existingStudentList = studentNames;
-      }
-    }
-
-    if (!sessionId) {
-      throw new Error('Gagal mendapatkan atau membuat ID sesi ujian GradeMaster.');
-    }
-
-    // 3. Upsert Nilai ke gm_students
-    const updatedStudentNames: string[] = [...existingStudentList];
-
-    for (let i = 0; i < scores.length; i++) {
-      const item = scores[i];
-      const rawName = item.studentName.trim();
-      const canonicalName = accountNamesMap.get(rawName.toLowerCase()) || rawName;
-      const finalScore = Number(item.score);
-      const remedialStatus = finalScore >= kkm ? 'PASSED' : 'NONE';
-
-      if (!updatedStudentNames.includes(canonicalName)) {
-        updatedStudentNames.push(canonicalName);
-      }
-
-      // Check if student already exists in this session
-      const { data: existingStudent } = await this.client
-        .from('gm_students')
-        .select('id')
-        .eq('session_id', sessionId)
-        .ilike('name', canonicalName)
-        .maybeSingle();
-
-      if (existingStudent) {
-        await this.client
-          .from('gm_students')
-          .update({
-            name: canonicalName,
-            final_score: finalScore,
-            original_score: finalScore,
-            mcq_score: finalScore,
-            essay_score: 0,
-            remedial_status: remedialStatus,
-            is_deleted: false,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingStudent.id);
-      } else {
-        const generatedStudentId =
-          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-            ? crypto.randomUUID()
-            : undefined;
-
-        const studentUserId = `std_${normalizeClassCode(cleanClass).toLowerCase()}_${Date.now()}_${i}`;
-
-        const insertStudentPayload: any = {
-          session_id: sessionId,
-          student_user_id: studentUserId,
-          name: canonicalName,
-          final_score: finalScore,
-          original_score: finalScore,
-          mcq_score: finalScore,
-          essay_score: 0,
-          remedial_status: remedialStatus,
-          is_deleted: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        if (generatedStudentId) insertStudentPayload.id = generatedStudentId;
-
-        const { error: insErr } = await this.client
-          .from('gm_students')
-          .insert(insertStudentPayload);
-
-        if (insErr) {
-          logger.warn('SupabaseProvider', 'syncScoresToGradeMaster insert student warning:', insErr.message);
-        }
-      }
-
-      // Mirror to student_scores
-      try {
-        await this.client.from('student_scores').upsert(
-          {
-            student_id: `std_${cleanClass}_${canonicalName.replace(/\s+/g, '_')}`,
-            session_id: sessionId,
-            score: finalScore,
-            answers: {
-              session_id: sessionId,
-              name: canonicalName,
-              score: finalScore,
-              synced_at: new Date().toISOString(),
-            },
-            is_completed: true,
-            completed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'student_id,session_id' }
-        );
-      } catch (mirrorErr) {
-        logger.debug('SupabaseProvider', 'Mirror student_scores note:', mirrorErr);
-      }
-    }
-
-    // 4. Update student_list in gm_sessions if needed
-    if (updatedStudentNames.length > existingStudentList.length) {
-      try {
-        await this.client
-          .from('gm_sessions')
-          .update({
-            student_list: updatedStudentNames,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', sessionId);
-      } catch (sessListErr) {
-        logger.debug('SupabaseProvider', 'Update student_list note:', sessListErr);
-      }
+          academicYear: cleanYear,
+          examType,
+          teacherName,
+          kkm,
+          scores,
+        },
+        token
+      )
+    );
+    const json = await resp.json().catch(() => null);
+    if (!resp.ok || !json?.success) {
+      throw new Error(json?.message || `Gagal menyinkronkan nilai ke GradeMaster (HTTP ${resp.status}).`);
     }
 
     return {
       success: true,
-      count: scores.length,
-      sessionId: sessionId || undefined,
-      message: `Berhasil menyinkronkan ${scores.length} nilai siswa ke GradeMaster (${cleanClass}).`,
+      count: Number(json.count) || scores.length,
+      sessionId: json.sessionId || undefined,
+      message: json.message || `Berhasil menyinkronkan ${scores.length} nilai siswa ke GradeMaster (${cleanClass}).`,
     };
   }
 
@@ -8068,11 +7808,12 @@ export class SupabaseProvider implements IDataProvider {
             if (Array.isArray(parsed) && parsed.length > 0) {
               const localForYear = parsed.filter((m) => !targetYear || m.academicYear === targetYear);
               if (localForYear.length > 0) {
-                logger.info('SupabaseProvider', 'Auto-migrating local committee data to cloud for year:', targetYear);
-                // Asynchronously push to cloud without blocking
-                this.saveExamCommitteeMembers(localForYear, targetYear).catch((e) => {
-                  logger.warn('SupabaseProvider', 'Failed auto-migrating local committee to cloud:', e);
-                });
+                if (resolveClientAuthToken(_token)) {
+                  logger.info('SupabaseProvider', 'Auto-migrating local committee data to cloud for year:', targetYear);
+                  this.saveExamCommitteeMembers(localForYear, targetYear, _token).catch((e) => {
+                    logger.warn('SupabaseProvider', 'Failed auto-migrating local committee to cloud:', e);
+                  });
+                }
                 this.cachedExamCommittees.set(targetYear, { data: localForYear, timestamp: Date.now() });
                 return localForYear;
               }
@@ -8093,54 +7834,54 @@ export class SupabaseProvider implements IDataProvider {
     const targetYear = academicYear || '2026/2027';
     this.cachedExamCommittees.delete(targetYear);
 
-    // 1. Update local storage immediately for fast local response
+    const localKey = 'smart_absensi_exam_committee';
+    let prevLocalRaw: string | null = null;
+
+    // 1. Update local storage immediately for fast local response (with rollback snapshot)
     try {
       if (typeof localStorage !== 'undefined') {
-        const raw = localStorage.getItem('smart_absensi_exam_committee');
-        let all: ExamCommitteeMember[] = raw ? JSON.parse(raw) : [];
+        prevLocalRaw = localStorage.getItem(localKey);
+        let all: ExamCommitteeMember[] = prevLocalRaw ? JSON.parse(prevLocalRaw) : [];
         if (!Array.isArray(all)) all = [];
         all = all.filter((m) => m.academicYear !== targetYear);
         all.push(...members);
-        localStorage.setItem('smart_absensi_exam_committee', JSON.stringify(all));
+        localStorage.setItem(localKey, JSON.stringify(all));
       }
     } catch {}
 
-    // 2. Save to system_settings KV (Guaranteed zero-downtime multi-device cloud sync)
+    // 2. Persist through authenticated serverless endpoint (serverSupabase enforces ADMIN/OPERATOR/KEPSEK role)
     try {
-      const settingKey = `exam_committee_${targetYear}`;
-      await this.client.from('system_settings').upsert({
-        key: settingKey,
-        value: JSON.stringify(members),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'key' });
+      const token = resolveClientAuthToken(_token);
+      if (!token) {
+        throw new Error('AUTH_SESSION_MISSING: Sesi login diperlukan untuk menyimpan SK Panitia Ujian.');
+      }
 
-      await this.client.from('system_settings').upsert({
-        key: 'smart_absensi_exam_committee',
-        value: JSON.stringify(members),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'key' });
-    } catch (err) {
-      logger.warn('SupabaseProvider', 'Failed to save committee to system_settings:', err);
-    }
-
-    // 3. Save to public.exam_committees table if exists
-    try {
-      await this.client.from('exam_committees').delete().eq('academic_year', targetYear);
-      if (members.length > 0) {
-        const rows = members.map((m) => ({
-          id: m.id || `comm_${m.userId}_${Date.now()}`,
-          academic_year: targetYear,
-          user_id: m.userId,
-          full_name: m.fullName,
-          npp: m.npp || null,
-          role: m.role,
-          is_active: m.isActive ?? true,
-          updated_at: new Date().toISOString(),
-        }));
-        await this.client.from('exam_committees').upsert(rows, { onConflict: 'id' });
+      const resp = await fetch(
+        '/api/admin/teaching-schedules?action=save_exam_committee',
+        buildAuthenticatedFetchOptions(
+          'POST',
+          {
+            action: 'save_exam_committee',
+            academicYear: targetYear,
+            members,
+          },
+          token
+        )
+      );
+      const resJson = await resp.json().catch(() => null);
+      if (!resp.ok || !resJson?.success) {
+        throw new Error(resJson?.errorMessage || `HTTP ${resp.status}: Gagal menyimpan SK Panitia Ujian.`);
       }
     } catch (err) {
-      logger.warn('SupabaseProvider', 'Table exam_committees insert skipped or table not yet created:', err);
+      logger.warn('SupabaseProvider', 'Failed to save committee via serverless endpoint:', err);
+      this.cachedExamCommittees.delete(targetYear);
+      try {
+        if (typeof localStorage !== 'undefined') {
+          if (prevLocalRaw !== null) localStorage.setItem(localKey, prevLocalRaw);
+          else localStorage.removeItem(localKey);
+        }
+      } catch {}
+      return false;
     }
 
     // 4. Broadcast window event
@@ -8239,40 +7980,67 @@ export class SupabaseProvider implements IDataProvider {
     const effectiveLevel = level || schedule.config.educationLevel || schedule.educationLevel;
     const levelSuffix = effectiveLevel ? `_${effectiveLevel.toLowerCase()}` : '';
     const storageKey = `exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`;
+    const localPrimaryKey = `smart_absensi_exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`;
+    const localLegacyKey = `smart_absensi_exam_schedule_${cleanYear}_${cleanType}`;
+
+    let prevPrimaryRaw: string | null = null;
+    let prevLegacyRaw: string | null = null;
 
     this.cachedExamSchedules.delete(storageKey);
     if (effectiveLevel === 'SMP') {
       this.cachedExamSchedules.delete(`exam_schedule_${cleanYear}_${cleanType}`);
     }
 
-    // 1. Local storage
+    // 1. Local storage (snapshot previous values for rollback on cloud error)
     try {
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`, JSON.stringify(schedule));
+        prevPrimaryRaw = localStorage.getItem(localPrimaryKey);
+        localStorage.setItem(localPrimaryKey, JSON.stringify(schedule));
         if (effectiveLevel === 'SMP') {
-          localStorage.setItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`, JSON.stringify(schedule));
+          prevLegacyRaw = localStorage.getItem(localLegacyKey);
+          localStorage.setItem(localLegacyKey, JSON.stringify(schedule));
         }
       }
     } catch {}
 
-    // 2. Cloud system_settings (Upsert primary key + legacy key for SMP)
+    // 2. Cloud persistence via authenticated serverless endpoint (ADMIN / OPERATOR / Panitia Ujian aktif)
     try {
-      const payload = {
-        key: storageKey,
-        value: JSON.stringify(schedule),
-        updated_at: new Date().toISOString(),
-      };
-      await this.client.from('system_settings').upsert(payload, { onConflict: 'key' });
+      const token = resolveClientAuthToken(_token);
+      if (!token) {
+        throw new Error('AUTH_SESSION_MISSING: Sesi login diperlukan untuk menyimpan jadwal ujian.');
+      }
 
-      if (effectiveLevel === 'SMP') {
-        await this.client.from('system_settings').upsert({
-          key: `exam_schedule_${cleanYear}_${cleanType}`,
-          value: JSON.stringify(schedule),
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'key' });
+      const resp = await fetch(
+        '/api/admin/teaching-schedules?action=save_exam_schedule',
+        buildAuthenticatedFetchOptions(
+          'POST',
+          {
+            action: 'save_exam_schedule',
+            schedule,
+            level: effectiveLevel,
+          },
+          token
+        )
+      );
+      const resJson = await resp.json().catch(() => null);
+      if (!resp.ok || !resJson?.success) {
+        throw new Error(resJson?.errorMessage || `HTTP ${resp.status}: Gagal menyimpan jadwal ujian.`);
       }
     } catch (err) {
-      logger.warn('SupabaseProvider', 'Failed to save exam schedule to system_settings:', err);
+      logger.warn('SupabaseProvider', 'Failed to save exam schedule via serverless endpoint:', err);
+      this.cachedExamSchedules.delete(storageKey);
+      try {
+        if (typeof localStorage !== 'undefined') {
+          if (prevPrimaryRaw !== null) localStorage.setItem(localPrimaryKey, prevPrimaryRaw);
+          else localStorage.removeItem(localPrimaryKey);
+          if (effectiveLevel === 'SMP') {
+            this.cachedExamSchedules.delete(`exam_schedule_${cleanYear}_${cleanType}`);
+            if (prevLegacyRaw !== null) localStorage.setItem(localLegacyKey, prevLegacyRaw);
+            else localStorage.removeItem(localLegacyKey);
+          }
+        }
+      } catch {}
+      return false;
     }
 
     if (typeof window !== 'undefined') {
@@ -8289,6 +8057,15 @@ export class SupabaseProvider implements IDataProvider {
     const cleanType = examType.replace(/[^\w]/g, '_');
     const levelSuffix = level ? `_${level.toLowerCase()}` : '';
     const storageKey = `exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`;
+    const localPrimaryKey = `smart_absensi_exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`;
+    const localLegacyKey = `smart_absensi_exam_schedule_${cleanYear}_${cleanType}`;
+    const localSmpKey = `smart_absensi_exam_schedule_${cleanYear}_${cleanType}_smp`;
+    const localSmaKey = `smart_absensi_exam_schedule_${cleanYear}_${cleanType}_sma`;
+
+    let prevPrimaryRaw: string | null = null;
+    let prevLegacyRaw: string | null = null;
+    let prevSmpRaw: string | null = null;
+    let prevSmaRaw: string | null = null;
 
     this.cachedExamSchedules.delete(storageKey);
     if (level === 'SMP' || !level) {
@@ -8297,24 +8074,57 @@ export class SupabaseProvider implements IDataProvider {
 
     try {
       if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`);
+        prevPrimaryRaw = localStorage.getItem(localPrimaryKey);
+        localStorage.removeItem(localPrimaryKey);
         if (level === 'SMP' || !level) {
-          localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`);
+          prevLegacyRaw = localStorage.getItem(localLegacyKey);
+          localStorage.removeItem(localLegacyKey);
         }
         if (!level) {
-          localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}_smp`);
-          localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}_sma`);
+          prevSmpRaw = localStorage.getItem(localSmpKey);
+          prevSmaRaw = localStorage.getItem(localSmaKey);
+          localStorage.removeItem(localSmpKey);
+          localStorage.removeItem(localSmaKey);
         }
       }
     } catch {}
 
     try {
-      await this.client.from('system_settings').delete().eq('key', storageKey);
-      if (level === 'SMP' || !level) {
-        await this.client.from('system_settings').delete().eq('key', `exam_schedule_${cleanYear}_${cleanType}`);
+      const token = resolveClientAuthToken(_token);
+      if (!token) {
+        throw new Error('AUTH_SESSION_MISSING: Sesi login diperlukan untuk menghapus jadwal ujian.');
+      }
+
+      const resp = await fetch(
+        '/api/admin/teaching-schedules?action=delete_exam_schedule',
+        buildAuthenticatedFetchOptions(
+          'POST',
+          {
+            action: 'delete_exam_schedule',
+            academicYear,
+            examType,
+            level,
+          },
+          token
+        )
+      );
+      const resJson = await resp.json().catch(() => null);
+      if (!resp.ok || !resJson?.success) {
+        throw new Error(resJson?.errorMessage || `HTTP ${resp.status}: Gagal menghapus jadwal ujian.`);
       }
     } catch (err) {
-      logger.warn('SupabaseProvider', 'Failed to delete exam schedule from system_settings:', err);
+      logger.warn('SupabaseProvider', 'Failed to delete exam schedule via serverless endpoint:', err);
+      try {
+        if (typeof localStorage !== 'undefined') {
+          if (prevPrimaryRaw !== null) localStorage.setItem(localPrimaryKey, prevPrimaryRaw);
+          if ((level === 'SMP' || !level) && prevLegacyRaw !== null) localStorage.setItem(localLegacyKey, prevLegacyRaw);
+          if (!level) {
+            if (prevSmpRaw !== null) localStorage.setItem(localSmpKey, prevSmpRaw);
+            if (prevSmaRaw !== null) localStorage.setItem(localSmaKey, prevSmaRaw);
+          }
+        }
+      } catch {}
+      return false;
     }
 
     return true;
@@ -8379,28 +8189,58 @@ export class SupabaseProvider implements IDataProvider {
   public async saveExamPeriodSettings(settings: ExamPeriodSettings, _token?: string): Promise<boolean> {
     const targetYear = settings.academicYear || '2026/2027';
     const cleanYear = targetYear.replace(/[^\w]/g, '_');
-    const storageKey = `exam_period_${cleanYear}`;
+    const localYearKey = `smart_absensi_exam_period_${cleanYear}`;
+    const localGlobalKey = 'smart_absensi_exam_period_settings';
+
+    let prevYearRaw: string | null = null;
+    let prevGlobalRaw: string | null = null;
 
     this.cachedExamPeriodSettings.delete(cleanYear);
 
-    // 1. Update localStorage
+    // 1. Update localStorage (with rollback snapshot)
     try {
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(`smart_absensi_exam_period_${cleanYear}`, JSON.stringify(settings));
-        localStorage.setItem('smart_absensi_exam_period_settings', JSON.stringify(settings));
+        prevYearRaw = localStorage.getItem(localYearKey);
+        prevGlobalRaw = localStorage.getItem(localGlobalKey);
+        localStorage.setItem(localYearKey, JSON.stringify(settings));
+        localStorage.setItem(localGlobalKey, JSON.stringify(settings));
       }
     } catch {}
 
-    // 2. Persist to Supabase cloud system_settings table
+    // 2. Persist via authenticated serverless endpoint (ADMIN / OPERATOR / Panitia Ujian aktif)
     try {
-      const payload = {
-        key: storageKey,
-        value: JSON.stringify(settings),
-        updated_at: new Date().toISOString(),
-      };
-      await this.client.from('system_settings').upsert(payload, { onConflict: 'key' });
+      const token = resolveClientAuthToken(_token);
+      if (!token) {
+        throw new Error('AUTH_SESSION_MISSING: Sesi login diperlukan untuk mengubah periode ujian.');
+      }
+
+      const resp = await fetch(
+        '/api/admin/teaching-schedules?action=save_exam_period',
+        buildAuthenticatedFetchOptions(
+          'POST',
+          {
+            action: 'save_exam_period',
+            settings,
+          },
+          token
+        )
+      );
+      const resJson = await resp.json().catch(() => null);
+      if (!resp.ok || !resJson?.success) {
+        throw new Error(resJson?.errorMessage || `HTTP ${resp.status}: Gagal menyimpan pengaturan periode ujian.`);
+      }
     } catch (err) {
-      logger.warn('SupabaseProvider', 'Failed to save exam period settings to system_settings:', err);
+      logger.warn('SupabaseProvider', 'Failed to save exam period settings via serverless endpoint:', err);
+      this.cachedExamPeriodSettings.delete(cleanYear);
+      try {
+        if (typeof localStorage !== 'undefined') {
+          if (prevYearRaw !== null) localStorage.setItem(localYearKey, prevYearRaw);
+          else localStorage.removeItem(localYearKey);
+          if (prevGlobalRaw !== null) localStorage.setItem(localGlobalKey, prevGlobalRaw);
+          else localStorage.removeItem(localGlobalKey);
+        }
+      } catch {}
+      return false;
     }
 
     if (typeof window !== 'undefined') {

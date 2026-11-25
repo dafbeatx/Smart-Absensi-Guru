@@ -68,6 +68,15 @@ export const ExamSubjectSwapModal: React.FC<ExamSubjectSwapModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'SWAP' | 'REPLACE' | 'HISTORY'>('SWAP');
 
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+
   // Extract unique session slots from subjectSchedules
   const sessionSlots: SessionSlotGroup[] = useMemo(() => {
     if (!scheduleData?.subjectSchedules) return [];
@@ -115,6 +124,7 @@ export const ExamSubjectSwapModal: React.FC<ExamSubjectSwapModalProps> = ({
   const [customSubjectInput, setCustomSubjectInput] = useState<string>('');
 
   // Status & Feedback
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -122,8 +132,14 @@ export const ExamSubjectSwapModal: React.FC<ExamSubjectSwapModalProps> = ({
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Sync initial slot when opened
+  // Sync initial slot when opened or schedule changes
   useEffect(() => {
+    if (!isOpen) return;
+    setIsSubmitting(false);
+    setToastMessage(null);
+    setSelectedSubject('');
+    setCustomSubjectInput('');
+
     if (sessionSlots.length > 0) {
       if (initialSelectedSlot) {
         const matchingKey = `${initialSelectedSlot.date}_S${initialSelectedSlot.sessionNumber}`;
@@ -132,20 +148,18 @@ export const ExamSubjectSwapModal: React.FC<ExamSubjectSwapModalProps> = ({
           setSlotAKey(found.key);
           setTargetSlotKey(found.key);
           const other = sessionSlots.find((s) => s.key !== found.key);
-          if (other) setSlotBKey(other.key);
+          setSlotBKey(other ? other.key : '');
           return;
         }
       }
 
-      if (!slotAKey && sessionSlots[0]) {
+      if (sessionSlots[0]) {
         setSlotAKey(sessionSlots[0].key);
         setTargetSlotKey(sessionSlots[0].key);
       }
-      if (!slotBKey && sessionSlots.length > 1) {
-        setSlotBKey(sessionSlots[1].key);
-      }
+      setSlotBKey(sessionSlots.length > 1 ? sessionSlots[1].key : '');
     }
-  }, [sessionSlots, initialSelectedSlot]);
+  }, [isOpen, scheduleData.id, sessionSlots, initialSelectedSlot]);
 
   const slotA = useMemo(() => sessionSlots.find((s) => s.key === slotAKey), [sessionSlots, slotAKey]);
   const slotB = useMemo(() => sessionSlots.find((s) => s.key === slotBKey), [sessionSlots, slotBKey]);
@@ -161,6 +175,7 @@ export const ExamSubjectSwapModal: React.FC<ExamSubjectSwapModalProps> = ({
 
   // Handle Mutual Swap
   const handleExecuteSwap = async () => {
+    if (isSubmitting) return;
     if (!slotA || !slotB) {
       showToast('Pilih kedua sesi (Sesi A dan Sesi B) untuk melakukan pertukaran.', 'error');
       return;
@@ -171,31 +186,43 @@ export const ExamSubjectSwapModal: React.FC<ExamSubjectSwapModalProps> = ({
       return;
     }
 
-    const result = ExamSchedulerService.swapSubjectsBetweenSessions(
-      scheduleData,
-      { date: slotA.date, sessionNumber: slotA.sessionNumber },
-      { date: slotB.date, sessionNumber: slotB.sessionNumber },
-      currentAdminName
-    );
+    setIsSubmitting(true);
+    try {
+      const result = ExamSchedulerService.swapSubjectsBetweenSessions(
+        scheduleData,
+        { date: slotA.date, sessionNumber: slotA.sessionNumber },
+        { date: slotB.date, sessionNumber: slotB.sessionNumber },
+        currentAdminName
+      );
 
-    if (!result.success || !result.updatedSchedule) {
-      showToast(result.error || 'Gagal menukar mata pelajaran.', 'error');
-      return;
+      if (!result.success || !result.updatedSchedule) {
+        showToast(result.error || 'Gagal menukar mata pelajaran.', 'error');
+        return;
+      }
+
+      // Persist to repository
+      const level = (scheduleData.educationLevel || scheduleData.config?.educationLevel || 'SMP') as 'SMP' | 'SMA';
+      const ok = await ExamScheduleRepository.saveSchedule(result.updatedSchedule, level);
+      if (!ok) {
+        showToast('Gagal menyimpan perubahan pertukaran mapel ke server. Coba lagi.', 'error');
+        return;
+      }
+
+      showToast(
+        `Sukses menukar mapel! [${slotA.dayName} Sesi ${slotA.sessionNumber}: ${slotB.subject}] ⇄ [${slotB.dayName} Sesi ${slotB.sessionNumber}: ${slotA.subject}]`,
+        'success'
+      );
+      onSuccess(result.updatedSchedule);
+    } catch {
+      showToast('Terjadi kesalahan saat menyimpan pertukaran mata pelajaran.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Persist to repository
-    const level = (scheduleData.educationLevel || scheduleData.config?.educationLevel || 'SMP') as 'SMP' | 'SMA';
-    await ExamScheduleRepository.saveSchedule(result.updatedSchedule, level);
-
-    showToast(
-      `Sukses menukar mapel! [${slotA.dayName} Sesi ${slotA.sessionNumber}: ${slotB.subject}] ⇄ [${slotB.dayName} Sesi ${slotB.sessionNumber}: ${slotA.subject}]`,
-      'success'
-    );
-    onSuccess(result.updatedSchedule);
   };
 
   // Handle Single Replace
   const handleExecuteReplace = async () => {
+    if (isSubmitting) return;
     if (!targetSlot) {
       showToast('Pilih sesi ujian yang ingin diganti mata pelajarannya.', 'error');
       return;
@@ -212,30 +239,41 @@ export const ExamSubjectSwapModal: React.FC<ExamSubjectSwapModalProps> = ({
       return;
     }
 
-    const result = ExamSchedulerService.replaceSubjectInSession(
-      scheduleData,
-      { date: targetSlot.date, sessionNumber: targetSlot.sessionNumber },
-      finalSubject,
-      undefined,
-      currentAdminName
-    );
+    setIsSubmitting(true);
+    try {
+      const result = ExamSchedulerService.replaceSubjectInSession(
+        scheduleData,
+        { date: targetSlot.date, sessionNumber: targetSlot.sessionNumber },
+        finalSubject,
+        undefined,
+        currentAdminName
+      );
 
-    if (!result.success || !result.updatedSchedule) {
-      showToast(result.error || 'Gagal mengganti mata pelajaran.', 'error');
-      return;
+      if (!result.success || !result.updatedSchedule) {
+        showToast(result.error || 'Gagal mengganti mata pelajaran.', 'error');
+        return;
+      }
+
+      // Persist to repository
+      const level = (scheduleData.educationLevel || scheduleData.config?.educationLevel || 'SMP') as 'SMP' | 'SMA';
+      const ok = await ExamScheduleRepository.saveSchedule(result.updatedSchedule, level);
+      if (!ok) {
+        showToast('Gagal menyimpan penggantian mata pelajaran ke server. Coba lagi.', 'error');
+        return;
+      }
+
+      showToast(
+        `Mata pelajaran Sesi ${targetSlot.sessionNumber} (${targetSlot.dayName}) berhasil diubah menjadi ${finalSubject}.`,
+        'success'
+      );
+      setSelectedSubject('');
+      setCustomSubjectInput('');
+      onSuccess(result.updatedSchedule);
+    } catch {
+      showToast('Terjadi kesalahan saat menyimpan penggantian mata pelajaran.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Persist to repository
-    const level = (scheduleData.educationLevel || scheduleData.config?.educationLevel || 'SMP') as 'SMP' | 'SMA';
-    await ExamScheduleRepository.saveSchedule(result.updatedSchedule, level);
-
-    showToast(
-      `Mata pelajaran Sesi ${targetSlot.sessionNumber} (${targetSlot.dayName}) berhasil diubah menjadi ${finalSubject}.`,
-      'success'
-    );
-    setSelectedSubject('');
-    setCustomSubjectInput('');
-    onSuccess(result.updatedSchedule);
   };
 
   return (
@@ -243,11 +281,11 @@ export const ExamSubjectSwapModal: React.FC<ExamSubjectSwapModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="subject-swap-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/75 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/75 backdrop-blur-xs animate-in fade-in duration-200"
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200">
+      <div className="bg-white rounded-none sm:rounded-2xl shadow-2xl w-full max-w-4xl h-dvh sm:h-auto sm:max-h-[92dvh] flex flex-col overflow-hidden border-0 sm:border sm:border-slate-200">
         {/* HEADER BAR */}
-        <div className="px-5 py-4 bg-linear-to-r from-slate-900 via-slate-800 to-teal-950 text-white flex items-center justify-between gap-3 shrink-0">
+        <div className="px-4 sm:px-5 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 sm:py-4 bg-linear-to-r from-slate-900 via-slate-800 to-teal-950 text-white flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-teal-500/20 border border-teal-400/30 flex items-center justify-center shrink-0">
               <ArrowLeftRight className="w-5 h-5 text-teal-300" />
@@ -270,7 +308,7 @@ export const ExamSubjectSwapModal: React.FC<ExamSubjectSwapModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 w-10 h-10 sm:w-8 sm:h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
             title="Tutup (Esc)"
           >
             <X className="w-4 h-4" />
@@ -488,11 +526,11 @@ export const ExamSubjectSwapModal: React.FC<ExamSubjectSwapModalProps> = ({
                 <button
                   type="button"
                   onClick={handleExecuteSwap}
-                  disabled={!slotA || !slotB || slotA.key === slotB.key}
+                  disabled={isSubmitting || !slotA || !slotB || slotA.key === slotB.key}
                   className="px-5 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 disabled:opacity-50 active:scale-98 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-all cursor-pointer"
                 >
                   <ArrowLeftRight className="w-4 h-4" />
-                  <span>Tukar Mapel Sesi A &amp; Sesi B</span>
+                  <span>{isSubmitting ? 'Menyimpan...' : 'Tukar Mapel Sesi A & Sesi B'}</span>
                 </button>
               </div>
             </div>
@@ -607,11 +645,11 @@ export const ExamSubjectSwapModal: React.FC<ExamSubjectSwapModalProps> = ({
                 <button
                   type="button"
                   onClick={handleExecuteReplace}
-                  disabled={!targetSlot || (!selectedSubject && !customSubjectInput.trim())}
+                  disabled={isSubmitting || !targetSlot || (!selectedSubject && !customSubjectInput.trim())}
                   className="px-5 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 disabled:opacity-50 active:scale-98 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-all cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Simpan Perubahan Mapel</span>
+                  <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan Mapel'}</span>
                 </button>
               </div>
             </div>

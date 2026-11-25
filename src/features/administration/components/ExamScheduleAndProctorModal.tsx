@@ -42,7 +42,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { formatTimeForInput } from '../../../utils/time.utils';
+import { formatTimeForInput, getTodayDateInJakarta } from '../../../utils/time.utils';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import type { UserProfile } from '../../../types/database.types';
@@ -73,7 +73,7 @@ import {
   ExamScheduleAIGeneratorService,
   getExamAIPromptPresets,
 } from '../../../services/exam-ai-generator.service';
-import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
+import { AdministrationRepository, ADMIN_YEAR_CHANGED_EVENT, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { normalizeClassCode, resolveSchoolLevel } from '../../../utils/class.utils';
@@ -175,13 +175,25 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   readOnly = false,
 }) => {
   // Active filter state
-  const activeAcademicYear = useMemo(() => AdministrationRepository.getActiveAcademicYear(), []);
-  const activeSemester = useMemo(() => {
-    const s = AdministrationRepository.getActiveSemester();
-    return s === 'GENAP' ? 'Genap' : 'Ganjil';
-  }, []);
+  const [activeAcademicYear, setActiveAcademicYear] = useState<string>(() =>
+    AdministrationRepository.getActiveAcademicYear()
+  );
+  const [activeSemester, setActiveSemester] = useState<string>(() =>
+    AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil'
+  );
   const [selectedExamType, setSelectedExamType] = useState<ExamType>('ASTS');
   const [selectedLevel, setSelectedLevel] = useState<EducationLevel>(() => initialLevel || 'SMP');
+
+  useEffect(() => {
+    const syncGlobalAcademicContext = () => {
+      setActiveAcademicYear(AdministrationRepository.getActiveAcademicYear());
+      setActiveSemester(AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil');
+    };
+    window.addEventListener(ADMIN_YEAR_CHANGED_EVENT, syncGlobalAcademicContext);
+    return () => {
+      window.removeEventListener(ADMIN_YEAR_CHANGED_EVENT, syncGlobalAcademicContext);
+    };
+  }, []);
 
   // Navigation active tab
   const [activeTab, setActiveTab] = useState<'ai_prompt' | 'form' | 'subjects' | 'proctors' | 'my_schedule' | 'committee'>(
@@ -198,6 +210,11 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   // Sync initialLevel and initialTab when modal opens
   useEffect(() => {
     if (isOpen) {
+      const latestYear = AdministrationRepository.getActiveAcademicYear();
+      const latestSemester = AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil';
+      setActiveAcademicYear(latestYear);
+      setActiveSemester(latestSemester);
+      setFormAcademicYear(latestYear);
       if (initialLevel) {
         setSelectedLevel(initialLevel);
       }
@@ -235,6 +252,16 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [otherScheduleData, setOtherScheduleData] = useState<ExamScheduleData | null>(null);
   const [smpScheduleData, setSmpScheduleData] = useState<ExamScheduleData | null>(null);
   const [smaScheduleData, setSmaScheduleData] = useState<ExamScheduleData | null>(null);
+  const smpScheduleRef = useRef<ExamScheduleData | null>(null);
+  const smaScheduleRef = useRef<ExamScheduleData | null>(null);
+  const loadSeqRef = useRef<number>(0);
+
+  const updateScheduleRefs = useCallback((smp: ExamScheduleData | null, sma: ExamScheduleData | null) => {
+    smpScheduleRef.current = smp;
+    smaScheduleRef.current = sma;
+    setSmpScheduleData(smp);
+    setSmaScheduleData(sma);
+  }, []);
   const [myScheduleLevelFilter, setMyScheduleLevelFilter] = useState<'ALL' | 'SMP' | 'SMA'>('ALL');
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -305,11 +332,20 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
       const parsedSchedule = ExamScheduleRepository.parseAsasExcelWorkbook(workbook, formAcademicYear);
-      await ExamScheduleRepository.saveSchedule(parsedSchedule, selectedLevel);
+      const savedOk = await ExamScheduleRepository.saveSchedule(parsedSchedule, selectedLevel);
+      if (!savedOk) {
+        setToast({
+          text: 'Gagal menyimpan jadwal hasil impor ke server. Periksa koneksi Anda lalu coba lagi.',
+          type: 'error',
+        });
+        return;
+      }
       setScheduleData(parsedSchedule);
       if (selectedLevel === 'SMA') {
+        smaScheduleRef.current = parsedSchedule;
         setSmaScheduleData(parsedSchedule);
       } else {
+        smpScheduleRef.current = parsedSchedule;
         setSmpScheduleData(parsedSchedule);
       }
       setSelectedExamType('ASAS');
@@ -330,21 +366,27 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     }
   }, [formAcademicYear, selectedLevel]);
 
-  // Helper to compute smart default exam dates (Standard 5-day school week: Senin s/d Jumat)
+  // Helper to compute smart default exam dates in WIB Asia/Jakarta (Standard 5-day school week: Senin s/d Jumat)
+  const addDaysToIsoDate = (isoDate: string, deltaDays: number): string => {
+    const parts = (isoDate || getTodayDateInJakarta()).split('-').map(Number);
+    const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + deltaDays, 12, 0, 0));
+    return getTodayDateInJakarta(dt);
+  };
+
+  const getWeekdayUtcFromIso = (isoDate: string): number => {
+    const parts = (isoDate || getTodayDateInJakarta()).split('-').map(Number);
+    return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12, 0, 0)).getUTCDay();
+  };
+
   const getSmartDefaultExamStartDate = (): string => {
-    const now = new Date();
-    const day = now.getDay(); // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
+    const todayWib = getTodayDateInJakarta();
+    const day = getWeekdayUtcFromIso(todayWib); // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
     const diff = day === 1 ? 0 : (8 - day) % 7;
-    const targetMonday = new Date(now);
-    targetMonday.setDate(now.getDate() + diff);
-    return targetMonday.toISOString().split('T')[0];
+    return addDaysToIsoDate(todayWib, diff);
   };
 
   const getSmartDefaultExamEndDate = (startDateStr: string): string => {
-    const start = new Date(startDateStr);
-    const targetFriday = new Date(start);
-    targetFriday.setDate(start.getDate() + 4); // Senin + 4 hari = Jumat
-    return targetFriday.toISOString().split('T')[0];
+    return addDaysToIsoDate(startDateStr, 4); // Senin + 4 hari = Jumat
   };
 
   const [includeSaturday, setIncludeSaturday] = useState<boolean>(false);
@@ -620,6 +662,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     }
   }, [selectedLevel]);
 
+  const loadSubjectsRef = useRef(loadSubjectsForYear);
+  loadSubjectsRef.current = loadSubjectsForYear;
+
   // Load distinct classes strictly filtered by Academic Year and Education Level (Zero Unnecessary Egress)
   const loadClassesForYear = useCallback(async (year: string, forceRefresh: boolean = false, levelToUse?: EducationLevel) => {
     if (forceRefresh) setIsSyncingClasses(true);
@@ -652,7 +697,10 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     }
   }, [selectedLevel]);
 
-  // Handle switching education level (SMP vs SMA)
+  const loadClassesRef = useRef(loadClassesForYear);
+  loadClassesRef.current = loadClassesForYear;
+
+  // Handle switching education level (SMP vs SMA) without silent canonical auto-overwrite
   const handleLevelChange = useCallback(async (newLevel: EducationLevel) => {
     const targetType = formExamType || selectedExamType;
     if (newLevel === 'SMA' && targetType === 'ASAS') {
@@ -664,38 +712,27 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       return;
     }
     setSelectedLevel(newLevel);
-    // Reload schedule for this level
+    const reqSeq = ++loadSeqRef.current;
+
     const targetYear = formAcademicYear || activeAcademicYear;
-    let saved = await ExamScheduleRepository.getSchedule(targetYear, targetType, newLevel);
-    // Fallback if not found under targetType: check alternative type (ASTS / ASAS)
-    if (!saved) {
-      const altType = targetType === 'ASTS' ? 'ASAS' : 'ASTS';
-      const altSaved = await ExamScheduleRepository.getSchedule(targetYear, altType, newLevel);
-      if (altSaved) {
-        saved = altSaved;
-        setSelectedExamType(altType);
-        setFormExamType(altType);
-      } else if (newLevel === 'SMA' && targetType !== 'ASAS') {
-        saved = ExamScheduleRepository.createCanonicalSmaSchedule(targetYear, targetType);
-        await ExamScheduleRepository.saveSchedule(saved, 'SMA');
-      } else if (newLevel === 'SMP') {
-        saved = targetType === 'ASAS'
-          ? ExamScheduleRepository.createCanonicalAsasSchedule(targetYear)
-          : ExamScheduleRepository.createCanonicalSmpSchedule(targetYear, targetType);
-        await ExamScheduleRepository.saveSchedule(saved, 'SMP');
-      }
-    }
+    const siblingLevel: EducationLevel = newLevel === 'SMA' ? 'SMP' : 'SMA';
+    const [saved, siblingSaved] = await Promise.all([
+      ExamScheduleRepository.getSchedule(targetYear, targetType, newLevel),
+      targetType === 'ASAS'
+        ? Promise.resolve(null)
+        : ExamScheduleRepository.getSchedule(targetYear, targetType, siblingLevel),
+    ]);
+    if (reqSeq !== loadSeqRef.current) return;
+
     setScheduleData(saved);
     if (newLevel === 'SMA') {
-      setSmaScheduleData(saved);
-      setOtherScheduleData(smpScheduleData);
+      updateScheduleRefs(siblingSaved, saved);
+      setOtherScheduleData(siblingSaved);
     } else {
-      setSmpScheduleData(saved);
-      setOtherScheduleData(smaScheduleData);
+      updateScheduleRefs(saved, siblingSaved);
+      setOtherScheduleData(siblingSaved);
     }
-    if (saved) {
-      setActiveTab((prev) => (prev === 'form' || prev === 'ai_prompt' ? 'subjects' : prev));
-    }
+
     if (saved?.config?.selectedSubjects && saved.config.selectedSubjects.length > 0) {
       setSelectedSubjects(saved.config.selectedSubjects);
     }
@@ -715,28 +752,111 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       setSelectedPresetId(presets[0].id);
       setAiPromptInput(presets[0].prompt);
     }
-  }, [formAcademicYear, activeAcademicYear, formExamType, selectedExamType, allYearClasses]);
+  }, [formAcademicYear, activeAcademicYear, formExamType, selectedExamType, allYearClasses, updateScheduleRefs]);
 
   // Handle academic year change in exam questionnaire
   const handleAcademicYearChange = useCallback(async (newYear: string) => {
     setFormAcademicYear(newYear);
+    const reqSeq = ++loadSeqRef.current;
     await loadClassesForYear(newYear, false, selectedLevel);
     loadSubjectsForYear(newYear);
-    const saved = await ExamScheduleRepository.getSchedule(newYear, formExamType, selectedLevel);
-    setScheduleData(saved);
-  }, [loadClassesForYear, loadSubjectsForYear, formExamType, selectedLevel]);
+    const siblingLevel: EducationLevel = selectedLevel === 'SMA' ? 'SMP' : 'SMA';
+    const [saved, siblingSaved] = await Promise.all([
+      ExamScheduleRepository.getSchedule(newYear, formExamType, selectedLevel),
+      formExamType === 'ASAS'
+        ? Promise.resolve(null)
+        : ExamScheduleRepository.getSchedule(newYear, formExamType, siblingLevel),
+    ]);
+    if (reqSeq !== loadSeqRef.current) return;
 
-  // Handle exam type change
+    setScheduleData(saved);
+    setOtherScheduleData(siblingSaved);
+    if (selectedLevel === 'SMA') {
+      updateScheduleRefs(siblingSaved, saved);
+    } else {
+      updateScheduleRefs(saved, siblingSaved);
+    }
+  }, [loadClassesForYear, loadSubjectsForYear, formExamType, selectedLevel, updateScheduleRefs]);
+
+  // Handle exam type change without silently overwriting deleted canonical schedules
   const handleExamTypeChange = useCallback(async (newType: ExamType) => {
     setFormExamType(newType);
     setSelectedExamType(newType);
-    let saved = await ExamScheduleRepository.getSchedule(formAcademicYear, newType, selectedLevel);
-    if (!saved && newType === 'ASAS') {
-      saved = ExamScheduleRepository.createCanonicalAsasSchedule(formAcademicYear);
-      await ExamScheduleRepository.saveSchedule(saved, selectedLevel);
+    const effectiveLevel: EducationLevel = newType === 'ASAS' ? 'SMP' : selectedLevel;
+    if (newType === 'ASAS' && selectedLevel === 'SMA') {
+      setSelectedLevel('SMP');
     }
+
+    const reqSeq = ++loadSeqRef.current;
+    const siblingLevel: EducationLevel = effectiveLevel === 'SMA' ? 'SMP' : 'SMA';
+    const [saved, siblingSaved] = await Promise.all([
+      ExamScheduleRepository.getSchedule(formAcademicYear, newType, effectiveLevel),
+      newType === 'ASAS'
+        ? Promise.resolve(null)
+        : ExamScheduleRepository.getSchedule(formAcademicYear, newType, siblingLevel),
+    ]);
+    if (reqSeq !== loadSeqRef.current) return;
+
     setScheduleData(saved);
-  }, [formAcademicYear, selectedLevel]);
+    setOtherScheduleData(siblingSaved);
+    if (effectiveLevel === 'SMA') {
+      updateScheduleRefs(siblingSaved, saved);
+    } else {
+      updateScheduleRefs(saved, siblingSaved);
+    }
+  }, [formAcademicYear, selectedLevel, updateScheduleRefs]);
+
+  // Explicit admin action to load official canonical schedule template into storage
+  const handleLoadCanonicalTemplate = useCallback(async () => {
+    if (!accessInfo.canManage) return;
+    if (selectedExamType === 'ASAS' && selectedLevel === 'SMA') {
+      setToast({
+        text: 'Template ASAS hanya tersedia untuk jenjang SMP (Ruang 1 s.d. 7).',
+        type: 'error',
+      });
+      return;
+    }
+
+    const targetYear = formAcademicYear || activeAcademicYear;
+    const canonical =
+      selectedExamType === 'ASAS'
+        ? ExamScheduleRepository.createCanonicalAsasSchedule(targetYear)
+        : selectedLevel === 'SMA'
+        ? ExamScheduleRepository.createCanonicalSmaSchedule(targetYear, selectedExamType)
+        : ExamScheduleRepository.createCanonicalSmpSchedule(targetYear, selectedExamType);
+
+    try {
+      const savedOk = await ExamScheduleRepository.saveSchedule(canonical, selectedLevel);
+      if (!savedOk) {
+        setToast({
+          text: 'Gagal menyimpan template jadwal resmi ke server. Silakan coba lagi.',
+          type: 'error',
+        });
+        return;
+      }
+
+      setScheduleData(canonical);
+      if (selectedLevel === 'SMA') {
+        smaScheduleRef.current = canonical;
+        setSmaScheduleData(canonical);
+        setOtherScheduleData(smpScheduleRef.current);
+      } else {
+        smpScheduleRef.current = canonical;
+        setSmpScheduleData(canonical);
+        setOtherScheduleData(smaScheduleRef.current);
+      }
+      setToast({
+        text: `Template resmi ${selectedExamType} (${selectedLevel}) berhasil dimuat dan disimpan!`,
+        type: 'success',
+      });
+    } catch (err) {
+      logger.error('ExamScheduleAndProctorModal', 'Failed to load canonical template:', err);
+      setToast({
+        text: 'Terjadi kesalahan saat memuat template resmi.',
+        type: 'error',
+      });
+    }
+  }, [accessInfo.canManage, selectedExamType, selectedLevel, formAcademicYear, activeAcademicYear]);
 
   // Handle adding custom subject to exam
   const handleAddCustomSubject = useCallback(() => {
@@ -1015,52 +1135,31 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       );
 
       // 4. Load dynamic classes strictly filtered by active academic year & level (Zero Egress Priority)
-      await loadClassesForYear(formAcademicYear, false, selectedLevel);
+      const seq = ++loadSeqRef.current;
+      const targetYear = AdministrationRepository.getActiveAcademicYear();
+      const initLevel: EducationLevel = initialLevel || 'SMP';
+      const initType: ExamType = 'ASTS';
+      setSelectedExamType(initType);
+      setFormExamType(initType);
+      setSelectedLevel(initLevel);
+
+      await loadClassesRef.current(targetYear, false, initLevel);
+      if (seq !== loadSeqRef.current) return;
 
       // 5. Load subjects for academic year (Zero Egress Priority)
-      loadSubjectsForYear(formAcademicYear);
+      loadSubjectsRef.current(targetYear);
 
-      // 6. Load existing schedule for BOTH SMP and SMA
+      // 6. Load existing schedule for BOTH SMP and SMA (without overwriting deleted/empty schedules)
       const [smpSaved, smaSaved] = await Promise.all([
-        (async () => {
-          let s = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType, 'SMP');
-          if (!s) {
-            if (selectedExamType === 'ASAS') {
-              s = ExamScheduleRepository.createCanonicalAsasSchedule(activeAcademicYear);
-              await ExamScheduleRepository.saveSchedule(s, 'SMP');
-            } else {
-              const altType = selectedExamType === 'ASTS' ? 'ASAS' : 'ASTS';
-              s = await ExamScheduleRepository.getSchedule(activeAcademicYear, altType, 'SMP');
-              if (!s) {
-                s = ExamScheduleRepository.createCanonicalSmpSchedule(activeAcademicYear, selectedExamType);
-                await ExamScheduleRepository.saveSchedule(s, 'SMP');
-              }
-            }
-          }
-          return s;
-        })(),
-        (async () => {
-          if (selectedExamType === 'ASAS') {
-            return null;
-          }
-          let s = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType, 'SMA');
-          if (!s) {
-            const altType = selectedExamType === 'ASTS' ? 'ASAS' : 'ASTS';
-            s = await ExamScheduleRepository.getSchedule(activeAcademicYear, altType, 'SMA');
-            if (!s) {
-              s = ExamScheduleRepository.createCanonicalSmaSchedule(activeAcademicYear, selectedExamType);
-              await ExamScheduleRepository.saveSchedule(s, 'SMA');
-            }
-          }
-          return s;
-        })(),
+        ExamScheduleRepository.getSchedule(targetYear, initType, 'SMP'),
+        ExamScheduleRepository.getSchedule(targetYear, initType, 'SMA'),
       ]);
+      if (seq !== loadSeqRef.current) return;
 
-      setSmpScheduleData(smpSaved);
-      setSmaScheduleData(smaSaved);
+      updateScheduleRefs(smpSaved, smaSaved);
 
-      const activeSaved = selectedLevel === 'SMA' ? smaSaved : smpSaved;
-      const otherSaved = selectedLevel === 'SMA' ? smpSaved : smaSaved;
+      const activeSaved = initLevel === 'SMA' ? smaSaved : smpSaved;
+      const otherSaved = initLevel === 'SMA' ? smpSaved : smaSaved;
       setScheduleData(activeSaved);
       setOtherScheduleData(otherSaved);
       const saved = activeSaved;
@@ -1084,11 +1183,13 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser, activeAcademicYear, selectedExamType, formAcademicYear, selectedLevel, loadClassesForYear, loadSubjectsForYear, readOnly, initialTab]);
+  }, [currentUser, activeAcademicYear, readOnly, initialLevel, initialTab, updateScheduleRefs]);
 
   useEffect(() => {
     if (isOpen) {
       loadInitialData();
+    } else {
+      loadSeqRef.current += 1;
     }
   }, [isOpen, loadInitialData]);
 
@@ -1165,8 +1266,19 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       const generated = ExamSchedulerService.generateSchedule(config, teachers, committeeMembers);
 
       // Save to repository with level
-      await ExamScheduleRepository.saveSchedule(generated, selectedLevel);
+      const savedOk = await ExamScheduleRepository.saveSchedule(generated, selectedLevel);
+      if (!savedOk) {
+        setToast({ text: 'Gagal menyimpan jadwal ke server. Periksa koneksi Anda lalu coba lagi.', type: 'error' });
+        return;
+      }
       setScheduleData(generated);
+      if (selectedLevel === 'SMA') {
+        smaScheduleRef.current = generated;
+        setSmaScheduleData(generated);
+      } else {
+        smpScheduleRef.current = generated;
+        setSmpScheduleData(generated);
+      }
       setSelectedExamType(formExamType);
       setActiveTab('subjects');
       setToast({ text: `Jadwal Ujian & Pengawas ${selectedLevel} berhasil di-generate secara cerdas oleh AI! 🎉`, type: 'success' });
@@ -1202,6 +1314,13 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       });
 
       setScheduleData(result.schedule);
+      if (selectedLevel === 'SMA') {
+        smaScheduleRef.current = result.schedule;
+        setSmaScheduleData(result.schedule);
+      } else {
+        smpScheduleRef.current = result.schedule;
+        setSmpScheduleData(result.schedule);
+      }
       setSelectedExamType(result.config.examType);
       setFormExamType(result.config.examType);
       setFormStartDate(result.config.startDate);
@@ -1378,8 +1497,19 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
     const targetType = scheduleData?.config.examType || formExamType || selectedExamType;
     const targetLevel = scheduleData?.config.educationLevel || scheduleData?.educationLevel || selectedLevel;
     try {
-      await ExamScheduleRepository.deleteSchedule(targetYear, targetType, targetLevel);
+      const deletedOk = await ExamScheduleRepository.deleteSchedule(targetYear, targetType, targetLevel);
+      if (!deletedOk) {
+        setToast({ text: 'Gagal menghapus jadwal ujian di server. Silakan coba lagi.', type: 'error' });
+        return;
+      }
       setScheduleData(null);
+      if (targetLevel === 'SMA') {
+        smaScheduleRef.current = null;
+        setSmaScheduleData(null);
+      } else {
+        smpScheduleRef.current = null;
+        setSmpScheduleData(null);
+      }
       setIsConfirmDeleteOpen(false);
       setActiveTab('form');
       setToast({
@@ -1412,8 +1542,19 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
         updatedAt: new Date().toISOString(),
       };
 
-      await ExamScheduleRepository.saveSchedule(updatedSchedule, effectiveLevel);
+      const savedOk = await ExamScheduleRepository.saveSchedule(updatedSchedule, effectiveLevel);
+      if (!savedOk) {
+        setToast({ text: 'Gagal menyimpan penghapusan slot ujian ke server. Silakan coba lagi.', type: 'error' });
+        return;
+      }
       setScheduleData(updatedSchedule);
+      if (effectiveLevel === 'SMA') {
+        smaScheduleRef.current = updatedSchedule;
+        setSmaScheduleData(updatedSchedule);
+      } else {
+        smpScheduleRef.current = updatedSchedule;
+        setSmpScheduleData(updatedSchedule);
+      }
       setToast({
         text: `Jadwal ${subjectName} (${className}) berhasil dihapus dari jadwal aktif.`,
         type: 'success',
@@ -1713,7 +1854,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
       )}
 
       {/* Fullscreen Workspace Header */}
-      <header className="px-4 py-3 sm:px-6 sm:py-3.5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
+      <header className="px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3 sm:px-6 sm:py-3.5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
         <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
           <button
             type="button"
@@ -1976,7 +2117,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
           )}
 
           {/* Tombol Kontrol Periode Ujian & Kepanitiaan (Admin & Panitia) */}
-          {(accessInfo.isAdmin || accessInfo.isCommittee) && (
+          {accessInfo.canManage && (accessInfo.isAdmin || accessInfo.isCommittee) && (
             <button
               type="button"
               onClick={() => setIsPeriodModalOpen(true)}
@@ -2015,7 +2156,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
               <strong>Masa Ujian Telah Usai / Nonaktif:</strong> Bagian ujian dan kartu tugas kepanitiaan saat ini disembunyikan otomatis dari beranda guru.
             </span>
           </div>
-          {(accessInfo.isAdmin || accessInfo.isCommittee) && (
+          {accessInfo.canManage && (accessInfo.isAdmin || accessInfo.isCommittee) && (
             <button
               type="button"
               onClick={() => setIsPeriodModalOpen(true)}
@@ -2759,12 +2900,10 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                       <button
                         type="button"
                         onClick={() => {
-                          const now = new Date();
-                          const day = now.getDay();
-                          const daysToNextNextMon = day === 1 ? 7 : (8 - day) % 7 + 7;
-                          const nextMon = new Date(now);
-                          nextMon.setDate(now.getDate() + daysToNextNextMon);
-                          const monStr = nextMon.toISOString().split('T')[0];
+                          const todayWib = getTodayDateInJakarta();
+                          const day = getWeekdayUtcFromIso(todayWib);
+                          const daysToNextNextMon = day === 1 ? 7 : ((8 - day) % 7) + 7;
+                          const monStr = addDaysToIsoDate(todayWib, daysToNextNextMon);
                           setFormStartDate(monStr);
                           setFormEndDate(getSmartDefaultExamEndDate(monStr));
                         }}
@@ -3724,17 +3863,28 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                 <h4 className="text-base font-bold text-slate-900">Belum Ada Jadwal Ujian untuk Periode Ini</h4>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
                   {accessInfo.canManage
-                    ? 'Buka tab "Form Parameter & AI" untuk menyusun jadwal asesmen mata pelajaran secara otomatis.'
+                    ? 'Buka tab "Form Parameter & AI" untuk menyusun jadwal asesmen secara otomatis, atau muat template jadwal resmi.'
                     : 'Panitia Ujian belum mengesahkan jadwal ujian untuk tahun ajaran ini. Silakan hubungi Panitia Ujian sekolah.'}
                 </p>
                 {accessInfo.canManage && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('form')}
-                    className="mt-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-xs"
-                  >
-                    <Sliders className="w-4 h-4" /> Buka Formulir Panitia
-                  </button>
+                  <div className="mt-2 flex items-center justify-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('form')}
+                      className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                    >
+                      <Sliders className="w-4 h-4" /> Buka Formulir Panitia
+                    </button>
+                    {!(selectedExamType === 'ASAS' && selectedLevel === 'SMA') && (
+                      <button
+                        type="button"
+                        onClick={handleLoadCanonicalTemplate}
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                      >
+                        <Sparkles className="w-4 h-4 text-amber-300" /> Muat Template Resmi ({selectedLevel} • {selectedExamType})
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             ) : (
@@ -4052,8 +4202,30 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                 <Users className="w-12 h-12 text-slate-300 mx-auto" />
                 <h4 className="text-base font-bold text-slate-900">Belum Ada Roster Pengawas Ujian</h4>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Jadwal pengawas akan terisi otomatis begitu Panitia Ujian menjalankan generator AI.
+                  {accessInfo.canManage
+                    ? 'Susun jadwal melalui Formulir Panitia / AI atau muat template jadwal resmi untuk membentuk roster pengawas.'
+                    : 'Jadwal pengawas akan tampil setelah Panitia Ujian menyusun atau mengesahkan jadwal asesmen.'}
                 </p>
+                {accessInfo.canManage && (
+                  <div className="mt-2 flex items-center justify-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('form')}
+                      className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                    >
+                      <Sliders className="w-4 h-4" /> Buka Formulir Panitia
+                    </button>
+                    {!(selectedExamType === 'ASAS' && selectedLevel === 'SMA') && (
+                      <button
+                        type="button"
+                        onClick={handleLoadCanonicalTemplate}
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                      >
+                        <Sparkles className="w-4 h-4 text-amber-300" /> Muat Template Resmi ({selectedLevel} • {selectedExamType})
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
@@ -5150,14 +5322,14 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
               <button
                 type="button"
                 onClick={() => setIsConfirmDeleteOpen(false)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors"
+                className="flex-1 min-h-11 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={handleDeleteSchedule}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors shadow-md flex items-center justify-center gap-1.5"
+                className="flex-1 min-h-11 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Ya, Hapus Jadwal</span>
@@ -5195,12 +5367,28 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
           initialSelectedSlotId={swapInitialSlotId}
           onSwapSuccess={(updatedPrimary, updatedOther) => {
             setScheduleData(updatedPrimary);
+            const primaryLvl = updatedPrimary.educationLevel || updatedPrimary.config?.educationLevel || selectedLevel;
+            if (primaryLvl === 'SMA') {
+              smaScheduleRef.current = updatedPrimary;
+              setSmaScheduleData(updatedPrimary);
+            } else {
+              smpScheduleRef.current = updatedPrimary;
+              setSmpScheduleData(updatedPrimary);
+            }
             if (updatedOther) {
               setOtherScheduleData(updatedOther);
+              const otherLvl = updatedOther.educationLevel || updatedOther.config?.educationLevel || (primaryLvl === 'SMA' ? 'SMP' : 'SMA');
+              if (otherLvl === 'SMA') {
+                smaScheduleRef.current = updatedOther;
+                setSmaScheduleData(updatedOther);
+              } else {
+                smpScheduleRef.current = updatedOther;
+                setSmpScheduleData(updatedOther);
+              }
             }
             setToast({
               type: 'success',
-              text: 'Pergantian jadwal pengawas (SMP & SMA Ruang 6) berhasil disimpan dan disinkronkan.',
+              text: 'Pergantian jadwal pengawas berhasil disimpan dan disinkronkan.',
             });
           }}
         />
@@ -5219,6 +5407,14 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
           initialSelectedSlot={subjectSwapInitialSlot}
           onSuccess={(updated) => {
             setScheduleData(updated);
+            const updatedLvl = updated.educationLevel || updated.config?.educationLevel || selectedLevel;
+            if (updatedLvl === 'SMA') {
+              smaScheduleRef.current = updated;
+              setSmaScheduleData(updated);
+            } else {
+              smpScheduleRef.current = updated;
+              setSmpScheduleData(updated);
+            }
             setToast({
               type: 'success',
               text: 'Perubahan mata pelajaran ujian berhasil diperbarui dan disinkronkan ke seluruh jadwal & pengawas.',
@@ -5228,18 +5424,22 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
       )}
 
       {/* MODAL PENGATURAN PERIODE UJIAN & KEPANITIAAN (TOGGLE & AUTO EXPIRE) */}
-      <ExamPeriodSettingsModal
-        isOpen={isPeriodModalOpen}
-        onClose={() => setIsPeriodModalOpen(false)}
-        academicYear={activeAcademicYear}
-        onSettingsSaved={(_newSettings, newStatus) => {
-          setPeriodStatus(newStatus);
-          setToast({
-            type: 'success',
-            text: `Status masa ujian berhasil diperbarui: ${newStatus.isActive ? 'Aktif' : 'Usai / Nonaktif'}`,
-          });
-        }}
-      />
+      {accessInfo.canManage && (accessInfo.isAdmin || accessInfo.isCommittee) && (
+        <ExamPeriodSettingsModal
+          isOpen={isPeriodModalOpen}
+          onClose={() => setIsPeriodModalOpen(false)}
+          academicYear={activeAcademicYear}
+          userRole={currentUser?.role}
+          isAuthorized={accessInfo.canManage && (accessInfo.isAdmin || accessInfo.isCommittee)}
+          onSettingsSaved={(_newSettings, newStatus) => {
+            setPeriodStatus(newStatus);
+            setToast({
+              type: 'success',
+              text: `Status masa ujian berhasil diperbarui: ${newStatus.isActive ? 'Aktif' : 'Usai / Nonaktif'}`,
+            });
+          }}
+        />
+      )}
     </div>,
     document.body
   );

@@ -31,14 +31,16 @@ export interface OralExamStudentRecord {
 
   // --- Format Model 2: Bahasa Inggris & Bahasa Arab (Checklist 15 Butir Soal) ---
   englishChecklist?: boolean[]; // Array boolean 15 elemen
-  englishCorrectCount?: number;
-  englishScore?: number; // Konversi ke skala 0-100
+  englishCorrectCount?: number | null;
+  englishScore?: number | null; // Konversi ke skala 0-100 (null jika belum dinilai)
   englishPredicate?: OralExamGrade | null;
+  englishAssessed?: boolean;
 
   arabicChecklist?: boolean[]; // Array boolean 15 elemen
-  arabicCorrectCount?: number;
-  arabicScore?: number; // Konversi ke skala 0-100
+  arabicCorrectCount?: number | null;
+  arabicScore?: number | null; // Konversi ke skala 0-100 (null jika belum dinilai)
   arabicPredicate?: OralExamGrade | null;
+  arabicAssessed?: boolean;
 
   notes?: string;
 }
@@ -50,6 +52,7 @@ export interface OralExamSession {
   academicYear: string; // e.g. '2026/2027'
   semester: 'GANJIL' | 'GENAP';
   examinerName: string; // e.g. 'Ibu Mira Nurdianti, S.Pd' / 'Ibu Septi Nur Aeni, S.E'
+  examinerNpp?: string | null;
   roomNumber?: string; // e.g. 'Ruang 01'
   className: string; // e.g. '7A', '7B', '8A', '9A'
   date: string; // YYYY-MM-DD

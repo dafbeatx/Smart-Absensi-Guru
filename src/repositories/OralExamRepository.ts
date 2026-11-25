@@ -8,7 +8,6 @@ import type {
   OralExamTemplateType,
   OralExamStudentRecord,
 } from '../types/oral-exam.types';
-import { calculateChecklistScoreAndPredicate } from '../utils/oral-exam-scoring.utils';
 
 export const ORAL_EXAM_STORAGE_KEY = 'smart_absensi_oral_exam_sessions_v1';
 export const ORAL_EXAM_CHANGED_EVENT = 'smart_absensi_oral_exam_changed';
@@ -123,6 +122,7 @@ export class OralExamRepository {
     academicYear: string;
     semester: 'GANJIL' | 'GENAP';
     examinerName: string;
+    examinerNpp?: string | null;
     roomNumber?: string;
     className: string;
     date: string;
@@ -135,8 +135,6 @@ export class OralExamRepository {
       if (params.templateType === 'BAHASA_INGGRIS_ARAB') {
         const defaultEnglishChecklist = new Array(15).fill(false);
         const defaultArabicChecklist = new Array(15).fill(false);
-        const engCalc = calculateChecklistScoreAndPredicate(defaultEnglishChecklist, 15);
-        const arabCalc = calculateChecklistScoreAndPredicate(defaultArabicChecklist, 15);
 
         return {
           studentId: st.studentId,
@@ -144,13 +142,15 @@ export class OralExamRepository {
           nisn: st.nisn,
           className: st.className || params.className,
           englishChecklist: defaultEnglishChecklist,
-          englishCorrectCount: engCalc.correctCount,
-          englishScore: engCalc.score,
-          englishPredicate: engCalc.predicate,
+          englishCorrectCount: null,
+          englishScore: null,
+          englishPredicate: null,
+          englishAssessed: false,
           arabicChecklist: defaultArabicChecklist,
-          arabicCorrectCount: arabCalc.correctCount,
-          arabicScore: arabCalc.score,
-          arabicPredicate: arabCalc.predicate,
+          arabicCorrectCount: null,
+          arabicScore: null,
+          arabicPredicate: null,
+          arabicAssessed: false,
         };
       }
 
@@ -174,6 +174,7 @@ export class OralExamRepository {
       academicYear: params.academicYear,
       semester: params.semester,
       examinerName: params.examinerName,
+      examinerNpp: params.examinerNpp ?? null,
       roomNumber: params.roomNumber || 'Ruang 01',
       className: params.className,
       date: params.date,

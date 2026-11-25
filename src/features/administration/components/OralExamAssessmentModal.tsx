@@ -39,7 +39,9 @@ import {
   calculateChecklistScoreAndPredicate,
   getOralExamPredicateBadgeStyle,
   calculateOralExamSummaryStats,
+  isChecklistTrackAssessed,
 } from '../../../utils/oral-exam-scoring.utils';
+import { getTodayDateInJakarta } from '../../../utils/time.utils';
 
 export interface OralExamAssessmentModalProps {
   isOpen: boolean;
@@ -74,13 +76,32 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   const [examinerName, setExaminerName] = useState('');
   const [roomNumber, setRoomNumber] = useState('Ruang 01');
   const [selectedClass, setSelectedClass] = useState('7');
-  const [sessionDate, setSessionDate] = useState(() => new Date().toISOString().substring(0, 10));
+  const [sessionDate, setSessionDate] = useState(() => getTodayDateInJakarta());
 
   // Active editing session
   const [currentSession, setCurrentSession] = useState<OralExamSession | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+  const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    tone?: 'danger' | 'primary';
+    onConfirm: () => void;
+  } | null>(null);
+  const [addStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
+  const [newStudentNameDraft, setNewStudentNameDraft] = useState('');
+
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
 
   // Load all sessions from repository
   const loadSessions = useCallback(() => {
@@ -109,19 +130,33 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     }
   }, [isOpen, loadSessions, user?.full_name]);
 
-  // Handle switching active session
-  const handleSelectSession = (id: string) => {
-    if (isDirty) {
-      const confirmLeave = window.confirm('Ada perubahan nilai yang belum disimpan. Tetap beralih sesi?');
-      if (!confirmLeave) return;
-    }
+  const applySelectSession = (id: string) => {
     setSelectedSessionId(id);
     const found = sessions.find((s) => s.id === id);
     if (found) {
       setCurrentSession(JSON.parse(JSON.stringify(found)));
       setIsDirty(false);
       setIsCreatingNew(false);
+      setScoreDrafts({});
     }
+  };
+
+  // Handle switching active session
+  const handleSelectSession = (id: string) => {
+    if (isDirty) {
+      setConfirmDialog({
+        title: 'Perubahan Belum Disimpan',
+        message: 'Ada perubahan nilai ujian lisan yang belum disimpan. Tetap beralih ke sesi lain?',
+        confirmLabel: 'Ya, Beralih Sesi',
+        tone: 'danger',
+        onConfirm: () => {
+          setConfirmDialog(null);
+          applySelectSession(id);
+        },
+      });
+      return;
+    }
+    applySelectSession(id);
   };
 
   // Create new session flow
@@ -176,7 +211,8 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       title: sessionTitle.trim() || defaultTitle,
       academicYear: activeAcademicYear,
       semester: activeSemester,
-      examinerName: examinerName.trim() || user?.full_name || 'Ibu Guru Penguji',
+      examinerName: examinerName.trim() || user?.full_name || 'Guru Penguji',
+      examinerNpp: user?.nip || null,
       roomNumber: roomNumber.trim() || 'Ruang 01',
       className: selectedClass,
       date: sessionDate,
@@ -188,27 +224,71 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     setCurrentSession(created);
     setIsCreatingNew(false);
     setIsDirty(false);
+    setScoreDrafts({});
     showToast('success', 'Sesi Berhasil Dibuat', `Daftar penilaian untuk kelas ${selectedClass} siap digunakan.`);
   };
 
-  // Score direct input handler (BTQ & Hafalan)
+  // Score direct input handler (BTQ & Hafalan) — dukung desimal koma (, -> .) & tolak NaN
   const handleDirectScoreChange = (
     studentIndex: number,
     field: 'btqScore' | 'hafalanScore',
     valStr: string
   ) => {
-    if (!currentSession) return;
-    const parsed = valStr === '' ? null : Math.max(0, Math.min(100, Number(valStr)));
-    const predicate = calculateDirectScorePredicate(parsed);
+    if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
+    const student = currentSession.students[studentIndex];
+    const draftKey = `${student.studentId}:${field}`;
+    const trimmed = valStr.trim();
+
+    if (trimmed === '') {
+      setScoreDrafts((prev) => {
+        const next = { ...prev };
+        delete next[draftKey];
+        return next;
+      });
+      const updatedStudents = [...currentSession.students];
+      const target = { ...updatedStudents[studentIndex] };
+      if (field === 'btqScore') {
+        target.btqScore = null;
+        target.btqPredicate = null;
+      } else {
+        target.hafalanScore = null;
+        target.hafalanPredicate = null;
+      }
+      updatedStudents[studentIndex] = target;
+      setCurrentSession({ ...currentSession, students: updatedStudents });
+      setIsDirty(true);
+      return;
+    }
+
+    const normalizedStr = trimmed.replace(/,/g, '.');
+    // Hanya terima karakter angka positif dengan maksimal satu pemisah desimal
+    if (!/^\d*(?:\.\d*)?$/.test(normalizedStr)) {
+      return;
+    }
+
+    setScoreDrafts((prev) => ({ ...prev, [draftKey]: valStr }));
+
+    // Jika sedang mengetik diakhiri koma/titik (misal "85,"), simpan draft sambil menunggu digit desimal
+    if (normalizedStr === '.' || normalizedStr.endsWith('.')) {
+      return;
+    }
+
+    const numeric = Number(normalizedStr);
+    if (Number.isNaN(numeric) || !Number.isFinite(numeric)) {
+      return;
+    }
+
+    const clamped = Math.round(Math.max(0, Math.min(100, numeric)) * 100) / 100;
+    const predicate = calculateDirectScorePredicate(clamped);
 
     const updatedStudents = [...currentSession.students];
     const target = { ...updatedStudents[studentIndex] };
 
     if (field === 'btqScore') {
-      target.btqScore = parsed;
+      target.btqScore = clamped;
       target.btqPredicate = predicate;
     } else {
-      target.hafalanScore = parsed;
+      target.hafalanScore = clamped;
       target.hafalanPredicate = predicate;
     }
 
@@ -217,13 +297,23 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     setIsDirty(true);
   };
 
+  const handleDirectScoreBlur = (studentId: string, field: 'btqScore' | 'hafalanScore') => {
+    const draftKey = `${studentId}:${field}`;
+    setScoreDrafts((prev) => {
+      if (!(draftKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[draftKey];
+      return next;
+    });
+  };
+
   // Toggle single question checkbox (Bahasa Inggris / Arab)
   const handleToggleChecklist = (
     studentIndex: number,
     subject: 'english' | 'arabic',
     qIndex: number
   ) => {
-    if (!currentSession) return;
+    if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
     const updatedStudents = [...currentSession.students];
     const target = { ...updatedStudents[studentIndex] };
 
@@ -235,6 +325,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       target.englishCorrectCount = calc.correctCount;
       target.englishScore = calc.score;
       target.englishPredicate = calc.predicate;
+      target.englishAssessed = true;
     } else {
       const arr = target.arabicChecklist ? [...target.arabicChecklist] : new Array(15).fill(false);
       arr[qIndex] = !arr[qIndex];
@@ -243,6 +334,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       target.arabicCorrectCount = calc.correctCount;
       target.arabicScore = calc.score;
       target.arabicPredicate = calc.predicate;
+      target.arabicAssessed = true;
     }
 
     updatedStudents[studentIndex] = target;
@@ -256,7 +348,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     subject: 'english' | 'arabic',
     state: boolean
   ) => {
-    if (!currentSession) return;
+    if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
     const updatedStudents = [...currentSession.students];
     const target = { ...updatedStudents[studentIndex] };
     const arr = new Array(15).fill(state);
@@ -267,11 +359,13 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       target.englishCorrectCount = calc.correctCount;
       target.englishScore = calc.score;
       target.englishPredicate = calc.predicate;
+      target.englishAssessed = true;
     } else {
       target.arabicChecklist = arr;
       target.arabicCorrectCount = calc.correctCount;
       target.arabicScore = calc.score;
       target.arabicPredicate = calc.predicate;
+      target.arabicAssessed = true;
     }
 
     updatedStudents[studentIndex] = target;
@@ -279,27 +373,39 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     setIsDirty(true);
   };
 
-  // Add new student row
+  // Add new student row via React dialog
   const handleAddStudent = () => {
     if (!currentSession) return;
-    const newName = window.prompt('Masukkan Nama Siswa Baru:');
-    if (!newName || !newName.trim()) return;
+    setNewStudentNameDraft('');
+    setAddStudentDialogOpen(true);
+  };
+
+  const handleConfirmAddStudent = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!currentSession) return;
+    const trimmed = newStudentNameDraft.trim();
+    if (!trimmed) {
+      showToast('error', 'Nama Siswa Wajib Diisi', 'Masukkan nama siswa sebelum menambahkan.');
+      return;
+    }
 
     const isChecklist = currentSession.templateType === 'BAHASA_INGGRIS_ARAB';
     const newRecord: OralExamStudentRecord = {
       studentId: `manual_${Date.now()}`,
-      studentName: newName.trim(),
+      studentName: trimmed,
       className: currentSession.className,
       ...(isChecklist
         ? {
             englishChecklist: new Array(15).fill(false),
-            englishCorrectCount: 0,
-            englishScore: 0,
-            englishPredicate: 'D',
+            englishCorrectCount: null,
+            englishScore: null,
+            englishPredicate: null,
+            englishAssessed: false,
             arabicChecklist: new Array(15).fill(false),
-            arabicCorrectCount: 0,
-            arabicScore: 0,
-            arabicPredicate: 'D',
+            arabicCorrectCount: null,
+            arabicScore: null,
+            arabicPredicate: null,
+            arabicAssessed: false,
           }
         : {
             btqScore: null,
@@ -312,17 +418,29 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     const updated = [...currentSession.students, newRecord];
     setCurrentSession({ ...currentSession, students: updated });
     setIsDirty(true);
+    setAddStudentDialogOpen(false);
+    setNewStudentNameDraft('');
   };
 
   // Remove student row
   const handleRemoveStudent = (idx: number) => {
-    if (!currentSession) return;
+    if (!currentSession || idx < 0 || idx >= currentSession.students.length) return;
     const target = currentSession.students[idx];
-    if (!window.confirm(`Hapus ${target.studentName} dari lembar penilaian ini?`)) return;
-
-    const updated = currentSession.students.filter((_, i) => i !== idx);
-    setCurrentSession({ ...currentSession, students: updated });
-    setIsDirty(true);
+    setConfirmDialog({
+      title: 'Hapus Peserta Ujian Lisan?',
+      message: `Hapus ${target.studentName} dari lembar penilaian ini?`,
+      confirmLabel: 'Ya, Hapus',
+      tone: 'danger',
+      onConfirm: () => {
+        setConfirmDialog(null);
+        setCurrentSession((prev) => {
+          if (!prev) return prev;
+          const updated = prev.students.filter((st, i) => st.studentId !== target.studentId && i !== idx);
+          return { ...prev, students: updated };
+        });
+        setIsDirty(true);
+      },
+    });
   };
 
   // Save changes to repository
@@ -330,6 +448,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     if (!currentSession) return;
     OralExamRepository.saveSession(currentSession);
     setIsDirty(false);
+    setScoreDrafts({});
     loadSessions();
     showToast('success', 'Nilai Tersimpan', 'Seluruh penilaian ujian lisan berhasil disimpan.');
   };
@@ -337,11 +456,21 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   // Delete active session
   const handleDeleteCurrentSession = () => {
     if (!currentSession) return;
-    if (!window.confirm(`Hapus seluruh sesi ujian lisan "${currentSession.title}"?`)) return;
-
-    OralExamRepository.deleteSession(currentSession.id);
-    showToast('info', 'Sesi Dihapus', 'Sesi penilaian lisan berhasil dihapus.');
-    loadSessions();
+    const sessionToDelete = currentSession;
+    setConfirmDialog({
+      title: 'Hapus Sesi Ujian Lisan?',
+      message: `Hapus seluruh sesi ujian lisan "${sessionToDelete.title}" beserta seluruh nilainya?`,
+      confirmLabel: 'Ya, Hapus Sesi',
+      tone: 'danger',
+      onConfirm: () => {
+        setConfirmDialog(null);
+        OralExamRepository.deleteSession(sessionToDelete.id);
+        setIsDirty(false);
+        setScoreDrafts({});
+        showToast('info', 'Sesi Dihapus', 'Sesi penilaian lisan berhasil dihapus.');
+        loadSessions();
+      },
+    });
   };
 
   // Export PDF
@@ -393,7 +522,18 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   const isChecklistMode = currentSession?.templateType === 'BAHASA_INGGRIS_ARAB';
 
   const handleClose = useCallback(() => {
-    if (isDirty && !window.confirm('Ada perubahan yang belum disimpan. Yakin ingin keluar?')) {
+    if (isDirty) {
+      setConfirmDialog({
+        title: 'Keluar Tanpa Menyimpan?',
+        message: 'Ada perubahan nilai yang belum disimpan. Yakin ingin menutup lembar penilaian?',
+        confirmLabel: 'Ya, Keluar',
+        tone: 'danger',
+        onConfirm: () => {
+          setConfirmDialog(null);
+          setIsDirty(false);
+          onClose();
+        },
+      });
       return;
     }
     onClose();
@@ -402,12 +542,18 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        handleClose();
+        if (confirmDialog) {
+          setConfirmDialog(null);
+        } else if (addStudentDialogOpen) {
+          setAddStudentDialogOpen(false);
+        } else {
+          handleClose();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, handleClose]);
+  }, [isOpen, handleClose, confirmDialog, addStudentDialogOpen]);
 
   if (!isOpen || typeof document === 'undefined') return null;
 
@@ -416,10 +562,10 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       role="dialog"
       aria-modal="true"
       aria-labelledby="oral-exam-title"
-      className="fixed inset-0 z-100 w-screen h-screen flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans animate-fadeIn"
+      className="fixed inset-0 z-100 w-full h-dvh flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans animate-fadeIn"
     >
       {/* Fullscreen Workspace Header */}
-      <header className="px-4 py-3 sm:px-6 sm:py-3.5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
+      <header className="px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3 sm:px-6 sm:py-3.5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
         <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
           <button
             type="button"
@@ -464,7 +610,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       </header>
 
       {/* Main Fullscreen Scrollable Body Container */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#F8FAFC]">
+      <div className="flex-1 overflow-y-auto p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:p-6 bg-[#F8FAFC]">
         <div className="max-w-7xl mx-auto w-full space-y-4">
         {/* Top Header Controls: Sessions Bar & Add Button */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200">
@@ -575,7 +721,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                   value={examinerName}
                   onChange={(e) => setExaminerName(e.target.value)}
                   placeholder="Nama Penguji (misal: Ibu Mira Nurdianti, S.Pd)"
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-200 rounded-xl px-3 py-2 text-base sm:text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
 
@@ -584,7 +730,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                 <select
                   value={selectedClass}
                   onChange={(e) => setSelectedClass(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-base sm:text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 >
                   {AVAILABLE_CLASSES.map((cls) => (
                     <option key={cls} value={cls}>
@@ -601,7 +747,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                   value={roomNumber}
                   onChange={(e) => setRoomNumber(e.target.value)}
                   placeholder="Contoh: Ruang 01"
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-200 rounded-xl px-3 py-2 text-base sm:text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
 
@@ -611,7 +757,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                   type="date"
                   value={sessionDate}
                   onChange={(e) => setSessionDate(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-base sm:text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -726,20 +872,20 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
             {/* Table Search & Add Student */}
             <div className="flex items-center justify-between gap-2">
               <div className="relative flex-1 max-w-xs">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                <Search className="w-3.5 h-3.5 absolute left-3 top-3.5 sm:top-2.5 text-slate-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Cari nama siswa..."
-                  className="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-2 sm:py-1.5 text-base sm:text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={handleAddStudent}
-                className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1"
+                className="min-h-11 sm:min-h-0 px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1"
               >
                 <Plus className="w-3.5 h-3.5" /> Tambah Siswa
               </button>
@@ -793,8 +939,11 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                     <tbody className="divide-y divide-slate-100">
                       {filteredStudents.map((s, idx) => {
                         const originalIndex = currentSession.students.findIndex((st) => st.studentId === s.studentId);
-                        const engP = getOralExamPredicateBadgeStyle(s.englishPredicate);
-                        const araP = getOralExamPredicateBadgeStyle(s.arabicPredicate);
+                        if (originalIndex < 0) return null;
+                        const engDone = isChecklistTrackAssessed(s.englishScore, s.englishChecklist, s.englishAssessed);
+                        const araDone = isChecklistTrackAssessed(s.arabicScore, s.arabicChecklist, s.arabicAssessed);
+                        const engP = getOralExamPredicateBadgeStyle(engDone ? s.englishPredicate : null);
+                        const araP = getOralExamPredicateBadgeStyle(araDone ? s.arabicPredicate : null);
 
                         return (
                           <tr key={s.studentId} className="hover:bg-slate-50/80 transition-colors text-[11px]">
@@ -852,14 +1001,14 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                             })}
 
                             <td className="p-1 text-center font-black text-blue-950 bg-blue-50/50">
-                              {s.englishCorrectCount ?? 0}
+                              {engDone ? (s.englishCorrectCount ?? 0) : '-'}
                             </td>
                             <td className="p-1 text-center font-black text-blue-900 bg-blue-50/50">
-                              {s.englishScore ?? 0}
+                              {engDone && s.englishScore !== null && s.englishScore !== undefined ? s.englishScore : '-'}
                             </td>
                             <td className="p-1 text-center border-r border-slate-200">
                               <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-black border ${engP.bgClass} ${engP.textClass} ${engP.borderClass}`}>
-                                {s.englishPredicate || 'D'}
+                                {engDone ? (s.englishPredicate || '-') : '-'}
                               </span>
                             </td>
 
@@ -885,14 +1034,14 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                             })}
 
                             <td className="p-1 text-center font-black text-emerald-950 bg-emerald-50/50">
-                              {s.arabicCorrectCount ?? 0}
+                              {araDone ? (s.arabicCorrectCount ?? 0) : '-'}
                             </td>
                             <td className="p-1 text-center font-black text-emerald-900 bg-emerald-50/50">
-                              {s.arabicScore ?? 0}
+                              {araDone && s.arabicScore !== null && s.arabicScore !== undefined ? s.arabicScore : '-'}
                             </td>
                             <td className="p-1 text-center">
                               <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-black border ${araP.bgClass} ${araP.textClass} ${araP.borderClass}`}>
-                                {s.arabicPredicate || 'D'}
+                                {araDone ? (s.arabicPredicate || '-') : '-'}
                               </span>
                             </td>
                           </tr>
@@ -933,8 +1082,11 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                     <tbody className="divide-y divide-slate-100">
                       {filteredStudents.map((s, idx) => {
                         const originalIndex = currentSession.students.findIndex((st) => st.studentId === s.studentId);
+                        if (originalIndex < 0) return null;
                         const btqP = getOralExamPredicateBadgeStyle(s.btqPredicate);
                         const hafP = getOralExamPredicateBadgeStyle(s.hafalanPredicate);
+                        const btqDraftKey = `${s.studentId}:btqScore`;
+                        const hafDraftKey = `${s.studentId}:hafalanScore`;
 
                         return (
                           <tr key={s.studentId} className="hover:bg-slate-50/80 transition-colors">
@@ -948,13 +1100,17 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                             {/* BTQ Input & Predikat */}
                             <td className="p-1.5 border-r border-slate-200">
                               <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={s.btqScore ?? ''}
+                                type="text"
+                                inputMode="decimal"
+                                value={
+                                  btqDraftKey in scoreDrafts
+                                    ? scoreDrafts[btqDraftKey]
+                                    : (s.btqScore !== null && s.btqScore !== undefined ? String(s.btqScore) : '')
+                                }
                                 onChange={(e) => handleDirectScoreChange(originalIndex, 'btqScore', e.target.value)}
+                                onBlur={() => handleDirectScoreBlur(s.studentId, 'btqScore')}
                                 placeholder="0–100"
-                                className="w-full text-center font-black text-xs p-1.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                                className="w-full min-h-10 sm:min-h-0 text-center font-black text-base sm:text-xs p-1.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                               />
                             </td>
                             <td className="p-1.5 text-center border-r border-slate-200">
@@ -966,13 +1122,17 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                             {/* Hafalan Input & Predikat */}
                             <td className="p-1.5 border-r border-slate-200">
                               <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={s.hafalanScore ?? ''}
+                                type="text"
+                                inputMode="decimal"
+                                value={
+                                  hafDraftKey in scoreDrafts
+                                    ? scoreDrafts[hafDraftKey]
+                                    : (s.hafalanScore !== null && s.hafalanScore !== undefined ? String(s.hafalanScore) : '')
+                                }
                                 onChange={(e) => handleDirectScoreChange(originalIndex, 'hafalanScore', e.target.value)}
+                                onBlur={() => handleDirectScoreBlur(s.studentId, 'hafalanScore')}
                                 placeholder="0–100"
-                                className="w-full text-center font-black text-xs p-1.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                className="w-full min-h-10 sm:min-h-0 text-center font-black text-base sm:text-xs p-1.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                               />
                             </td>
                             <td className="p-1.5 text-center border-r border-slate-200">
@@ -985,7 +1145,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                               <button
                                 type="button"
                                 onClick={() => handleRemoveStudent(originalIndex)}
-                                className="text-xs text-rose-500 hover:text-rose-700 font-bold p-1 cursor-pointer"
+                                className="min-h-10 min-w-10 sm:min-h-0 sm:min-w-0 text-xs text-rose-500 hover:text-rose-700 font-bold p-1 cursor-pointer"
                                 title="Hapus baris siswa"
                               >
                                 ✕
@@ -1052,6 +1212,76 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
         )}
         </div>
       </div>
+
+      {/* Dialog Tambah Siswa Baru (Pengganti window.prompt) */}
+      {addStudentDialogOpen && (
+        <div className="fixed inset-0 z-120 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <form
+            onSubmit={handleConfirmAddStudent}
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-4"
+          >
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-slate-900">Tambah Siswa ke Sesi Ujian Lisan</h3>
+              <p className="text-xs text-slate-500">Masukkan nama lengkap siswa yang akan ditambahkan ke daftar penilaian ini.</p>
+            </div>
+            <input
+              type="text"
+              autoFocus
+              value={newStudentNameDraft}
+              onChange={(e) => setNewStudentNameDraft(e.target.value)}
+              placeholder="Contoh: Ahmad Fauzan"
+              className="w-full min-h-11 bg-white border border-slate-300 rounded-xl px-3 py-2 text-base sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            />
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setAddStudentDialogOpen(false)}
+                className="flex-1 min-h-11 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="flex-1 min-h-11 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-sm cursor-pointer"
+              >
+                Tambah Siswa
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Dialog Konfirmasi Aksi (Pengganti window.confirm) */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-120 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-slate-900">{confirmDialog.title}</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">{confirmDialog.message}</p>
+            </div>
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 min-h-11 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmDialog.onConfirm}
+                className={`flex-1 min-h-11 py-2.5 rounded-xl text-white text-xs font-bold transition-colors shadow-sm cursor-pointer ${
+                  confirmDialog.tone === 'danger'
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : 'bg-[#023246] hover:bg-[#0D7A5F]'
+                }`}
+              >
+                {confirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );

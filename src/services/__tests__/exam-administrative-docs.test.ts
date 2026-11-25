@@ -272,7 +272,7 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
 
   assert(
     '7. generateSingleRoomHandoverHtml populates scheduled subjects and leaves proctor names empty for handwriting',
-    doc2SingleHtml.includes('1. PAI & PB') &&
+    doc2SingleHtml.includes('1. PAI &amp; PB') &&
       doc2SingleHtml.includes('2. IPA') &&
       !doc2SingleHtml.includes('Farhan Sopian Sahid, S.Pd.I'),
     'Doc 2 should not pre-fill proctor names in physical handover sheet'
@@ -320,7 +320,7 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
 
   assert(
     '10. generateStudentAttendanceSummaryHtml lists distinct scheduled subjects',
-    doc3Html.includes('PAI & PB') &&
+    doc3Html.includes('PAI &amp; PB') &&
       doc3Html.includes('IPA') &&
       doc3Html.includes('Matematika'),
     'Doc 3 missing scheduled subjects'
@@ -345,7 +345,7 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
       docRosterHtml.includes('NAMA PESERTA') &&
       docRosterHtml.includes('L/P') &&
       docRosterHtml.includes('MATA PELAJARAN') &&
-      docRosterHtml.includes('PAI & BP') &&
+      docRosterHtml.includes('PAI &amp; BP') &&
       docRosterHtml.includes('Informatika') &&
       docRosterHtml.includes('Ketua Pelaksana') &&
       docRosterHtml.includes('Adi Prasetyo, S.Pd'),

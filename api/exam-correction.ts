@@ -1,61 +1,40 @@
 // api/exam-correction.ts
-// Serverless Controlled API for Exam Question Correction & Grade Storage
-// Enforces stateful session authentication, strict teacher ownership authorization,
-// deterministic server-side score calculation via atomic PostgreSQL RPCs,
-// optimistic concurrency protection, and zero credential leakage.
+// Serverless Secured Exam Correction & GradeMaster Transaction Endpoint
+// Supports:
+//   GET  /api/exam-correction?session_id=...   -> Load audit logs (requires ownership check for GURU)
+//   POST /api/exam-correction action=save_grade -> Atomic grade persistence via save_exam_grade_v2
+//   POST /api/exam-correction action=batch_save_grades -> Atomic batch import (max 100)
+//   POST /api/exam-correction action=delete_student -> Ownership-verified student grade deletion
+//   POST /api/exam-correction action=sync_scores -> GradeMaster portal synchronization via serverSupabase
 
-import { serverSupabase, authenticateUser } from './_shared/session-auth.js';
+import {
+  authenticateUser,
+  serverSupabase,
+  applyAuthCorsHeaders,
+  isAllowedAuthOrigin,
+} from './_shared/session-auth.js';
+import {
+  verifyExamSessionOwnership,
+  syncStudentGradeMirrorOnServer,
+  saveSingleGradeServerFallback,
+  handleDeleteGradedStudentOnServer,
+  handleSyncScoresOnServer,
+} from './_shared/exam-correction-helpers.js';
 
 export default async function handler(req: any, res: any) {
-  // 1. CORS Configuration
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-session-token');
+  // 1. Multi-platform Allowlist CORS Configuration
+  applyAuthCorsHeaders(req, res, 'GET, POST, OPTIONS');
 
   if (req.method === 'OPTIONS') {
+    const origin = typeof req?.headers?.origin === 'string' ? req.headers.origin.trim() : '';
+    if (origin && !isAllowedAuthOrigin(origin, req)) {
+      return res.status(403).end();
+    }
     return res.status(200).end();
   }
 
-  // 2. Session Authentication
-  let auth = await authenticateUser(req);
-  if (!auth.ok) {
-    // Fallback for legacy dev session token SB_JWT_${userId}_...
-    const authHeader = req.headers?.authorization || req.headers?.['x-session-token'];
-    const rawToken = typeof authHeader === 'string' ? authHeader.replace(/^Bearer\s+/i, '').trim() : '';
-    if (rawToken.startsWith('SB_JWT_')) {
-      const withoutPrefix = rawToken.substring(7);
-      const lastUnderscore = withoutPrefix.lastIndexOf('_');
-      const fallbackUserId = lastUnderscore !== -1 ? withoutPrefix.substring(0, lastUnderscore) : withoutPrefix;
-      if (fallbackUserId) {
-        try {
-          const { data: user, error: uErr } = await serverSupabase
-            .from('users')
-            .select('id, nip, full_name, role, position, account_status, avatar_url, phone_number')
-            .eq('id', fallbackUserId)
-            .maybeSingle();
-
-          if (!uErr && user && user.account_status === 'ACTIVE') {
-            auth = {
-              ok: true,
-              userId: user.id,
-              user: {
-                id: user.id,
-                nip: user.nip || null,
-                full_name: user.full_name,
-                role: (user.role || 'GURU').toUpperCase(),
-                position: user.position || null,
-                avatar_url: user.avatar_url || null,
-                phone_number: user.phone_number || null,
-              },
-              role: (user.role || 'GURU').toUpperCase(),
-              sessionId: 'sess_jwt_compat',
-            };
-          }
-        } catch {}
-      }
-    }
-  }
-
+  // 2. Strict Session Authentication (zero SB_JWT_ / mock bypasses)
+  const auth = await authenticateUser(req);
   if (!auth.ok) {
     return res.status(auth.status).json({
       success: false,
@@ -65,8 +44,8 @@ export default async function handler(req: any, res: any) {
   }
 
   const callerUser = auth.user;
-  const callerRole = (callerUser.role || 'GURU').toUpperCase();
-  const authorizedRoles = ['ADMIN', 'OPERATOR', 'GURU', 'KEPSEK'];
+  const callerRole = (callerUser.role || auth.role || '').trim().toUpperCase();
+  const authorizedRoles = ['ADMIN', 'OPERATOR', 'GURU', 'KEPSEK', 'SUPERADMIN'];
 
   if (!authorizedRoles.includes(callerRole)) {
     return res.status(403).json({
@@ -76,11 +55,20 @@ export default async function handler(req: any, res: any) {
     });
   }
 
-  // 3. Handle GET / Audit Logs
+  // 3. Handle GET / Audit Logs (with mandatory ownership check!)
   if (req.method === 'GET') {
     const { session_id, student_user_id } = req.query || {};
     if (!session_id) {
       return res.status(400).json({ success: false, message: 'Parameter session_id wajib diisi.' });
+    }
+
+    const ownership = await verifyExamSessionOwnership(String(session_id), callerUser, callerRole);
+    if (!ownership.ok) {
+      return res.status(ownership.status).json({
+        success: false,
+        code: ownership.code,
+        message: ownership.message,
+      });
     }
 
     try {
@@ -106,7 +94,7 @@ export default async function handler(req: any, res: any) {
     }
   }
 
-  // 4. Handle POST: save_grade or batch_save_grades
+  // 4. Handle POST Mutations
   if (req.method === 'POST') {
     if (callerRole === 'KEPSEK') {
       return res.status(403).json({
@@ -116,37 +104,36 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const { action, session_id, data, items, change_reason, source } = req.body || {};
+    const { action, session_id, data, items, change_reason, source, student_id } = req.body || {};
+
+    if (action === 'sync_scores') {
+      const syncResult = await handleSyncScoresOnServer(req.body || {}, callerUser);
+      return res.status(syncResult.status).json(syncResult.body);
+    }
+
+    if (action === 'delete_student') {
+      if (!student_id) {
+        return res.status(400).json({ success: false, message: 'Field student_id wajib disertakan.' });
+      }
+      const delResult = await handleDeleteGradedStudentOnServer(String(student_id), callerUser, callerRole);
+      return res.status(delResult.status).json(delResult.body);
+    }
 
     if (!session_id) {
       return res.status(400).json({ success: false, message: 'Field session_id wajib disertakan.' });
     }
 
-    // Teacher ownership verification:
-    // Teachers may only grade their own exam sessions
-    if (callerRole === 'GURU') {
-      const { data: sess, error: sessErr } = await serverSupabase
-        .from('gm_sessions')
-        .select('id, owner_user_id, teacher')
-        .eq('id', session_id)
-        .maybeSingle();
-
-      if (sessErr || !sess) {
-        return res.status(404).json({ success: false, message: 'Sesi ujian tidak ditemukan.' });
-      }
-
-      const isOwner =
-        (sess.owner_user_id && sess.owner_user_id === callerUser.id) ||
-        (sess.teacher && sess.teacher.trim().toLowerCase() === callerUser.full_name.trim().toLowerCase());
-
-      if (!isOwner) {
-        return res.status(403).json({
-          success: false,
-          code: 'SESSION_ACCESS_DENIED',
-          message: 'Anda hanya berhak mengoreksi dan menginput nilai pada sesi ujian milik Anda sendiri.',
-        });
-      }
+    // Enforce session existence & GURU ownership verification
+    const ownership = await verifyExamSessionOwnership(String(session_id), callerUser, callerRole);
+    if (!ownership.ok) {
+      return res.status(ownership.status).json({
+        success: false,
+        code: ownership.code,
+        message: ownership.message,
+      });
     }
+
+    const sessionKkm = Number(ownership.session.kkm) || 75;
 
     // Action A: Single Save
     if (action === 'save_grade') {
@@ -174,31 +161,43 @@ export default async function handler(req: any, res: any) {
 
         if (rpcErr) {
           const isConflict = rpcErr.message?.includes('CONCURRENCY_CONFLICT');
-          return res.status(isConflict ? 409 : 400).json({
-            success: false,
-            code: isConflict ? 'CONCURRENCY_CONFLICT' : 'SAVE_ERROR',
-            message: rpcErr.message,
-          });
+          if (isConflict) {
+            return res.status(409).json({
+              success: false,
+              code: 'CONCURRENCY_CONFLICT',
+              message: rpcErr.message,
+            });
+          }
+
+          // Server-side atomic fallback using service_role if RPC not yet deployed on instance
+          const fallbackRecord = await saveSingleGradeServerFallback(
+            String(session_id),
+            ownership.session,
+            data,
+            callerUser,
+            callerRole,
+            change_reason,
+            source || data.source || 'MANUAL_ENTRY'
+          );
+          return res.status(200).json({ success: true, result: fallbackRecord });
         }
 
-        if (rpcRes) {
-          try {
-            const finalScoreVal = Number(rpcRes.final_score) || 0;
-            await serverSupabase.from('gm_students').update({
-              is_deleted: false,
-              original_score: finalScoreVal,
-              remedial_status: finalScoreVal >= 75 ? 'PASSED' : 'NONE',
-            }).eq('id', rpcRes.id);
-          } catch {}
-        }
+        const syncedResult = await syncStudentGradeMirrorOnServer(
+          String(session_id),
+          rpcRes,
+          data,
+          sessionKkm
+        );
 
         return res.status(200).json({
           success: true,
-          result: rpcRes,
+          result: syncedResult,
         });
       } catch (err: any) {
-        return res.status(500).json({
+        const isConflict = String(err?.message || '').includes('CONCURRENCY_CONFLICT');
+        return res.status(isConflict ? 409 : 500).json({
           success: false,
+          code: isConflict ? 'CONCURRENCY_CONFLICT' : 'SAVE_ERROR',
           message: err?.message || 'Terjadi kesalahan server saat menyimpan nilai.',
         });
       }
@@ -225,7 +224,7 @@ export default async function handler(req: any, res: any) {
           p_session_id: session_id,
           p_items: items.map((it: any) => ({
             student_user_id: it.student_user_id || it.id,
-            name: it.name.trim(),
+            name: String(it.name || '').trim(),
             mcq_answers: it.mcq_answers || {},
             essay_scores: it.essay_scores || [],
             source: it.source || source || 'IMPORT_EXCEL',
@@ -237,21 +236,35 @@ export default async function handler(req: any, res: any) {
         });
 
         if (rpcErr) {
-          return res.status(400).json({
-            success: false,
-            code: 'BATCH_SAVE_ERROR',
-            message: rpcErr.message,
+          // Server-side batch loop fallback via service_role when RPC unavailable
+          const fallbackResults = [];
+          for (const item of items) {
+            const saved = await saveSingleGradeServerFallback(
+              String(session_id),
+              ownership.session,
+              item,
+              callerUser,
+              callerRole,
+              change_reason,
+              item.source || source || 'IMPORT_EXCEL'
+            );
+            fallbackResults.push(saved);
+          }
+          return res.status(200).json({
+            success: true,
+            total_processed: fallbackResults.length,
+            results: fallbackResults,
           });
         }
 
-        // Guarantee is_deleted = false for all saved batch students
         if (rpcRes?.results && Array.isArray(rpcRes.results)) {
           try {
             const savedIds = rpcRes.results.map((r: any) => r.id).filter(Boolean);
             if (savedIds.length > 0) {
-              await serverSupabase.from('gm_students').update({
-                is_deleted: false,
-              }).in('id', savedIds);
+              await serverSupabase
+                .from('gm_students')
+                .update({ is_deleted: false })
+                .in('id', savedIds);
             }
           } catch {}
         }
@@ -271,7 +284,7 @@ export default async function handler(req: any, res: any) {
 
     return res.status(400).json({
       success: false,
-      message: `Aksi "${action}" tidak dikenali. Gunakan "save_grade" atau "batch_save_grades".`,
+      message: `Aksi "${action}" tidak dikenali.`,
     });
   }
 

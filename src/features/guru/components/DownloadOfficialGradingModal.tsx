@@ -22,6 +22,7 @@ import {
   type StudentScoreEntry,
 } from '../../../services/semester-grading-excel.service';
 import { ExamCorrectionRepository } from '../../../repositories/ExamCorrectionRepository';
+import { StudentRepository } from '../../../repositories/StudentRepository';
 import { resolveSessionAcademicYear } from '../../../utils/academic-year.utils';
 import {
   OFFICIAL_SCHOOL_SUBJECTS,
@@ -83,20 +84,70 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
   // Loading & Error State
   const [isDownloading, setIsDownloading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [liveClassCounts, setLiveClassCounts] = useState<Record<string, number> | null>(null);
 
-  // Rombel statis yang selalu disertakan dalam format resmi
-  const canonicalClassesInfo = useMemo(() => [
-    { name: '7', count: 31, level: 'SMP' },
-    { name: '8A', count: 15, level: 'SMP' },
-    { name: '8B', count: 29, level: 'SMP' },
-    { name: '9A', count: 20, level: 'SMP' },
-    { name: '9B', count: 26, level: 'SMP' },
-    { name: 'SMA', count: 23, level: 'SMA' },
-  ], []);
+  // Rombel resmi yang disertakan dalam format sekolah (hitung dinamis dari StudentRepository)
+  const canonicalClassesInfo = useMemo(() => {
+    const templateDefaults: Array<{ name: string; count: number; level: string }> = [
+      { name: '7', count: 31, level: 'SMP' },
+      { name: '8A', count: 15, level: 'SMP' },
+      { name: '8B', count: 29, level: 'SMP' },
+      { name: '9A', count: 20, level: 'SMP' },
+      { name: '9B', count: 26, level: 'SMP' },
+      { name: 'SMA', count: 23, level: 'SMA' },
+    ];
+    if (!liveClassCounts) return templateDefaults;
+    return templateDefaults.map((item) => ({
+      ...item,
+      count: liveClassCounts[item.name] ?? 0,
+    }));
+  }, [liveClassCounts]);
 
   const totalRegisteredStudents = useMemo(() => {
-    return canonicalClassesInfo.reduce((acc, c) => acc + c.count, 0); // 144 siswa
+    return canonicalClassesInfo.reduce((acc, c) => acc + c.count, 0);
   }, [canonicalClassesInfo]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    StudentRepository.getStudents()
+      .then((allStudents) => {
+        if (cancelled || !Array.isArray(allStudents) || allStudents.length === 0) return;
+        const counts: Record<string, number> = {
+          '7': 0,
+          '8A': 0,
+          '8B': 0,
+          '9A': 0,
+          '9B': 0,
+          SMA: 0,
+        };
+        allStudents.forEach((st) => {
+          const norm = SemesterGradingExcelService.normalizeSheetClassName(st.className);
+          if (norm in counts) {
+            counts[norm] += 1;
+          }
+        });
+        const total = Object.values(counts).reduce((a, b) => a + b, 0);
+        if (total > 0) {
+          setLiveClassCounts(counts);
+        }
+      })
+      .catch((err) => {
+        logger.warn('DownloadOfficialGradingModal', 'Gagal memuat statistik jumlah siswa:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
 
   // Inisialisasi awal saat modal dibuka
   useEffect(() => {
@@ -168,17 +219,28 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
     });
   }, [availableSessions, effectiveSubjectName, selectedAcademicYear, defaultAcademicYear]);
 
+  const activeSessionMatchesYear = useMemo(() => {
+    if (!activeSession) return false;
+    const activeYear = resolveSessionAcademicYear(
+      activeSession.academic_year,
+      activeSession.session_name,
+      activeSession.created_at,
+      defaultAcademicYear
+    );
+    return activeYear === selectedAcademicYear;
+  }, [activeSession, selectedAcademicYear, defaultAcademicYear]);
+
   // Hitung jumlah rombel yang memiliki sesi ujian
   const classesWithSessions = useMemo(() => {
     const map = new Set<string>();
     matchingSessions.forEach((s) => {
       map.add(SemesterGradingExcelService.normalizeSheetClassName(s.class_name));
     });
-    if (activeSession && isSameSubject(activeSession.subject, effectiveSubjectName)) {
+    if (activeSession && activeSessionMatchesYear && isSameSubject(activeSession.subject, effectiveSubjectName)) {
       map.add(SemesterGradingExcelService.normalizeSheetClassName(activeSession.class_name));
     }
     return map;
-  }, [matchingSessions, activeSession, effectiveSubjectName]);
+  }, [matchingSessions, activeSession, activeSessionMatchesYear, effectiveSubjectName]);
 
   // Eksekusi Unduh Berkas Excel
   const handleDownload = useCallback(async () => {
@@ -198,8 +260,20 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
         // Gunakan Map per kelas agar nilai siswa digabungkan (merged) dari activeSession dan seluruh sesi yang cocok
         const classStudentMaps: Record<string, Map<string, StudentScoreEntry>> = {};
 
-        const addStudentGrade = (normCls: string, stName: string, rawScore: number, examType?: string) => {
-          if (!stName || !stName.trim()) return;
+        const resolveGradedStudentScore = (st: GradedStudentScoreRecord): number | null => {
+          if (st.final_score !== null && st.final_score !== undefined && !isNaN(Number(st.final_score))) {
+            return Number(st.final_score);
+          }
+          const hasMcq = st.mcq_score !== null && st.mcq_score !== undefined && !isNaN(Number(st.mcq_score));
+          const hasEssay = st.essay_score !== null && st.essay_score !== undefined && !isNaN(Number(st.essay_score));
+          if (hasMcq || hasEssay) {
+            return (hasMcq ? Number(st.mcq_score) : 0) + (hasEssay ? Number(st.essay_score) : 0);
+          }
+          return null;
+        };
+
+        const addStudentGrade = (normCls: string, stName: string, rawScore: number | null, examType?: string) => {
+          if (rawScore === null || Number.isNaN(rawScore) || !stName || !stName.trim()) return;
           const cleanName = stName.trim();
           const canonKey = SemesterGradingExcelService.canonicalizeStudentName(cleanName);
           if (!canonKey) return;
@@ -232,24 +306,23 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
             entry.asas = rawScore;
           } else {
             if (isAsas) {
-              if (entry.asas === null || entry.asas === 0 || rawScore > 0) entry.asas = rawScore;
+              if (entry.asas === null) entry.asas = rawScore;
             } else {
-              if (entry.asts === null || entry.asts === 0 || rawScore > 0) entry.asts = rawScore;
+              if (entry.asts === null) entry.asts = rawScore;
             }
           }
         };
 
-        // 1. Masukkan nilai dari activeSession jika cocok
+        // 1. Masukkan nilai dari activeSession jika cocok mata pelajaran DAN tahun ajaran
         if (
           activeSession &&
+          activeSessionMatchesYear &&
           (isSameSubject(activeSession.subject, finalSubject) || normalizeSubjectName(activeSession.subject) === normalizeSubjectName(finalSubject))
         ) {
           const normCls = SemesterGradingExcelService.normalizeSheetClassName(activeSession.class_name);
           const studentList = gradedStudents.length > 0 ? gradedStudents : [];
           studentList.forEach((st) => {
-            const score = (st.final_score !== null && st.final_score !== undefined && !isNaN(Number(st.final_score)) && Number(st.final_score) > 0)
-              ? Number(st.final_score)
-              : (Number(st.mcq_score) || Number(st.essay_score) || (st.final_score !== null && st.final_score !== undefined ? Number(st.final_score) : 0));
+            const score = resolveGradedStudentScore(st);
             addStudentGrade(normCls, st.name, score, activeSession.exam_type);
           });
         }
@@ -261,9 +334,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
             const grades = await ExamCorrectionRepository.getGradedStudents(sess.id);
             if (grades && grades.length > 0) {
               grades.forEach((st) => {
-                const score = (st.final_score !== null && st.final_score !== undefined && !isNaN(Number(st.final_score)) && Number(st.final_score) > 0)
-                  ? Number(st.final_score)
-                  : (Number(st.mcq_score) || Number(st.essay_score) || (st.final_score !== null && st.final_score !== undefined ? Number(st.final_score) : 0));
+                const score = resolveGradedStudentScore(st);
                 addStudentGrade(normCls, st.name, score, sess.exam_type);
               });
             }
@@ -311,6 +382,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
     effectiveSubjectName,
     targetColumn,
     activeSession,
+    activeSessionMatchesYear,
     gradedStudents,
     matchingSessions,
     teacherName,
@@ -328,11 +400,11 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
       role="dialog"
       aria-modal="true"
       aria-labelledby="download-format-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 overflow-hidden"
     >
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl my-auto overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="bg-white rounded-none sm:rounded-2xl shadow-2xl border-0 sm:border sm:border-slate-200 w-full max-w-xl h-dvh sm:h-auto sm:max-h-[92dvh] overflow-hidden flex flex-col">
         {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between bg-slate-50/80 shrink-0">
+        <div className="px-4 sm:px-5 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 sm:py-4 border-b border-slate-100 flex items-start justify-between bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 border border-emerald-200 shadow-2xs">
               <FileSpreadsheet className="w-5 h-5" />
@@ -382,7 +454,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
               <select
                 value={selectedSubject}
                 onChange={(e) => setSelectedSubject(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-base sm:text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
               >
                 {OFFICIAL_SCHOOL_SUBJECTS.map((subj) => (
                   <option key={subj.code} value={subj.name}>
@@ -399,7 +471,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
                     placeholder="Ketik nama mata pelajaran..."
                     value={customSubject}
                     onChange={(e) => setCustomSubject(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-base sm:text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
                     autoFocus
                   />
                 </div>
@@ -417,7 +489,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
                 <select
                   value={selectedAcademicYear}
                   onChange={(e) => setSelectedAcademicYear(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-base sm:text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
                 >
                   {AVAILABLE_ACADEMIC_YEARS.map((ay) => (
                     <option key={ay.year} value={ay.year}>
@@ -473,7 +545,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
                   placeholder="Nama Guru Pengampu..."
                   value={teacherName}
                   onChange={(e) => setTeacherName(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-base sm:text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
                 />
               </div>
 
@@ -488,7 +560,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
                   max={100}
                   value={kkm}
                   onChange={(e) => setKkm(Math.min(100, Math.max(1, Number(e.target.value) || 75)))}
-                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-base sm:text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
                 />
               </div>
             </div>
@@ -563,7 +635,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
-                  Tabel 144 siswa di semua 6 kelas disertakan lengkap dengan rumus, namun <strong>kolom nilai dikosongkan</strong>.
+                  Tabel {totalRegisteredStudents} siswa di semua 6 kelas disertakan lengkap dengan rumus, namun <strong>kolom nilai dikosongkan</strong>.
                 </p>
               </button>
 
@@ -666,7 +738,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
         </div>
 
         {/* Modal Footer */}
-        <div className="px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2.5 shrink-0">
+        <div className="px-4 sm:px-5 py-3.5 pb-[max(14px,env(safe-area-inset-bottom))] border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2.5 shrink-0">
           <button
             type="button"
             onClick={onClose}

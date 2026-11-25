@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   X,
   ArrowLeftRight,
@@ -12,10 +12,12 @@ import {
 } from 'lucide-react';
 import type {
   ExamScheduleData,
+  ExamProctorItem,
 } from '../../../types/exam-schedule.types';
 import type { UserProfile } from '../../../types/database.types';
 import { ExamSchedulerService } from '../../../services/exam-scheduler.service';
 import { ExamScheduleRepository } from '../../../repositories/ExamScheduleRepository';
+import { resolveSchoolLevel } from '../../../utils/class.utils';
 
 interface ExamProctorSwapModalProps {
   isOpen: boolean;
@@ -44,11 +46,21 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
   const [otherSchedule, setOtherSchedule] = useState<ExamScheduleData | null>(otherScheduleData || null);
 
   useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen) return;
     if (otherScheduleData) {
       setOtherSchedule(otherScheduleData);
       return;
     }
+    let isActive = true;
     const currentLevel = scheduleData.config.educationLevel || scheduleData.educationLevel || 'SMP';
     const complementaryLevel = currentLevel === 'SMP' ? 'SMA' : 'SMP';
     ExamScheduleRepository.getSchedule(
@@ -56,22 +68,47 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
       scheduleData.config.examType,
       complementaryLevel
     ).then((remoteOther) => {
-      if (remoteOther) setOtherSchedule(remoteOther);
-    }).catch(() => {});
+      if (isActive) {
+        setOtherSchedule(remoteOther || null);
+      }
+    }).catch(() => {
+      if (isActive) {
+        setOtherSchedule(null);
+      }
+    });
+    return () => {
+      isActive = false;
+    };
   }, [isOpen, otherScheduleData, scheduleData]);
 
-  const primaryLevel = scheduleData.config.educationLevel || scheduleData.educationLevel || 'SMP';
-  const otherLevel = otherSchedule?.config.educationLevel || otherSchedule?.educationLevel || (primaryLevel === 'SMP' ? 'SMA' : 'SMP');
+  const primaryLevel: 'SMP' | 'SMA' = scheduleData.config.educationLevel || scheduleData.educationLevel || 'SMP';
+  const otherLevel: 'SMP' | 'SMA' = otherSchedule?.config.educationLevel || otherSchedule?.educationLevel || (primaryLevel === 'SMP' ? 'SMA' : 'SMP');
 
-  // Combined proctors across SMP and SMA (including Ruang 6)
+  const getSlotLevel = useCallback(
+    (slot: ExamProctorItem): 'SMP' | 'SMA' => {
+      if (slot.educationLevel === 'SMP' || slot.educationLevel === 'SMA') {
+        return slot.educationLevel;
+      }
+      if (otherSchedule?.proctorSchedules?.some((p) => p.id === slot.id)) {
+        return otherLevel;
+      }
+      if (scheduleData.proctorSchedules.some((p) => p.id === slot.id)) {
+        return primaryLevel;
+      }
+      return slot.className ? resolveSchoolLevel(slot.className, primaryLevel) : primaryLevel;
+    },
+    [otherSchedule?.proctorSchedules, otherLevel, primaryLevel, scheduleData.proctorSchedules]
+  );
+
+  // Combined proctors across SMP and SMA
   const allCombinedProctors = useMemo(() => {
     const primaryItems = (scheduleData.proctorSchedules || []).map((p) => ({
       ...p,
-      educationLevel: p.educationLevel || primaryLevel,
+      educationLevel: p.educationLevel || (p.className ? resolveSchoolLevel(p.className, primaryLevel) : primaryLevel),
     }));
     const otherItems = (otherSchedule?.proctorSchedules || []).map((p) => ({
       ...p,
-      educationLevel: p.educationLevel || otherLevel,
+      educationLevel: p.educationLevel || (p.className ? resolveSchoolLevel(p.className, otherLevel) : otherLevel),
     }));
     return [...primaryItems, ...otherItems];
   }, [scheduleData.proctorSchedules, otherSchedule?.proctorSchedules, primaryLevel, otherLevel]);
@@ -93,6 +130,21 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const firstSlotIdRef = useRef<string>(scheduleData.proctorSchedules[0]?.id || '');
+  firstSlotIdRef.current = scheduleData.proctorSchedules[0]?.id || '';
+
+  // Sync/reset selection state when modal opens or schedule changes
+  useEffect(() => {
+    if (!isOpen) return;
+    const defaultSlotId = initialSelectedSlotId || firstSlotIdRef.current;
+    setSlotAId(defaultSlotId);
+    setSlotBId('');
+    setReassignSlotId(defaultSlotId);
+    setNewTeacherId('');
+    setSwapReason('');
+    setReassignReason('');
+    setErrorMessage(null);
+  }, [isOpen, initialSelectedSlotId, scheduleData.id]);
 
   // Unique exam days for fast filter chips (across both SMP and SMA)
   const availableDays = useMemo(() => {
@@ -186,7 +238,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
       slotB.id
     );
     if (confA && confA.id !== slotA.id) {
-      const confLevel = confA.educationLevel || (confA.roomName.includes('6') ? 'SMA' : 'SMP');
+      const confLevel = getSlotLevel(confA);
       return `Konflik: ${slotA.mainProctorName} sudah dijadwalkan mengawas di [${confLevel}] ${confA.roomName} pada ${confA.dayName}, Sesi ${confA.sessionNumber}.`;
     }
 
@@ -200,12 +252,12 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
       slotA.id
     );
     if (confB && confB.id !== slotB.id) {
-      const confLevel = confB.educationLevel || (confB.roomName.includes('6') ? 'SMA' : 'SMP');
+      const confLevel = getSlotLevel(confB);
       return `Konflik: ${slotB.mainProctorName} sudah dijadwalkan mengawas di [${confLevel}] ${confB.roomName} pada ${confB.dayName}, Sesi ${confB.sessionNumber}.`;
     }
 
     return null;
-  }, [slotA, slotB, allCombinedProctors]);
+  }, [slotA, slotB, allCombinedProctors, getSlotLevel]);
 
   // Conflict preview for REASSIGN (validated across SMP + SMA)
   const reassignConflictWarning = useMemo(() => {
@@ -219,14 +271,15 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
       reassignSlot.id
     );
     if (conf) {
-      const confLevel = conf.educationLevel || (conf.roomName.includes('6') ? 'SMA' : 'SMP');
+      const confLevel = getSlotLevel(conf);
       return `Konflik: ${selectedNewTeacher.full_name} sudah dijadwalkan mengawas di [${confLevel}] ${conf.roomName} pada ${conf.dayName}, Sesi ${conf.sessionNumber}.`;
     }
     return null;
-  }, [reassignSlot, selectedNewTeacher, allCombinedProctors]);
+  }, [reassignSlot, selectedNewTeacher, allCombinedProctors, getSlotLevel]);
 
   // Handlers
   const handleExecuteSwap = async () => {
+    if (isSubmitting) return;
     if (!slotA || !slotB) {
       setErrorMessage('Silakan pilih kedua sesi yang ingin ditukar.');
       return;
@@ -252,18 +305,28 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
 
         if (!result.success || !result.updatedScheduleA || !result.updatedScheduleB) {
           setErrorMessage(result.error || 'Gagal menukar jadwal pengawas.');
-          setIsSubmitting(false);
           return;
         }
 
-        await ExamScheduleRepository.saveSchedule(
-          result.updatedScheduleA,
-          result.updatedScheduleA.educationLevel || scheduleData.config.educationLevel || 'SMP'
-        );
-        await ExamScheduleRepository.saveSchedule(
-          result.updatedScheduleB,
-          result.updatedScheduleB.educationLevel || otherSchedule.config.educationLevel || 'SMA'
-        );
+        const levelA = result.updatedScheduleA.educationLevel || scheduleData.config.educationLevel || 'SMP';
+        const levelB = result.updatedScheduleB.educationLevel || otherSchedule.config.educationLevel || 'SMA';
+
+        const savedA = await ExamScheduleRepository.saveSchedule(result.updatedScheduleA, levelA);
+        if (!savedA) {
+          setErrorMessage('Gagal menyimpan perubahan jadwal jenjang pertama ke server. Pertukaran dibatalkan.');
+          return;
+        }
+
+        const savedB = await ExamScheduleRepository.saveSchedule(result.updatedScheduleB, levelB);
+        if (!savedB) {
+          const rollbackOk = await ExamScheduleRepository.saveSchedule(scheduleData, levelA);
+          setErrorMessage(
+            rollbackOk
+              ? 'Gagal menyimpan jadwal jenjang kedua ke server. Perubahan otomatis dibatalkan (rollback) demi menjaga konsistensi jadwal.'
+              : 'Gagal menyimpan jadwal jenjang kedua dan gagal memulihkan jadwal pertama. Silakan muat ulang dan periksa jadwal.'
+          );
+          return;
+        }
 
         setOtherSchedule(result.updatedScheduleB);
         onSwapSuccess(result.updatedScheduleA, result.updatedScheduleB);
@@ -280,19 +343,22 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
 
         if (!result.success || !result.updatedSchedule) {
           setErrorMessage(result.error || 'Gagal menukar jadwal pengawas.');
-          setIsSubmitting(false);
           return;
         }
 
-        await ExamScheduleRepository.saveSchedule(
+        const saved = await ExamScheduleRepository.saveSchedule(
           result.updatedSchedule,
           result.updatedSchedule.educationLevel || scheduleData.config.educationLevel
         );
+        if (!saved) {
+          setErrorMessage('Gagal menyimpan perubahan pertukaran jadwal ke server.');
+          return;
+        }
 
         onSwapSuccess(result.updatedSchedule);
         onClose();
       }
-    } catch (err) {
+    } catch {
       setErrorMessage('Terjadi kesalahan saat menyimpan jadwal yang ditukar.');
     } finally {
       setIsSubmitting(false);
@@ -300,6 +366,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
   };
 
   const handleExecuteReassign = async () => {
+    if (isSubmitting) return;
     if (!reassignSlot || !selectedNewTeacher) {
       setErrorMessage('Silakan pilih sesi dan guru pengganti.');
       return;
@@ -317,7 +384,6 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
 
       if (!targetSchedule) {
         setErrorMessage('Jadwal untuk sesi ini tidak ditemukan.');
-        setIsSubmitting(false);
         return;
       }
 
@@ -339,14 +405,17 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
 
       if (!result.success || !result.updatedSchedule) {
         setErrorMessage(result.error || 'Gagal mengganti pengawas.');
-        setIsSubmitting(false);
         return;
       }
 
-      await ExamScheduleRepository.saveSchedule(
+      const saved = await ExamScheduleRepository.saveSchedule(
         result.updatedSchedule,
         result.updatedSchedule.educationLevel || targetSchedule.config.educationLevel
       );
+      if (!saved) {
+        setErrorMessage('Gagal menyimpan penggantian pengawas ke server.');
+        return;
+      }
 
       if (isSlotInPrimary) {
         onSwapSuccess(result.updatedSchedule, otherSchedule || undefined);
@@ -355,7 +424,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
         onSwapSuccess(scheduleData, result.updatedSchedule);
       }
       onClose();
-    } catch (err) {
+    } catch {
       setErrorMessage('Terjadi kesalahan saat menyimpan penggantian pengawas.');
     } finally {
       setIsSubmitting(false);
@@ -365,10 +434,10 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-fadeIn overflow-y-auto">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-5xl overflow-hidden my-auto flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-fadeIn overflow-hidden">
+      <div className="bg-white rounded-none sm:rounded-2xl border-0 sm:border sm:border-slate-200 shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col h-dvh sm:h-auto sm:max-h-[92dvh]">
         {/* Modal Header */}
-        <div className="px-4 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div className="px-4 sm:px-6 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 sm:py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shadow-xs">
               <ArrowLeftRight className="w-5 h-5" />
@@ -385,7 +454,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -494,7 +563,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                       className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500/40 cursor-pointer"
                     >
                       {allCombinedProctors.map((p) => {
-                        const lvl = p.educationLevel || (p.roomName.includes('6') ? 'SMA' : 'SMP');
+                        const lvl = getSlotLevel(p);
                         return (
                           <option key={p.id} value={p.id}>
                             [{lvl}] {p.dayName} (Sesi {p.sessionNumber}) • {p.roomName} - {p.mainProctorName} ({p.subject})
@@ -504,16 +573,18 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                     </select>
                   </div>
 
-                  {slotA && (
+                  {slotA && (() => {
+                    const slotALevel = getSlotLevel(slotA);
+                    return (
                     <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5 text-xs">
                       <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-100">
                         <span className="text-slate-500">Jenjang:</span>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                          (slotA.educationLevel === 'SMA' || slotA.roomName.includes('6'))
+                          slotALevel === 'SMA'
                             ? 'bg-blue-100 text-blue-900 border border-blue-300'
                             : 'bg-teal-100 text-teal-900 border border-teal-300'
                         }`}>
-                          {(slotA.educationLevel === 'SMA' || slotA.roomName.includes('6')) ? '🎓 SMA Terpadu As Salaam' : '🏫 SMP Terpadu Al-Ittihadiyah'}
+                          {slotALevel === 'SMA' ? '🎓 SMA Terpadu As Salaam' : '🏫 SMP Terpadu Al-Ittihadiyah'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -536,7 +607,8 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                         </div>
                       )}
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
 
                 {/* SLOT B */}
@@ -565,7 +637,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                       {allCombinedProctors
                         .filter((p) => p.id !== slotAId)
                         .map((p) => {
-                          const lvl = p.educationLevel || (p.roomName.includes('6') ? 'SMA' : 'SMP');
+                          const lvl = getSlotLevel(p);
                           return (
                             <option key={p.id} value={p.id}>
                               [{lvl}] {p.dayName} (Sesi {p.sessionNumber}) • {p.roomName} - {p.mainProctorName} ({p.subject})
@@ -575,16 +647,18 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                     </select>
                   </div>
 
-                  {slotB ? (
+                  {slotB ? (() => {
+                    const slotBLevel = getSlotLevel(slotB);
+                    return (
                     <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5 text-xs">
                       <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-100">
                         <span className="text-slate-500">Jenjang:</span>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                          (slotB.educationLevel === 'SMA' || slotB.roomName.includes('6'))
+                          slotBLevel === 'SMA'
                             ? 'bg-blue-100 text-blue-900 border border-blue-300'
                             : 'bg-teal-100 text-teal-900 border border-teal-300'
                         }`}>
-                          {(slotB.educationLevel === 'SMA' || slotB.roomName.includes('6')) ? '🎓 SMA Terpadu As Salaam' : '🏫 SMP Terpadu Al-Ittihadiyah'}
+                          {slotBLevel === 'SMA' ? '🎓 SMA Terpadu As Salaam' : '🏫 SMP Terpadu Al-Ittihadiyah'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -607,7 +681,8 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                         </div>
                       )}
                     </div>
-                  ) : (
+                    );
+                  })() : (
                     <div className="p-6 bg-white/60 rounded-xl border border-dashed border-slate-300 text-center text-slate-400 text-xs">
                       Silakan pilih Sesi B yang ingin ditukar dengan Sesi A
                     </div>
@@ -689,13 +764,18 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
                                 {cand.slot.dayName}, {cand.slot.date}
                               </span>
+                              {(() => {
+                                const candLevel = getSlotLevel(cand.slot);
+                                return (
                               <span className={`px-1.5 py-0.2 rounded text-[10px] font-black ${
-                                (cand.slot.educationLevel === 'SMA' || cand.slot.roomName.includes('6'))
+                                candLevel === 'SMA'
                                   ? 'bg-blue-100 text-blue-900 border border-blue-300'
                                   : 'bg-teal-50 text-teal-800 border border-teal-200'
                               }`}>
-                                {(cand.slot.educationLevel === 'SMA' || cand.slot.roomName.includes('6')) ? '[SMA] ' : '[SMP] '}{cand.slot.roomName}
+                                [{candLevel}] {cand.slot.roomName}
                               </span>
+                                );
+                              })()}
                             </div>
 
                             <div className="pt-0.5 flex items-center justify-between gap-1">
@@ -843,7 +923,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                       className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer"
                     >
                       {allCombinedProctors.map((p) => {
-                        const lvl = p.educationLevel || (p.roomName.includes('6') ? 'SMA' : 'SMP');
+                        const lvl = getSlotLevel(p);
                         return (
                           <option key={p.id} value={p.id}>
                             [{lvl}] {p.dayName} (Sesi {p.sessionNumber}) • {p.roomName} - {p.mainProctorName} ({p.subject})
@@ -853,16 +933,18 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                     </select>
                   </div>
 
-                  {reassignSlot && (
+                  {reassignSlot && (() => {
+                    const reassignLevel = getSlotLevel(reassignSlot);
+                    return (
                     <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5 text-xs">
                       <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-100">
                         <span className="text-slate-500">Jenjang:</span>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                          (reassignSlot.educationLevel === 'SMA' || reassignSlot.roomName.includes('6'))
+                          reassignLevel === 'SMA'
                             ? 'bg-blue-100 text-blue-900 border border-blue-300'
                             : 'bg-teal-100 text-teal-900 border border-teal-300'
                         }`}>
-                          {(reassignSlot.educationLevel === 'SMA' || reassignSlot.roomName.includes('6')) ? '🎓 SMA Terpadu As Salaam' : '🏫 SMP Terpadu Al-Ittihadiyah'}
+                          {reassignLevel === 'SMA' ? '🎓 SMA Terpadu As Salaam' : '🏫 SMP Terpadu Al-Ittihadiyah'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -882,7 +964,8 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                         <span className="font-semibold text-slate-700">{reassignSlot.subject}</span>
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
 
                 {/* Pick New Teacher */}
@@ -906,7 +989,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                         .map((t) => {
                           const isBusy = reassignSlot
                             ? ExamSchedulerService.checkProctorConflict(
-                                scheduleData.proctorSchedules,
+                                allCombinedProctors,
                                 t.id,
                                 t.full_name || '',
                                 reassignSlot.date,
@@ -1157,14 +1240,14 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-4 sm:px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs shrink-0">
+        <div className="px-4 sm:px-6 py-3 pb-[max(12px,env(safe-area-inset-bottom))] bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs shrink-0">
           <span className="text-slate-500 font-medium hidden sm:inline">
             💡 Perubahan akan langsung sinkron ke Kartu Pengawas di Beranda Guru.
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold transition-colors cursor-pointer ml-auto"
+            className="min-h-11 sm:min-h-0 px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold transition-colors cursor-pointer ml-auto"
           >
             Tutup
           </button>

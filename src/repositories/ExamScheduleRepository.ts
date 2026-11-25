@@ -344,12 +344,27 @@ const safeSetStorage = (key: string, value: string): void => {
   } catch {}
 };
 
+const safeRemoveStorage = (key: string): void => {
+  memoryScheduleStore.delete(key);
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.removeItem === 'function') {
+      localStorage.removeItem(key);
+    }
+  } catch {}
+};
+
 export class ExamScheduleRepository {
-  private static getStorageKey(academicYear: string, examType: string, level?: 'SMP' | 'SMA'): string {
+  private static getStorageKey(
+    academicYear: string,
+    examType: string,
+    level?: 'SMP' | 'SMA',
+    examPeriodId?: string
+  ): string {
     const cleanYear = academicYear.replace(/[^\w]/g, '_');
     const cleanType = examType.replace(/[^\w]/g, '_');
     const cleanLevel = level ? `_${level.toLowerCase()}` : '';
-    return `${EXAM_SCHEDULE_STORAGE_PREFIX}${cleanYear}_${cleanType}${cleanLevel}`;
+    const cleanPeriod = examPeriodId ? `_p_${examPeriodId.replace(/[^\w]/g, '_')}` : '';
+    return `${EXAM_SCHEDULE_STORAGE_PREFIX}${cleanYear}_${cleanType}${cleanLevel}${cleanPeriod}`;
   }
 
   /**
@@ -822,7 +837,7 @@ export class ExamScheduleRepository {
         if (num > 0 && rawName) {
           const existing = teacherMap[num];
           if (existing) {
-            teacherMap[num] = { ...existing, name: existing.name || rawName };
+            teacherMap[num] = { ...existing, name: rawName };
           } else {
             teacherMap[num] = {
               id: `usr_guru_${String(num).padStart(3, '0')}`,
@@ -863,8 +878,17 @@ export class ExamScheduleRepository {
     sessionDefs.forEach((s) => {
       roomCols.forEach((r) => {
         const cell = sheet[r.col + s.row];
-        const val = cell ? Number(cell.v) : null;
-        const teacher = (val && teacherMap[val]) || teacherMap[1];
+        const rawCellVal = cell?.v !== undefined && cell?.v !== null ? String(cell.v).trim() : '';
+        if (rawCellVal === '') {
+          return;
+        }
+        const val = Number(rawCellVal);
+        if (!Number.isInteger(val) || val <= 0 || !teacherMap[val]) {
+          throw new Error(
+            `Kode pengawas tidak valid "${rawCellVal}" pada sel ${r.col}${s.row} (${r.name}, Sesi ${s.sessionNumber}).`
+          );
+        }
+        const teacher = teacherMap[val];
         proctorSchedules.push({
           id: `proc_asas_${s.date}_s${s.sessionNumber}_r${r.name.replace(/[^\d]/g, '')}`,
           date: s.date,
@@ -886,6 +910,10 @@ export class ExamScheduleRepository {
     return {
       ...canonical,
       proctorSchedules,
+      summary: {
+        ...canonical.summary,
+        totalProctorsAssigned: proctorSchedules.length,
+      },
       updatedAt: new Date().toISOString(),
     };
   }
@@ -1239,15 +1267,16 @@ export class ExamScheduleRepository {
   public static async getSchedule(
     academicYear: string,
     examType: string,
-    level?: 'SMP' | 'SMA'
+    level?: 'SMP' | 'SMA',
+    examPeriodId?: string
   ): Promise<ExamScheduleData | null> {
     let schedule: ExamScheduleData | null = null;
 
-    // 1. Fetch from cloud provider
+    // 1. Fetch from cloud provider (unless explicitly isolated by an unstored custom period key only)
     try {
       const provider = ProviderFactory.getProvider();
       const remoteSchedule = await provider.getExamSchedule(academicYear, examType, undefined, level);
-      if (remoteSchedule) {
+      if (remoteSchedule && (!examPeriodId || remoteSchedule.config?.examPeriodId === examPeriodId)) {
         schedule = remoteSchedule;
       }
     } catch (err) {
@@ -1257,11 +1286,11 @@ export class ExamScheduleRepository {
     // 2. Fallback to local storage
     if (!schedule) {
       try {
-        const key = this.getStorageKey(academicYear, examType, level);
+        const key = this.getStorageKey(academicYear, examType, level, examPeriodId);
         const raw = safeGetStorage(key);
         if (raw) {
           schedule = JSON.parse(raw);
-        } else if (level === 'SMP') {
+        } else if (!examPeriodId && level === 'SMP') {
           // Fallback for SMP to legacy key without level suffix
           const legacyKey = this.getStorageKey(academicYear, examType);
           const legacyRaw = safeGetStorage(legacyKey);
@@ -1281,7 +1310,7 @@ export class ExamScheduleRepository {
       schedule?.isCustomSchedule
     );
 
-    // 3. For ASAS: Return canonical/synced ASAS schedule across all 7 rooms (SMP Only, zero SMA)
+    // 3. For ASAS: Return synced ASAS schedule if saved across all 7 rooms (SMP Only, zero SMA)
     if (examType.toUpperCase() === 'ASAS') {
       // Jadwal ngawas ASAS murni untuk SMP (Ruang 1 s.d. 7). Tidak ada jadwal mengawas di SMA.
       if (level === 'SMA') {
@@ -1290,14 +1319,11 @@ export class ExamScheduleRepository {
       if (schedule) {
         if (isCustomSchedule) return schedule;
         const synced = this.normalizeScheduleSessionTimes(this.syncAsasSchedule(schedule));
-        const key = this.getStorageKey(academicYear, examType, 'SMP');
+        const key = this.getStorageKey(academicYear, examType, 'SMP', examPeriodId);
         safeSetStorage(key, JSON.stringify(synced));
         return synced;
       }
-      const canonical = this.createCanonicalAsasSchedule(academicYear);
-      const key = this.getStorageKey(academicYear, examType, 'SMP');
-      safeSetStorage(key, JSON.stringify(canonical));
-      return canonical;
+      return null;
     }
 
     // 4. For SMA: Synchronize subjects when schedule exists
@@ -1307,7 +1333,7 @@ export class ExamScheduleRepository {
           return schedule;
         }
         const synced = this.normalizeScheduleSessionTimes(this.syncSmaScheduleSubjects(schedule));
-        const key = this.getStorageKey(academicYear, examType, 'SMA');
+        const key = this.getStorageKey(academicYear, examType, 'SMA', examPeriodId);
         safeSetStorage(key, JSON.stringify(synced));
         return synced;
       }
@@ -1321,7 +1347,7 @@ export class ExamScheduleRepository {
           return schedule;
         }
         const synced = this.normalizeScheduleSessionTimes(this.syncSmpScheduleSubjects(schedule));
-        const key = this.getStorageKey(academicYear, examType, 'SMP');
+        const key = this.getStorageKey(academicYear, examType, 'SMP', examPeriodId);
         safeSetStorage(key, JSON.stringify(synced));
         return synced;
       }
@@ -1376,15 +1402,25 @@ export class ExamScheduleRepository {
               : schedule
           );
 
-      const key = this.getStorageKey(finalSchedule.config.academicYear, finalSchedule.config.examType, effectiveLevel);
+      const periodId = finalSchedule.config?.examPeriodId;
+      const key = this.getStorageKey(finalSchedule.config.academicYear, finalSchedule.config.examType, effectiveLevel, periodId);
+      const prevRaw = safeGetStorage(key);
       safeSetStorage(key, JSON.stringify(finalSchedule));
 
       // Persist to Supabase Cloud Provider
+      let cloudOk = false;
       try {
         const provider = ProviderFactory.getProvider();
-        await provider.saveExamSchedule(finalSchedule, undefined, effectiveLevel);
+        cloudOk = await provider.saveExamSchedule(finalSchedule, undefined, effectiveLevel);
       } catch (cloudErr) {
         logger.warn('ExamScheduleRepository', 'Failed to save schedule to cloud provider:', cloudErr);
+        cloudOk = false;
+      }
+
+      if (!cloudOk) {
+        if (prevRaw !== null) safeSetStorage(key, prevRaw);
+        else safeRemoveStorage(key);
+        return false;
       }
 
       if (typeof window !== 'undefined') {
@@ -1703,29 +1739,39 @@ export class ExamScheduleRepository {
   /**
    * Deletes an exam schedule.
    */
-  public static async deleteSchedule(academicYear: string, examType: string, level?: 'SMP' | 'SMA'): Promise<boolean> {
+  public static async deleteSchedule(
+    academicYear: string,
+    examType: string,
+    level?: 'SMP' | 'SMA',
+    examPeriodId?: string
+  ): Promise<boolean> {
+    const key = this.getStorageKey(academicYear, examType, level, examPeriodId);
+    const prevRaw = safeGetStorage(key);
+    const legacyKey = !examPeriodId && (level === 'SMP' || !level) ? this.getStorageKey(academicYear, examType) : null;
+    const prevLegacyRaw = legacyKey ? safeGetStorage(legacyKey) : null;
+
     try {
-      const key = this.getStorageKey(academicYear, examType, level);
-      if (typeof localStorage !== 'undefined' && localStorage) {
-        localStorage.removeItem(key);
-      }
-      memoryScheduleStore.delete(key);
+      safeRemoveStorage(key);
 
       // Clean legacy key if SMP or unspecified
-      if (level === 'SMP' || !level) {
-        const legacyKey = this.getStorageKey(academicYear, examType);
-        if (typeof localStorage !== 'undefined' && localStorage) {
-          localStorage.removeItem(legacyKey);
-        }
-        memoryScheduleStore.delete(legacyKey);
+      if (legacyKey) {
+        safeRemoveStorage(legacyKey);
       }
 
       // Delete from Supabase Cloud Provider
+      let cloudOk = false;
       try {
         const provider = ProviderFactory.getProvider();
-        await provider.deleteExamSchedule(academicYear, examType, undefined, level);
+        cloudOk = await provider.deleteExamSchedule(academicYear, examType, undefined, level);
       } catch (cloudErr) {
         logger.warn('ExamScheduleRepository', 'Failed to delete schedule from cloud provider:', cloudErr);
+        cloudOk = false;
+      }
+
+      if (!cloudOk) {
+        if (prevRaw !== null) safeSetStorage(key, prevRaw);
+        if (legacyKey && prevLegacyRaw !== null) safeSetStorage(legacyKey, prevLegacyRaw);
+        return false;
       }
 
       if (typeof window !== 'undefined') {
@@ -1736,6 +1782,8 @@ export class ExamScheduleRepository {
       return true;
     } catch (err) {
       logger.error('ExamScheduleRepository', 'Failed to delete exam schedule:', err);
+      if (prevRaw !== null) safeSetStorage(key, prevRaw);
+      if (legacyKey && prevLegacyRaw !== null) safeSetStorage(legacyKey, prevLegacyRaw);
       return false;
     }
   }

@@ -69,6 +69,7 @@ export interface DaySessionOverride {
 }
 
 export interface ExamScheduleFormConfig {
+  examPeriodId?: string;
   educationLevel?: EducationLevel; // 'SMP' | 'SMA' (Terpisah antar jenjang)
   examType: ExamType;
   examTitle: string;

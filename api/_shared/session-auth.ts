@@ -42,6 +42,15 @@ export function getServerHmacSecret(): string | null {
 }
 
 /**
+ * Returns dedicated secret for cryptographic document QR signing/verification.
+ */
+export function getDocVerificationSecret(): string | null {
+  const docSecret = safeEnv.DOC_VERIFICATION_SECRET || '';
+  if (docSecret.trim().length > 0) return docSecret.trim();
+  return getServerHmacSecret();
+}
+
+/**
  * Signs a server-verifiable HMAC-SHA256 transition session token (saga_tok_<payload>.<sig>)
  * Used ONLY if public.user_sessions has not been created on Toren 2 yet (PGRST205 / 42P01).
  */
@@ -153,36 +162,47 @@ export type AuthContext = AuthSuccessContext | AuthErrorContext;
 
 /**
  * Checks whether an HTTP request origin is authorized for credentialed CORS
+ * across Web PWA (Vercel prod/preview), local dev, Capacitor Android, and Electron containers.
  */
-export function isAllowedAuthOrigin(origin: string | undefined): boolean {
+export function isAllowedAuthOrigin(origin: string | undefined, req?: any): boolean {
   if (!origin) return false;
+  const trimmed = origin.trim();
   const exactAllowed = new Set([
     'https://smart-absensi-guru-eight.vercel.app',
     'https://localhost',
     'http://localhost',
     'capacitor://localhost',
     'ionic://localhost',
+    'file://',
   ]);
-  if (exactAllowed.has(origin)) return true;
-  if (/^https:\/\/smart-absensi-guru[a-z0-9-]*\.vercel\.app$/i.test(origin)) return true;
-  if (/^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/i.test(origin)) return true;
+  if (exactAllowed.has(trimmed)) return true;
+  if (/^https:\/\/smart-absensi-guru[a-z0-9-]*\.vercel\.app$/i.test(trimmed)) return true;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/i.test(trimmed)) return true;
+  if (/^file:\/\//i.test(trimmed)) return true;
+
+  // Electron desktop apps loading local bundles sometimes send Origin: null
+  if (trimmed === 'null') {
+    const platformHeader = String(req?.headers?.['x-saga-platform'] || '').trim().toLowerCase();
+    const userAgent = String(req?.headers?.['user-agent'] || '').toLowerCase();
+    return platformHeader === 'electron' || userAgent.includes('electron');
+  }
+
   return false;
 }
 
 /**
- * Applies multi-platform CORS (Web PWA, Capacitor Android, Electron) and strict anti-cache headers
+ * Applies multi-platform CORS (Web PWA, Capacitor Android, Electron) and strict anti-cache headers.
+ * Never falls back to Access-Control-Allow-Origin: * on authenticated/API endpoints.
  */
 export function applyAuthCorsHeaders(req: any, res: any, allowedMethods = 'POST, OPTIONS') {
   const origin = typeof req?.headers?.origin === 'string' ? req.headers.origin.trim() : '';
 
-  if (origin && isAllowedAuthOrigin(origin)) {
+  if (origin && isAllowedAuthOrigin(origin, req)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Vary', 'Origin');
-  } else if (!origin) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
   } else {
-    // Reject browser credentialed cross-origin calls from unknown domains cleanly
+    // Non-CORS native requests without Origin, or untrusted cross-origin callers
     res.setHeader('Vary', 'Origin');
   }
 

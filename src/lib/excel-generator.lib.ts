@@ -7,6 +7,19 @@ import { CONSTANTS } from '../config/constants';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { getMonthWorkingDays, parseIndonesianMonth, isDateOffDay, getTodayDateInJakarta } from '../utils/time.utils';
 import type { MonthWorkingDaysInfo } from '../utils/time.utils';
+import {
+  escapeHtml,
+  formatNppHtmlLine,
+  getLevelSchoolBranding,
+  openHtmlBlobPrintWindow,
+  resolvePrintAssetUrl,
+  resolveSignatoryNpp,
+} from '../utils/html.utils';
+import {
+  buildVerifyDocumentUrl,
+  resolveReportBaseUrl,
+  type SignedDocumentTokenResult,
+} from '../services/document-verification.service';
 
 export const getDynamicBranding = () => {
   try {
@@ -267,15 +280,15 @@ export class ExcelReportGenerator {
         })
       : [
           {
-            No: 1,
-            'ID Pengajuan': 'leave_demo_01',
-            NPP: '198502',
-            'Nama Guru': 'Budi Santoso, M.Pd.',
-            'Jenis Izin': 'SAKIT',
-            'Mulai Tanggal': '2026-08-10',
-            'Sampai Tanggal': '2026-08-11',
-            'Alasan Lengkap': 'Demam tinggi & istirahat dokter',
-            'Status Persetujuan': 'APPROVED',
+            No: '-',
+            'ID Pengajuan': '-',
+            NPP: '-',
+            'Nama Guru': 'Belum ada pengajuan izin/sakit pada periode ini',
+            'Jenis Izin': '-',
+            'Mulai Tanggal': '-',
+            'Sampai Tanggal': '-',
+            'Alasan Lengkap': '-',
+            'Status Persetujuan': '-',
           },
         ];
 
@@ -336,7 +349,10 @@ export class ExcelReportGenerator {
    * 2. Halaman 2: Lembar Kalender Absensi Bulanan (Matriks Harian Tanggal 1 s/d 31)
    * 3. Halaman 3 / Seksi Rincian: Rekapitulasi Detail Pengajuan Izin & Sakit Lengkap dengan Alasan
    */
-  public static getPrintablePDFHTML(payload: MultiSheetReportPayload): string {
+  public static getPrintablePDFHTML(
+    payload: MultiSheetReportPayload,
+    signedToken?: SignedDocumentTokenResult | null
+  ): string {
     const workingDaysInfo = payload.workingDaysInfo || getMonthWorkingDays(payload.month, payload.year, true, null, payload.holidays);
     const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
     const monthNumber = parseIndonesianMonth(payload.month);
@@ -345,10 +361,18 @@ export class ExcelReportGenerator {
     const todayDateStr = getTodayDateInJakarta();
 
     const docNo = `421.3/SAG-BOGOR/${parseIndonesianMonth(payload.month)}/${payload.year}`;
-    const baseUrl = typeof window !== 'undefined' && window.location?.origin && !window.location.origin.includes('localhost')
-      ? window.location.origin
-      : 'https://smart-absensi.sch.id';
-    const qrVerifyUrl = `${baseUrl}/verify-document?no=${encodeURIComponent(docNo)}&type=REKAP_PRESENSI&month=${encodeURIComponent(payload.month)}&year=${payload.year}&school=${encodeURIComponent(getDynamicBranding().institutionName)}&signatory=${encodeURIComponent(SIGNATORY_OFFICIALS.KEPSEK_NAME)}`;
+    const institutionName = getDynamicBranding().institutionName;
+    const baseUrl = resolveReportBaseUrl();
+    const qrVerifyUrl = buildVerifyDocumentUrl(baseUrl, {
+      docNo,
+      type: 'REKAP_PRESENSI',
+      month: payload.month,
+      year: payload.year,
+      school: institutionName,
+      signatory: SIGNATORY_OFFICIALS.KEPSEK_NAME,
+      iat: signedToken?.iat,
+      sig: signedToken?.sig,
+    });
     const qrSvg = generateScannableQRCodeSVG(qrVerifyUrl, 64);
 
     const totalTeachers = payload.summary.totalTeachers || 1;
@@ -489,22 +513,38 @@ export class ExcelReportGenerator {
         <!-- HALAMAN 1: RINGKASAN EKSEKUTIF & REKAP KESELURUHAN                       -->
         <!-- ═══════════════════════════════════════════════════════════════════════ -->
         <div class="header" style="text-align: center; margin-bottom: 20px; border-bottom: none; padding-bottom: 0;">
-          <img src="/kop-surat-al-ittihadiyah.jpg" alt="Kop Surat SMP Terpadu Al-Ittihadiyah" style="width: 100%; max-width: 900px; height: auto; display: block; margin: 0 auto 10px auto;" />
+          ${(() => {
+            const branding = getDynamicBranding();
+            const isSma = /sma|salaam/i.test(branding.institutionName || '');
+            const levelBranding = getLevelSchoolBranding(isSma ? 'SMA' : 'SMP', branding.institutionName);
+            if (levelBranding.kopImagePath) {
+              return `<img src="${escapeHtml(resolvePrintAssetUrl(levelBranding.kopImagePath))}" alt="Kop Surat ${escapeHtml(levelBranding.institutionName)}" style="width: 100%; max-width: 900px; height: auto; display: block; margin: 0 auto 10px auto;" />`;
+            }
+            return `
+              <div style="display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 2px solid #065f46;">
+                <img src="${escapeHtml(resolvePrintAssetUrl(levelBranding.logoPath))}" alt="Logo ${escapeHtml(levelBranding.institutionName)}" style="width: 56px; height: 56px; object-fit: contain;" />
+                <div style="text-align: left;">
+                  <div style="font-size: 16px; font-weight: 900; color: #065f46; text-transform: uppercase;">${escapeHtml(levelBranding.institutionName)}</div>
+                  <div style="font-size: 11px; color: #475569; font-weight: 600;">${escapeHtml(levelBranding.address)}</div>
+                </div>
+              </div>
+            `;
+          })()}
           <div style="border-bottom: 3px double #15803d; padding-bottom: 8px; margin-bottom: 12px;">
             <h2 style="margin: 0; font-size: 15px; font-weight: 800; text-transform: uppercase; color: #023246; letter-spacing: 0.5px;">
-              LAPORAN RESMI KEHADIRAN GURU & STAF
+              LAPORAN RESMI KEHADIRAN GURU &amp; STAF
             </h2>
             <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b; font-weight: 600;">
-              Sistem Absensi Berbasis QR Code & Geofence GPS (${getDynamicBranding().appName})
+              Sistem Absensi Berbasis QR Code &amp; Geofence GPS (${escapeHtml(getDynamicBranding().appName)})
             </p>
           </div>
         </div>
 
         <div class="meta-grid">
-          <div><strong>Periode Laporan:</strong> ${payload.month} ${payload.year} ${workingDaysInfo.isCurrentMonth ? `<span style="color:#0284c7;font-weight:700;">(${workingDaysInfo.effectiveWorkingDays} Hari Kerja Berjalan)</span>` : `<span style="color:#64748b;">(${workingDaysInfo.totalMonthWorkingDays} Hari Kerja)</span>`}</div>
+          <div><strong>Periode Laporan:</strong> ${escapeHtml(payload.month)} ${escapeHtml(payload.year)} ${workingDaysInfo.isCurrentMonth ? `<span style="color:#0284c7;font-weight:700;">(${workingDaysInfo.effectiveWorkingDays} Hari Kerja Berjalan)</span>` : `<span style="color:#64748b;">(${workingDaysInfo.totalMonthWorkingDays} Hari Kerja)</span>`}</div>
           <div><strong>Total Guru Terdaftar:</strong> ${payload.teachers.length} Orang</div>
           <div><strong>Tingkat Kehadiran:</strong> ${payload.summary.attendancePercentage}%</div>
-          <div><strong>Tanggal Cetak:</strong> ${new Date().toLocaleDateString('id-ID', { dateStyle: 'long' })}</div>
+          <div><strong>Tanggal Cetak:</strong> ${escapeHtml(new Date().toLocaleDateString('id-ID', { dateStyle: 'long', timeZone: 'Asia/Jakarta' }))}</div>
         </div>
 
         <div class="kpi-container">
@@ -693,22 +733,22 @@ export class ExcelReportGenerator {
                   if (leave) {
                     if (leave.leave_type === 'SAKIT') {
                       countS++;
-                      return `<td><span class="matrix-cell-s" title="${leave.reason}">S</span></td>`;
+                      return `<td><span class="matrix-cell-s" title="${escapeHtml(leave.reason)}">S</span></td>`;
                     }
                     if (leave.leave_type === 'CUTI') {
                       countC++;
-                      return `<td><span class="matrix-cell-c" title="${leave.reason}">C</span></td>`;
+                      return `<td><span class="matrix-cell-c" title="${escapeHtml(leave.reason)}">C</span></td>`;
                     }
                     if (leave.leave_type === 'DINAS_LUAR') {
                       countD++;
-                      return `<td><span class="matrix-cell-d" title="${leave.reason}">D</span></td>`;
+                      return `<td><span class="matrix-cell-d" title="${escapeHtml(leave.reason)}">D</span></td>`;
                     }
                     if (leave.leave_type === 'KOREKSI_ABSEN') {
                       countH++;
-                      return `<td><span class="matrix-cell-h" title="${leave.reason}">H</span></td>`;
+                      return `<td><span class="matrix-cell-h" title="${escapeHtml(leave.reason)}">H</span></td>`;
                     }
                     countI++;
-                    return `<td><span class="matrix-cell-i" title="${leave.reason}">I</span></td>`;
+                    return `<td><span class="matrix-cell-i" title="${escapeHtml(leave.reason)}">I</span></td>`;
                   }
 
                   if (day.isFuture) {
@@ -726,7 +766,7 @@ export class ExcelReportGenerator {
                   <tr>
                     <td>${idx + 1}</td>
                     <td style="text-align: left; padding-left: 4px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                      ${teacher.full_name}
+                      ${escapeHtml(teacher.full_name)}
                     </td>
                     ${dayCells}
                     <td style="font-weight: 800; color: #16a34a;">${countH}</td>
@@ -775,9 +815,9 @@ export class ExcelReportGenerator {
                 return `
                   <tr>
                     <td>${idx + 1}</td>
-                    <td><strong>${l.start_date}</strong> ${l.end_date && l.end_date !== l.start_date ? `s/d <strong>${l.end_date}</strong>` : ''}</td>
-                    <td>${matchedTeacher?.nip || '-'}</td>
-                    <td><strong>${matchedTeacher?.full_name || l.teacher_name || l.user_name || l.user_id}</strong></td>
+                    <td><strong>${escapeHtml(l.start_date)}</strong> ${l.end_date && l.end_date !== l.start_date ? `s/d <strong>${escapeHtml(l.end_date)}</strong>` : ''}</td>
+                    <td>${escapeHtml(matchedTeacher?.nip || '-')}</td>
+                    <td><strong>${escapeHtml(matchedTeacher?.full_name || l.teacher_name || l.user_name || l.user_id)}</strong></td>
                     <td style="text-align: center;">
                       <span style="font-weight: 800; padding: 2px 6px; border-radius: 4px; font-size: 9px; ${
                         l.leave_type === 'SAKIT' ? 'background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe;' :
@@ -785,11 +825,11 @@ export class ExcelReportGenerator {
                         l.leave_type === 'CUTI' ? 'background: #cffafe; color: #0e7490; border: 1px solid #a5f3fc;' :
                         'background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;'
                       }">
-                        ${l.leave_type}
+                        ${escapeHtml(l.leave_type)}
                       </span>
                     </td>
                     <td>
-                      <div style="font-weight: 600; color: #1e293b;">"${l.reason || 'Tidak ada catatan alasan'}"</div>
+                      <div style="font-weight: 600; color: #1e293b;">"${escapeHtml(l.reason || 'Tidak ada catatan alasan')}"</div>
                       ${l.attachment_url ? '<span style="font-size: 9px; color: #15803d; font-weight: 700;">📎 Berkas / Surat Dokter Terlampir</span>' : ''}
                     </td>
                     <td style="text-align: center;">
@@ -804,49 +844,60 @@ export class ExcelReportGenerator {
               }).join('') : `
                 <tr>
                   <td colspan="7" style="text-align: center; color: #64748b; padding: 14px;">
-                    Tidak ada catatan permohonan izin/sakit/cuti yang diajukan pada periode ${payload.month} ${payload.year}.
+                    Tidak ada catatan permohonan izin/sakit/cuti yang diajukan pada periode ${escapeHtml(payload.month)} ${escapeHtml(payload.year)}.
                   </td>
                 </tr>
               `}
             </tbody>
           </table>
 
+          ${(() => {
+            const branding = getDynamicBranding();
+            const isSma = /sma|salaam/i.test(branding.institutionName || '');
+            const levelBranding = getLevelSchoolBranding(isSma ? 'SMA' : 'SMP', branding.institutionName);
+            const tuNppHtml = formatNppHtmlLine(
+              resolveSignatoryNpp(payload.teachers, SIGNATORY_OFFICIALS.TU_NAME),
+              { style: 'margin: 2px 0 0 0; font-size: 9px; color: #64748b;' }
+            );
+            const kepsekNppHtml = formatNppHtmlLine(
+              resolveSignatoryNpp(payload.teachers, SIGNATORY_OFFICIALS.KEPSEK_NAME),
+              { style: 'margin: 2px 0 0 0; font-size: 9px; color: #64748b; position: relative; z-index: 10;' }
+            );
+            const stampHtml = levelBranding.stampPath
+              ? `<img src="${escapeHtml(resolvePrintAssetUrl(levelBranding.stampPath))}" alt="Stempel &amp; TTD Resmi Kepala Sekolah" style="position: absolute; top: -16px; left: 50%; transform: translateX(-50%); width: 140px; height: 95px; object-fit: contain; z-index: 5; pointer-events: none; opacity: 0.95;" />`
+              : '';
+
+            return `
           <div class="signature-section" style="margin-top: 35px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 11px; page-break-inside: avoid;">
             <div class="sig-box" style="text-align: center; width: 200px;">
               <p style="margin: 0 0 4px 0;">Diperiksa oleh,</p>
-              <p style="margin: 0; font-weight: 700;">${SIGNATORY_OFFICIALS.TU_TITLE}</p>
+              <p style="margin: 0; font-weight: 700;">${escapeHtml(SIGNATORY_OFFICIALS.TU_TITLE)}</p>
               <div style="height: 65px;"></div>
-              <p style="margin: 0; font-weight: 800; text-decoration: underline;">${SIGNATORY_OFFICIALS.TU_NAME}</p>
-              <p style="margin: 2px 0 0 0; font-size: 9px; color: #64748b;">NPP. 199208152020122003</p>
+              <p style="margin: 0; font-weight: 800; text-decoration: underline;">${escapeHtml(SIGNATORY_OFFICIALS.TU_NAME)}</p>
+              ${tuNppHtml}
             </div>
 
             <!-- QR Validasi Dokumen Resmi -->
             <div style="text-align: center; padding: 8px 14px; background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 8px; font-size: 8px; max-width: 190px;">
               <div style="font-weight: 800; color: #1e40af; font-size: 9px; margin-bottom: 4px;">🛡️ VALIDASI DOKUMEN RESMI</div>
-              <div style="margin: 4px auto; display: flex; justify-content: center; align-items: center; background: #ffffff; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e1; width: 70px; height: 70px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" title="Pindai QR untuk Verifikasi: ${qrVerifyUrl}" data-qr-payload="${qrVerifyUrl}">
+              <div style="margin: 4px auto; display: flex; justify-content: center; align-items: center; background: #ffffff; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e1; width: 70px; height: 70px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" title="Pindai QR untuk Verifikasi: ${escapeHtml(qrVerifyUrl)}" data-qr-payload="${escapeHtml(qrVerifyUrl)}">
                 ${qrSvg}
               </div>
-              <div style="color: #475569; font-weight: 600; margin-top: 4px;">No: ${docNo}</div>
+              <div style="color: #475569; font-weight: 600; margin-top: 4px;">No: ${escapeHtml(docNo)}</div>
               <div style="color: #15803d; font-weight: 700; margin-top: 2px;">TERVERIFIKASI RESMI &amp; Kriptografis</div>
             </div>
 
             <div class="sig-box" style="text-align: center; width: 220px; position: relative;">
               <p style="margin: 0 0 4px 0;">Mengetahui,</p>
-              <p style="margin: 0; font-weight: 700;">${SIGNATORY_OFFICIALS.KEPSEK_TITLE}</p>
-              
-              <!-- Stempel Basah Resmi & Tanda Tangan Asli Kepala Sekolah -->
+              <p style="margin: 0; font-weight: 700;">${escapeHtml(SIGNATORY_OFFICIALS.KEPSEK_TITLE)}</p>
               <div style="height: 65px; position: relative;">
-                <img 
-                  src="/stempel-ttd-kepsek-as-salaam.png" 
-                  alt="Stempel & TTD Resmi Kepala Sekolah" 
-                  style="position: absolute; top: -16px; left: 50%; transform: translateX(-50%); width: 140px; height: 95px; object-fit: contain; z-index: 5; pointer-events: none; opacity: 0.95;" 
-                />
+                ${stampHtml}
               </div>
-
-              <p style="margin: 0; font-weight: 800; text-decoration: underline; position: relative; z-index: 10;">${SIGNATORY_OFFICIALS.KEPSEK_NAME}</p>
-              <p style="margin: 2px 0 0 0; font-size: 9px; color: #64748b; position: relative; z-index: 10;">NPP. 198205122008011004</p>
+              <p style="margin: 0; font-weight: 800; text-decoration: underline; position: relative; z-index: 10;">${escapeHtml(SIGNATORY_OFFICIALS.KEPSEK_NAME)}</p>
+              ${kepsekNppHtml}
             </div>
-          </div>
+          </div>`;
+          })()}
         </div>
       </body>
       </html>
@@ -856,19 +907,16 @@ export class ExcelReportGenerator {
   /**
    * Generates a printable, styled PDF document report in a popup window (Master School)
    */
-  public static generatePrintablePDF(payload: MultiSheetReportPayload): boolean {
-    const htmlContent = this.getPrintablePDFHTML(payload);
-    try {
-      const printWindow = window.open('', '_blank', 'width=1000,height=800');
-      if (!printWindow) return false;
-
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.focus();
-      return true;
-    } catch {
-      return false;
-    }
+  public static generatePrintablePDF(
+    payload: MultiSheetReportPayload,
+    signedToken?: SignedDocumentTokenResult | null
+  ): boolean {
+    const htmlContent = this.getPrintablePDFHTML(payload, signedToken);
+    const win = openHtmlBlobPrintWindow(htmlContent, {
+      autoPrint: false,
+      windowFeatures: 'width=1000,height=800',
+    });
+    return Boolean(win);
   }
 
   /**
@@ -880,7 +928,8 @@ export class ExcelReportGenerator {
     year: string,
     records: AttendanceRecord[],
     leaveRequests: LeaveRequest[] = [],
-    holidays: HolidayRecord[] = []
+    holidays: HolidayRecord[] = [],
+    signedToken?: SignedDocumentTokenResult | null
   ): string {
     const workingDaysInfo = getMonthWorkingDays(month, year, true, null, holidays);
     const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
@@ -890,10 +939,19 @@ export class ExcelReportGenerator {
     const todayDateStr = getTodayDateInJakarta();
 
     const docNo = `421.3/IND-${teacher.nip || teacher.id.slice(0, 8)}/${monthPrefix}`;
-    const baseUrl = typeof window !== 'undefined' && window.location?.origin && !window.location.origin.includes('localhost')
-      ? window.location.origin
-      : 'https://smart-absensi.sch.id';
-    const qrVerifyUrl = `${baseUrl}/verify-document?no=${encodeURIComponent(docNo)}&type=PRESENSI_INDIVIDU&teacher=${encodeURIComponent(teacher.full_name)}&month=${encodeURIComponent(month)}&year=${year}&school=${encodeURIComponent(getDynamicBranding().institutionName)}&signatory=${encodeURIComponent(SIGNATORY_OFFICIALS.KEPSEK_NAME)}`;
+    const institutionName = getDynamicBranding().institutionName;
+    const baseUrl = resolveReportBaseUrl();
+    const qrVerifyUrl = buildVerifyDocumentUrl(baseUrl, {
+      docNo,
+      type: 'PRESENSI_INDIVIDU',
+      teacher: teacher.full_name,
+      month,
+      year,
+      school: institutionName,
+      signatory: SIGNATORY_OFFICIALS.KEPSEK_NAME,
+      iat: signedToken?.iat,
+      sig: signedToken?.sig,
+    });
     const qrSvg = generateScannableQRCodeSVG(qrVerifyUrl, 64);
 
     const teacherRecords = records.filter((r) => isTeacherRecordMatch(teacher, r) && (!r.date || r.date.startsWith(monthPrefix)));
@@ -1052,24 +1110,40 @@ export class ExcelReportGenerator {
         </div>
 
         <div class="header" style="text-align: center; margin-bottom: 20px; border-bottom: none; padding-bottom: 0;">
-          <img src="/kop-surat-al-ittihadiyah.jpg" alt="Kop Surat SMP Terpadu Al-Ittihadiyah" style="width: 100%; max-width: 900px; height: auto; display: block; margin: 0 auto 10px auto;" />
+          ${(() => {
+            const branding = getDynamicBranding();
+            const isSma = /sma|salaam/i.test(branding.institutionName || '');
+            const levelBranding = getLevelSchoolBranding(isSma ? 'SMA' : 'SMP', branding.institutionName);
+            if (levelBranding.kopImagePath) {
+              return `<img src="${escapeHtml(resolvePrintAssetUrl(levelBranding.kopImagePath))}" alt="Kop Surat ${escapeHtml(levelBranding.institutionName)}" style="width: 100%; max-width: 900px; height: auto; display: block; margin: 0 auto 10px auto;" />`;
+            }
+            return `
+              <div style="display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 2px solid #065f46;">
+                <img src="${escapeHtml(resolvePrintAssetUrl(levelBranding.logoPath))}" alt="Logo ${escapeHtml(levelBranding.institutionName)}" style="width: 56px; height: 56px; object-fit: contain;" />
+                <div style="text-align: left;">
+                  <div style="font-size: 16px; font-weight: 900; color: #065f46; text-transform: uppercase;">${escapeHtml(levelBranding.institutionName)}</div>
+                  <div style="font-size: 11px; color: #475569; font-weight: 600;">${escapeHtml(levelBranding.address)}</div>
+                </div>
+              </div>
+            `;
+          })()}
           <div style="border-bottom: 3px double #15803d; padding-bottom: 8px; margin-bottom: 12px;">
             <h2 style="margin: 0; font-size: 15px; font-weight: 800; text-transform: uppercase; color: #023246; letter-spacing: 0.5px;">
               LAPORAN PRESENSI INDIVIDU GURU &amp; STAF
             </h2>
             <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b; font-weight: 600;">
-              Sistem Absensi Berbasis Digital Scan &amp; Geofence GPS (${getDynamicBranding().appName})
+              Sistem Absensi Berbasis Digital Scan &amp; Geofence GPS (${escapeHtml(getDynamicBranding().appName)})
             </p>
           </div>
         </div>
 
         <div class="profile-box">
-          <div><strong>Nama Lengkap:</strong> ${teacher.full_name}</div>
-          <div><strong>Periode Absensi:</strong> ${month} ${year} ${workingDaysInfo.isCurrentMonth ? `<span style="color:#0284c7;font-weight:700;">(${workingDaysInfo.effectiveWorkingDays} Hari Kerja Berjalan)</span>` : `<span style="color:#64748b;">(${workingDaysInfo.totalMonthWorkingDays} Hari Kerja)</span>`}</div>
-          <div><strong>NPP:</strong> ${teacher.nip || '-'}</div>
-          <div><strong>Jabatan / Tugas:</strong> ${teacher.position || 'Guru Pengajar'}</div>
-          <div><strong>No. WhatsApp:</strong> ${teacher.phone_number || '-'}</div>
-          <div><strong>Tanggal Cetak:</strong> ${new Date().toLocaleDateString('id-ID', { dateStyle: 'long' })}</div>
+          <div><strong>Nama Lengkap:</strong> ${escapeHtml(teacher.full_name)}</div>
+          <div><strong>Periode Absensi:</strong> ${escapeHtml(month)} ${escapeHtml(year)} ${workingDaysInfo.isCurrentMonth ? `<span style="color:#0284c7;font-weight:700;">(${workingDaysInfo.effectiveWorkingDays} Hari Kerja Berjalan)</span>` : `<span style="color:#64748b;">(${workingDaysInfo.totalMonthWorkingDays} Hari Kerja)</span>`}</div>
+          <div><strong>NPP:</strong> ${escapeHtml(teacher.nip || '-')}</div>
+          <div><strong>Jabatan / Tugas:</strong> ${escapeHtml(teacher.position || 'Guru Pengajar')}</div>
+          <div><strong>No. WhatsApp:</strong> ${escapeHtml(teacher.phone_number || '-')}</div>
+          <div><strong>Tanggal Cetak:</strong> ${escapeHtml(new Date().toLocaleDateString('id-ID', { dateStyle: 'long', timeZone: 'Asia/Jakarta' }))}</div>
         </div>
 
         <div class="kpi-container">
@@ -1179,9 +1253,9 @@ export class ExcelReportGenerator {
               return `
                 <tr>
                   <td>${idx + 1}</td>
-                  <td><strong>${r.date}</strong></td>
-                  <td><strong>${r.check_in_time || '--:--'}</strong></td>
-                  <td><strong>${r.check_out_time || '--:--'}</strong></td>
+                  <td><strong>${escapeHtml(r.date)}</strong></td>
+                  <td><strong>${escapeHtml(r.check_in_time || '--:--')}</strong></td>
+                  <td><strong>${escapeHtml(r.check_out_time || '--:--')}</strong></td>
                   <td>
                     <span style="font-weight: 800; ${
                       r.status === 'HADIR' ? 'color: #16a34a;' :
@@ -1189,10 +1263,10 @@ export class ExcelReportGenerator {
                       r.status === 'SAKIT' ? 'color: #7e22ce;' :
                       r.status === 'IZIN' ? 'color: #0284c7;' : 'color: #dc2626;'
                     }">
-                      ${r.status}
+                      ${escapeHtml(r.status)}
                     </span>
                   </td>
-                  <td>${reasonText}</td>
+                  <td>${escapeHtml(reasonText)}</td>
                   <td>${r.check_in_distance_meters ? `${r.check_in_distance_meters}m` : '-'}</td>
                 </tr>
               `;
@@ -1222,52 +1296,63 @@ export class ExcelReportGenerator {
               ${teacherLeaves.map((l, idx) => `
                 <tr>
                   <td>${idx + 1}</td>
-                  <td><strong>${l.start_date}</strong> s/d <strong>${l.end_date}</strong></td>
-                  <td><strong style="color: #0284c7;">${l.leave_type}</strong></td>
-                  <td>"${l.reason}"</td>
-                  <td style="text-align: center;"><strong style="color: ${l.approval_status === 'APPROVED' ? '#16a34a' : '#d97706'};">${l.approval_status || 'PENDING'}</strong></td>
+                  <td><strong>${escapeHtml(l.start_date)}</strong> s/d <strong>${escapeHtml(l.end_date)}</strong></td>
+                  <td><strong style="color: #0284c7;">${escapeHtml(l.leave_type)}</strong></td>
+                  <td>"${escapeHtml(l.reason)}"</td>
+                  <td style="text-align: center;"><strong style="color: ${l.approval_status === 'APPROVED' ? '#16a34a' : '#d97706'};">${escapeHtml(l.approval_status || 'PENDING')}</strong></td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
         ` : ''}
 
+        ${(() => {
+          const branding = getDynamicBranding();
+          const isSma = /sma|salaam/i.test(branding.institutionName || '');
+          const levelBranding = getLevelSchoolBranding(isSma ? 'SMA' : 'SMP', branding.institutionName);
+          const tuNppHtml = formatNppHtmlLine(
+            resolveSignatoryNpp([teacher], SIGNATORY_OFFICIALS.TU_NAME),
+            { style: 'margin: 2px 0 0 0; font-size: 9px; color: #64748b;' }
+          );
+          const kepsekNppHtml = formatNppHtmlLine(
+            resolveSignatoryNpp([teacher], SIGNATORY_OFFICIALS.KEPSEK_NAME),
+            { style: 'margin: 2px 0 0 0; font-size: 9px; color: #64748b; position: relative; z-index: 10;' }
+          );
+          const stampHtml = levelBranding.stampPath
+            ? `<img src="${escapeHtml(resolvePrintAssetUrl(levelBranding.stampPath))}" alt="Stempel &amp; TTD Resmi Kepala Sekolah" style="position: absolute; top: -16px; left: 50%; transform: translateX(-50%); width: 140px; height: 95px; object-fit: contain; z-index: 5; pointer-events: none; opacity: 0.95;" />`
+            : '';
+
+          return `
         <div class="signature-section" style="margin-top: 35px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 11px; page-break-inside: avoid;">
           <div class="sig-box" style="text-align: center; width: 200px;">
             <p style="margin: 0 0 4px 0;">Diperiksa oleh,</p>
-            <p style="margin: 0; font-weight: 700;">${SIGNATORY_OFFICIALS.TU_TITLE}</p>
+            <p style="margin: 0; font-weight: 700;">${escapeHtml(SIGNATORY_OFFICIALS.TU_TITLE)}</p>
             <div style="height: 65px;"></div>
-            <p style="margin: 0; font-weight: 800; text-decoration: underline;">${SIGNATORY_OFFICIALS.TU_NAME}</p>
-            <p style="margin: 2px 0 0 0; font-size: 9px; color: #64748b;">NPP. 199208152020122003</p>
+            <p style="margin: 0; font-weight: 800; text-decoration: underline;">${escapeHtml(SIGNATORY_OFFICIALS.TU_NAME)}</p>
+            ${tuNppHtml}
           </div>
 
           <!-- QR Validasi Dokumen Resmi Individu -->
           <div style="text-align: center; padding: 8px 14px; background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 8px; font-size: 8px; max-width: 190px;">
             <div style="font-weight: 800; color: #1e40af; font-size: 9px; margin-bottom: 4px;">🛡️ VALIDASI DOKUMEN RESMI</div>
-            <div style="margin: 4px auto; display: flex; justify-content: center; align-items: center; background: #ffffff; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e1; width: 70px; height: 70px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" title="Pindai QR untuk Verifikasi: ${qrVerifyUrl}" data-qr-payload="${qrVerifyUrl}">
+            <div style="margin: 4px auto; display: flex; justify-content: center; align-items: center; background: #ffffff; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e1; width: 70px; height: 70px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" title="Pindai QR untuk Verifikasi: ${escapeHtml(qrVerifyUrl)}" data-qr-payload="${escapeHtml(qrVerifyUrl)}">
               ${qrSvg}
             </div>
-            <div style="color: #475569; font-weight: 600; margin-top: 4px;">No: ${docNo}</div>
+            <div style="color: #475569; font-weight: 600; margin-top: 4px;">No: ${escapeHtml(docNo)}</div>
             <div style="color: #15803d; font-weight: 700; margin-top: 2px;">TERVERIFIKASI RESMI &amp; Kriptografis</div>
           </div>
 
           <div class="sig-box" style="text-align: center; width: 220px; position: relative;">
             <p style="margin: 0 0 4px 0;">Mengetahui,</p>
-            <p style="margin: 0; font-weight: 700;">${SIGNATORY_OFFICIALS.KEPSEK_TITLE}</p>
-            
-            <!-- Stempel Basah Resmi & Tanda Tangan Asli Kepala Sekolah -->
+            <p style="margin: 0; font-weight: 700;">${escapeHtml(SIGNATORY_OFFICIALS.KEPSEK_TITLE)}</p>
             <div style="height: 65px; position: relative;">
-              <img 
-                src="/stempel-ttd-kepsek-as-salaam.png" 
-                alt="Stempel & TTD Resmi Kepala Sekolah" 
-                style="position: absolute; top: -16px; left: 50%; transform: translateX(-50%); width: 140px; height: 95px; object-fit: contain; z-index: 5; pointer-events: none; opacity: 0.95;" 
-              />
+              ${stampHtml}
             </div>
-
-            <p style="margin: 0; font-weight: 800; text-decoration: underline; position: relative; z-index: 10;">${SIGNATORY_OFFICIALS.KEPSEK_NAME}</p>
-            <p style="margin: 2px 0 0 0; font-size: 9px; color: #64748b; position: relative; z-index: 10;">NPP. 198205122008011004</p>
+            <p style="margin: 0; font-weight: 800; text-decoration: underline; position: relative; z-index: 10;">${escapeHtml(SIGNATORY_OFFICIALS.KEPSEK_NAME)}</p>
+            ${kepsekNppHtml}
           </div>
-        </div>
+        </div>`;
+        })()}
       </body>
       </html>
     `;
@@ -1282,20 +1367,15 @@ export class ExcelReportGenerator {
     year: string,
     records: AttendanceRecord[],
     leaveRequests: LeaveRequest[] = [],
-    holidays: HolidayRecord[] = []
+    holidays: HolidayRecord[] = [],
+    signedToken?: SignedDocumentTokenResult | null
   ): boolean {
-    const htmlContent = this.getIndividualTeacherPDFHTML(teacher, month, year, records, leaveRequests, holidays);
-    try {
-      const printWindow = window.open('', '_blank', 'width=1000,height=800');
-      if (!printWindow) return false;
-
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.focus();
-      return true;
-    } catch {
-      return false;
-    }
+    const htmlContent = this.getIndividualTeacherPDFHTML(teacher, month, year, records, leaveRequests, holidays, signedToken);
+    const win = openHtmlBlobPrintWindow(htmlContent, {
+      autoPrint: false,
+      windowFeatures: 'width=1000,height=800',
+    });
+    return Boolean(win);
   }
 
   /**

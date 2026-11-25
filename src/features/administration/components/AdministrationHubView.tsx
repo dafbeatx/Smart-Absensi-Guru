@@ -247,15 +247,21 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
                 <span>Atur Modul Administrasi</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setIsExamPeriodModalOpen(true)}
-                className="w-full py-1.5 px-3 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-white/20 shadow-2xs"
-                title="Atur status aktif/nonaktif dan waktu berakhir masa ujian"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-300" />
-                <span>Masa Ujian: {examPeriodStatus?.isActive ? 'Aktif' : 'Usai / Nonaktif'}</span>
-              </button>
+              {['ADMIN', 'OPERATOR'].includes((userRole || '').toUpperCase()) ? (
+                <button
+                  type="button"
+                  onClick={() => setIsExamPeriodModalOpen(true)}
+                  className="w-full py-1.5 px-3 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-white/20 shadow-2xs"
+                  title="Atur status aktif/nonaktif dan waktu berakhir masa ujian"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-300" />
+                  <span>Masa Ujian: {examPeriodStatus?.isActive ? 'Aktif' : 'Usai / Nonaktif'}</span>
+                </button>
+              ) : (
+                <div className="w-full py-1.5 px-3 rounded-xl bg-white/10 text-white/90 text-xs font-bold flex items-center justify-center gap-1.5 border border-white/15">
+                  <span>Masa Ujian: {examPeriodStatus?.isActive ? 'Aktif' : 'Usai / Nonaktif'}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -339,7 +345,7 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
                       Masa pelaksanaan ujian telah usai. Layanan <strong>Pembuat Soal &amp; Kisi-Kisi AI</strong> dan koreksi tetap dapat Anda akses secara normal.
                     </span>
                   </div>
-                  {userRole === 'ADMIN' && (
+                  {['ADMIN', 'OPERATOR'].includes((userRole || '').toUpperCase()) && (
                     <button
                       type="button"
                       onClick={() => setIsExamPeriodModalOpen(true)}
@@ -359,7 +365,10 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
                       type="button"
                       onClick={() => {
                         if (item.actionId === 'custom_link' && item.customUrl) {
-                          window.open(item.customUrl, '_blank', 'noopener,noreferrer');
+                          const trimmedUrl = item.customUrl.trim();
+                          if (/^https?:\/\//i.test(trimmedUrl)) {
+                            window.open(trimmedUrl, '_blank', 'noopener,noreferrer');
+                          }
                           return;
                         }
                         onOpenModule(item.actionId, item, academicYear);
@@ -419,14 +428,17 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
       />
 
       {/* Modal Pengaturan Periode Ujian & Kepanitiaan (Toggle & Waktu Berakhir) */}
-      <ExamPeriodSettingsModal
-        isOpen={isExamPeriodModalOpen}
-        onClose={() => setIsExamPeriodModalOpen(false)}
-        academicYear={academicYear}
-        onSettingsSaved={(_newSettings, newStatus) => {
-          setExamPeriodStatus(newStatus);
-        }}
-      />
+      {['ADMIN', 'OPERATOR'].includes((userRole || '').toUpperCase()) && (
+        <ExamPeriodSettingsModal
+          isOpen={isExamPeriodModalOpen}
+          onClose={() => setIsExamPeriodModalOpen(false)}
+          academicYear={academicYear}
+          userRole={userRole}
+          onSettingsSaved={(_newSettings, newStatus) => {
+            setExamPeriodStatus(newStatus);
+          }}
+        />
+      )}
     </div>
   );
 };

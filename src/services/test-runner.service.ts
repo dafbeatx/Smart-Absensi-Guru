@@ -66,6 +66,7 @@ import { runCounselingBkTestSuite } from './__tests__/counseling-bk.test';
 import { runBackNavigationTestSuite } from './__tests__/back-navigation.test';
 import { runGamePidTestSuite } from './__tests__/game-pid.test';
 import { runAutoAttendanceRuleTestSuite } from './__tests__/auto-attendance-rule.test';
+import { runWave2CSecurityTestSuite } from './__tests__/wave-2c-security.test';
 export interface TestResultItem {
   testName: string;
   status: 'PASS' | 'FAIL';
@@ -175,6 +176,7 @@ export class MasterTestRunner {
       { name: 'Mobile Hardware & Gesture Back Navigation Engine (Phase 5.7)', fn: runBackNavigationTestSuite },
       { name: 'Game PID & School Slice 3D Integration Engine (Phase 5.8)', fn: runGamePidTestSuite },
       { name: 'Auto Attendance Unabsented Rule Engine (Terlambat - 0 Poin)', fn: runAutoAttendanceRuleTestSuite },
+      { name: 'Gelombang 2C Security, RLS & Document Verification Suite', fn: runWave2CSecurityTestSuite },
     ];
 
     let totalPassed = 0;

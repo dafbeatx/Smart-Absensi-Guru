@@ -17,7 +17,7 @@
  * - Unduh Excel (.xlsx A4 Page Setup)
  */
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   X,
   Printer,
@@ -28,6 +28,7 @@ import {
   BarChart3,
   ShieldCheck,
   CheckCircle2,
+  AlertTriangle,
   DoorOpen,
   Sparkles,
   GraduationCap,
@@ -144,7 +145,18 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     initialDocType === 'STUDENT_ATTENDANCE_ROSTER' || initialDocType === 'SEATING_LAYOUT' ? 'landscape' : 'portrait'
   );
   const [includeNumberPrefix, setIncludeNumberPrefix] = useState<boolean>(true);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toastState, setToastState] = useState<{ msg: string; type: 'info' | 'error' } | null>(null);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  const isMountedRef = useRef<boolean>(true);
+  const syncSeqRef = useRef<number>(0);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Synchronize activeEditRoom whenever availableRooms updates
   useEffect(() => {
@@ -159,39 +171,35 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     return `smart_absensi_exam_student_roster_v3_${level}_${scheduleData.id || 'default'}`;
   }, [scheduleData, isSma]);
 
-  // Custom Editable Roster state (persisted to localStorage)
-  const [customRosterMap, setCustomRosterMap] = useState<Record<string, Array<{
-    urut: number;
-    participantNumber: string;
-    fullName: string;
-    gender: string;
-    className: string;
-  }>>>(() => {
-    // 1. Ambil resolusi default langsung dari direktori siswa terbaru
-    const freshFromDir = ExamAdministrativeDocsService.resolveRoomStudents(scheduleData, { includeNumberPrefix: true });
+  const customEditedKey = `${storageKey}_custom_edited`;
+  const prevStorageKeyRef = useRef<string>(storageKey);
+
+  const loadRosterForSchedule = useCallback((targetSchedule: ExamScheduleData, key: string, targetIsSma: boolean) => {
+    const freshFromDir = ExamAdministrativeDocsService.resolveRoomStudents(targetSchedule, { includeNumberPrefix: true });
 
     try {
       if (typeof localStorage !== 'undefined') {
-        const level = scheduleData.educationLevel || scheduleData.config.educationLevel || (isSma ? 'SMA' : 'SMP');
-        const key = `smart_absensi_exam_student_roster_v3_${level}_${scheduleData.id || 'default'}`;
+        const isUserEdited = localStorage.getItem(`${key}_custom_edited`) === '1';
         const saved = localStorage.getItem(key);
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            if (isUserEdited) {
+              return parsed;
+            }
+
             // Check if any room has empty array or SMP Ruang 3 has outdated 8B
-            const isStaleSmpOrder = !isSma && (parsed['Ruang 03'] || parsed['Ruang 3'] || []).some(
+            const isStaleSmpOrder = !targetIsSma && (parsed['Ruang 03'] || parsed['Ruang 3'] || []).some(
               (s: any) => s.className === '8B'
             );
             // Invalidate cache if SMP Ruang 01 has no males or first student is not male
             const r1List = parsed['Ruang 01'] || parsed['Ruang 1'] || [];
-            const isStaleClass7Gender = !isSma && r1List.length > 0 && (
+            const isStaleClass7Gender = !targetIsSma && r1List.length > 0 && (
               !r1List.some((s: any) => s.gender === 'L') ||
               r1List[0].gender === 'P'
             );
 
             // Periksa apakah jumlah atau susunan siswa di saved berbeda dengan direktori siswa terbaru
-            // Jika ada selisih (misal admin baru menambahkan siswa di direktori siswa),
-            // maka cache saved sudah USANG (stale) dan WAJIB menggunakan freshFromDir!
             let isRosterStale = false;
             for (const roomKey of Object.keys(freshFromDir)) {
               const freshList = freshFromDir[roomKey] || [];
@@ -220,10 +228,24 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
       console.warn('Gagal membaca custom roster tersimpan:', e);
     }
     return freshFromDir;
-  });
+  }, []);
 
-  // Persist custom roster to localStorage on any modification
+  // Custom Editable Roster state (persisted to localStorage)
+  const [customRosterMap, setCustomRosterMap] = useState<Record<string, Array<{
+    urut: number;
+    participantNumber: string;
+    fullName: string;
+    gender: string;
+    className: string;
+  }>>>(() => loadRosterForSchedule(scheduleData, storageKey, isSma));
+
+  // Persist custom roster to localStorage on any modification (skip overwrite on schedule key switch)
   useEffect(() => {
+    if (prevStorageKeyRef.current !== storageKey) {
+      prevStorageKeyRef.current = storageKey;
+      setCustomRosterMap(loadRosterForSchedule(scheduleData, storageKey, isSma));
+      return;
+    }
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(storageKey, JSON.stringify(customRosterMap));
@@ -231,7 +253,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     } catch (e) {
       console.warn('Gagal menyimpan custom roster ke localStorage:', e);
     }
-  }, [customRosterMap, storageKey]);
+  }, [customRosterMap, storageKey, scheduleData, isSma, loadRosterForSchedule]);
 
   // Zero-Empty-Room Guarantee: ensure every room in availableRooms has populated students
   useEffect(() => {
@@ -253,10 +275,23 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   }, [availableRooms, scheduleData, customRosterMap]);
 
   // Sinkronisasi otomatis: ambil data siswa terkini dari StudentRepository saat modal terbuka
-  // dan dengarkan perubahan real-time dari Direktori Siswa & RFID
-  const syncWithStudentDirectory = useCallback(async (showNotice = false) => {
+  // (melindungi edit manual user kecuali user menekan tombol "Sinkron Siswa" secara eksplisit)
+  const syncWithStudentDirectory = useCallback(async (forceSync = false) => {
+    const currentSeq = ++syncSeqRef.current;
     try {
+      if (!forceSync && typeof localStorage !== 'undefined' && localStorage.getItem(customEditedKey) === '1') {
+        return;
+      }
+
       const freshStudents = await StudentRepository.getStudents();
+      if (!isMountedRef.current || currentSeq !== syncSeqRef.current) {
+        return;
+      }
+
+      if (!forceSync && typeof localStorage !== 'undefined' && localStorage.getItem(customEditedKey) === '1') {
+        return;
+      }
+
       const freshMap = ExamAdministrativeDocsService.resolveRoomStudents(
         scheduleData,
         {
@@ -267,27 +302,38 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
 
       try {
         if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem(storageKey);
+          if (forceSync) {
+            localStorage.removeItem(customEditedKey);
+          }
           localStorage.setItem(storageKey, JSON.stringify(freshMap));
         }
       } catch { /* ignore */ }
 
       setCustomRosterMap(freshMap);
-      if (showNotice) {
-        showToast('Berhasil disinkronkan dengan data terbaru Direktori Siswa & RFID!');
+      if (forceSync) {
+        setToastState({ msg: 'Berhasil disinkronkan dengan data terbaru Direktori Siswa & RFID!', type: 'info' });
+        setTimeout(() => {
+          if (isMountedRef.current) setToastState(null);
+        }, 3500);
       }
     } catch (err) {
       console.warn('Gagal sinkron data siswa ke dokumen administrasi:', err);
+      if (forceSync && isMountedRef.current) {
+        setToastState({ msg: 'Gagal menyinkronkan data siswa terbaru.', type: 'error' });
+        setTimeout(() => {
+          if (isMountedRef.current) setToastState(null);
+        }, 3500);
+      }
     }
-  }, [scheduleData, storageKey]);
+  }, [scheduleData, storageKey, customEditedKey]);
 
   useEffect(() => {
     if (isOpen) {
-      syncWithStudentDirectory();
+      syncWithStudentDirectory(false);
     }
 
     const handleStudentsUpdated = () => {
-      syncWithStudentDirectory();
+      syncWithStudentDirectory(false);
     };
 
     if (typeof window !== 'undefined') {
@@ -360,9 +406,19 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     }
   }, [isOpen, activeDocType, matrix, scheduleData, committeeMembers, docOptions]);
 
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
+  const showToast = (msg: string, type: 'info' | 'error' = 'info') => {
+    setToastState({ msg, type });
+    setTimeout(() => {
+      if (isMountedRef.current) setToastState(null);
+    }, 3500);
+  };
+
+  const markCustomEdited = () => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(customEditedKey, '1');
+      }
+    } catch {}
   };
 
   // Handlers for Review & In-Place Editing
@@ -372,6 +428,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     field: 'participantNumber' | 'fullName' | 'gender' | 'className',
     value: string
   ) => {
+    markCustomEdited();
     setCustomRosterMap((prev) => {
       const roomList = prev[room] ? [...prev[room]] : [];
       if (!roomList[index]) return prev;
@@ -385,6 +442,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   };
 
   const handleAddStudent = (room: string) => {
+    markCustomEdited();
     setCustomRosterMap((prev) => {
       const roomList = prev[room] ? [...prev[room]] : [];
       let totalBefore = 0;
@@ -426,9 +484,10 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   const handleDeleteStudent = (room: string, index: number) => {
     const currentList = customRosterMap[room] || [];
     if (currentList.length <= 1) {
-      showToast(`Peringatan: ${room} harus memiliki minimal 1 siswa agar tidak kosong.`);
+      showToast(`Peringatan: ${room} harus memiliki minimal 1 siswa agar tidak kosong.`, 'error');
       return;
     }
+    markCustomEdited();
     setCustomRosterMap((prev) => {
       const roomList = (prev[room] || []).filter((_, i) => i !== index);
       const reIndexed = roomList.map((s, idx) => ({ ...s, urut: idx + 1 }));
@@ -441,6 +500,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   };
 
   const handleRenumberAllSequentially = () => {
+    markCustomEdited();
     setCustomRosterMap((prev) => {
       let globalIdx = 1;
       const newMap: typeof prev = {};
@@ -476,6 +536,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   };
 
   const handleSortClass7Gender = () => {
+    markCustomEdited();
     const room = availableRooms.find((r) => parseInt(r.replace(/[^\d]/g, ''), 10) === 1) || availableRooms[0] || 'Ruang 01';
     setCustomRosterMap((prev) => {
       const list = prev[room] ? [...prev[room]] : [];
@@ -514,6 +575,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
       try {
         if (typeof localStorage !== 'undefined') {
           localStorage.removeItem(storageKey);
+          localStorage.removeItem(customEditedKey);
           localStorage.removeItem(`smart_absensi_exam_student_roster_${isSma ? 'SMA' : 'SMP'}_${scheduleData.id || 'default'}`);
           localStorage.removeItem('smart_absensi_exam_student_roster_custom');
         }
@@ -526,18 +588,25 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
 
   // Handlers for Export Actions (Strict A4 Size Guarantee across PDF, Word, and Excel)
   const handlePrintA4 = () => {
-    const titles: Record<AdminDocType, string> = {
-      PROCTOR_ATTENDANCE: 'Daftar Hadir Pengawas',
-      STUDENT_ATTENDANCE_ROSTER: 'Daftar Hadir Peserta Ujian',
-      SEATING_LAYOUT: 'Denah Tempat Duduk Peserta Ujian',
-      HANDOVER_DOCS: 'Daftar Serah Terima Naskah Soal & LJK',
-      STUDENT_ATTENDANCE_SUMMARY: 'Rekapitulasi Kehadiran Peserta Ujian',
-      COMMITTEE_ATTENDANCE: 'Daftar Hadir Panitia Ujian',
-    };
-    ExamAdministrativeDocsService.printHtmlDocument(currentHtml, titles[activeDocType]);
+    if (isExporting) return;
+    try {
+      const titles: Record<AdminDocType, string> = {
+        PROCTOR_ATTENDANCE: 'Daftar Hadir Pengawas',
+        STUDENT_ATTENDANCE_ROSTER: 'Daftar Hadir Peserta Ujian',
+        SEATING_LAYOUT: 'Denah Tempat Duduk Peserta Ujian',
+        HANDOVER_DOCS: 'Daftar Serah Terima Naskah Soal & LJK',
+        STUDENT_ATTENDANCE_SUMMARY: 'Rekapitulasi Kehadiran Peserta Ujian',
+        COMMITTEE_ATTENDANCE: 'Daftar Hadir Panitia Ujian',
+      };
+      ExamAdministrativeDocsService.printHtmlDocument(currentHtml, titles[activeDocType]);
+    } catch (err) {
+      console.error('Gagal mencetak dokumen A4:', err);
+      showToast('Gagal membuka dialog cetak dokumen. Silakan coba lagi.', 'error');
+    }
   };
 
   const handleDownloadA4 = async () => {
+    if (isExporting) return;
     const filePrefix: Record<AdminDocType, string> = {
       PROCTOR_ATTENDANCE: 'Daftar_Hadir_Pengawas',
       STUDENT_ATTENDANCE_ROSTER: selectedRoom === 'ALL' ? 'Daftar_Hadir_Peserta_Semua_Ruang' : `Daftar_Hadir_Peserta_${selectedRoom.replace(/\s+/g, '_')}`,
@@ -550,12 +619,25 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     const academicYear = (scheduleData.config.academicYear || '2026/2027').replace('/', '-');
     const fileName = `${filePrefix[activeDocType]}_${examType}_${academicYear}_A4.pdf`;
 
+    setIsExporting(true);
     showToast(`Menyiapkan unduhan PDF (${fileName})...`);
-    await ExamAdministrativeDocsService.downloadPdfDocument(currentHtml, fileName, pageOrientation);
-    showToast(`Dokumen PDF (${fileName}) berhasil diunduh.`);
+    try {
+      await ExamAdministrativeDocsService.downloadPdfDocument(currentHtml, fileName, pageOrientation);
+      if (isMountedRef.current) {
+        showToast(`Dokumen PDF (${fileName}) berhasil diunduh.`);
+      }
+    } catch (err) {
+      console.error('Gagal mengunduh PDF A4:', err);
+      if (isMountedRef.current) {
+        showToast('Gagal membuat dokumen PDF. Silakan coba kembali.', 'error');
+      }
+    } finally {
+      if (isMountedRef.current) setIsExporting(false);
+    }
   };
 
   const handleExportWord = () => {
+    if (isExporting) return;
     const filePrefix: Record<AdminDocType, string> = {
       PROCTOR_ATTENDANCE: 'Daftar_Hadir_Pengawas',
       STUDENT_ATTENDANCE_ROSTER: selectedRoom === 'ALL' ? 'Daftar_Hadir_Peserta_Semua_Ruang' : `Daftar_Hadir_Peserta_${selectedRoom.replace(/\s+/g, '_')}`,
@@ -568,27 +650,53 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     const academicYear = (scheduleData.config.academicYear || '2026/2027').replace('/', '-');
     const fileName = `${filePrefix[activeDocType]}_${examType}_${academicYear}_A4.doc`;
 
-    ExamAdministrativeDocsService.exportToWord(currentHtml, fileName, pageOrientation);
-    showToast(`Dokumen Word (${fileName}) berhasil diunduh.`);
+    setIsExporting(true);
+    try {
+      ExamAdministrativeDocsService.exportToWord(currentHtml, fileName, pageOrientation);
+      showToast(`Dokumen Word (${fileName}) berhasil diunduh.`);
+    } catch (err) {
+      console.error('Gagal mengekspor Word:', err);
+      showToast('Gagal mengekspor file Word (.doc). Silakan coba lagi.', 'error');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleExportExcel = () => {
-    ExamAdministrativeDocsService.exportToExcel(activeDocType, {
-      matrix,
-      scheduleData,
-      committeeMembers,
-      options: docOptions,
-    });
-    showToast('File Excel (.xlsx A4) berhasil diunduh.');
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      ExamAdministrativeDocsService.exportToExcel(activeDocType, {
+        matrix,
+        scheduleData,
+        committeeMembers,
+        options: docOptions,
+      });
+      showToast('File Excel (.xlsx A4) berhasil diunduh.');
+    } catch (err) {
+      console.error('Gagal mengekspor Excel:', err);
+      showToast('Gagal mengekspor file Excel (.xlsx). Silakan coba lagi.', 'error');
+    } finally {
+      setIsExporting(false);
+    }
   };
+
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl flex flex-col h-[94vh] max-h-225 border border-slate-200 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="relative w-full max-w-5xl bg-white rounded-none sm:rounded-2xl shadow-2xl flex flex-col h-dvh sm:h-[94dvh] sm:max-h-225 border-0 sm:border sm:border-slate-200 overflow-hidden">
         {/* MODAL HEADER */}
-        <div className="px-4 sm:px-6 py-3.5 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+        <div className="px-4 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 sm:px-6 sm:py-3.5 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 shadow-2xs">
               <FileText className="w-5 h-5" />
@@ -616,7 +724,8 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
             <button
               type="button"
               onClick={handleDownloadA4}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+              disabled={isExporting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 text-xs font-bold transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
               title="Unduh format dokumen resmi PDF (A4) siap pakai"
             >
               <Download className="w-3.5 h-3.5 text-sky-700" />
@@ -626,7 +735,8 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
             <button
               type="button"
               onClick={handlePrintA4}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              disabled={isExporting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
               title="Cetak langsung ke kertas A4 atau Simpan sebagai PDF"
             >
               <Printer className="w-3.5 h-3.5" />
@@ -636,7 +746,8 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
             <button
               type="button"
               onClick={handleExportWord}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+              disabled={isExporting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
               title="Unduh format Microsoft Word (.doc) ukuran A4 untuk diedit bebas"
             >
               <FileText className="w-3.5 h-3.5 text-blue-600" />
@@ -646,7 +757,8 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
             <button
               type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+              disabled={isExporting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
               title="Unduh format Microsoft Excel (.xlsx) ukuran A4"
             >
               <Download className="w-3.5 h-3.5 text-emerald-600" />
@@ -895,10 +1007,20 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
         )}
 
         {/* TOAST ALERT NOTIFICATION */}
-        {toastMsg && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>{toastMsg}</span>
+        {toastState && (
+          <div
+            className={`absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-xs font-semibold shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2 ${
+              toastState.type === 'error'
+                ? 'bg-rose-900 text-white border border-rose-500'
+                : 'bg-slate-900 text-white'
+            }`}
+          >
+            {toastState.type === 'error' ? (
+              <AlertTriangle className="w-4 h-4 text-rose-300" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            )}
+            <span>{toastState.msg}</span>
           </div>
         )}
 
@@ -1146,7 +1268,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
         )}
 
         {/* MODAL FOOTER */}
-        <div className="px-4 sm:px-6 py-2.5 bg-white border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
+        <div className="px-4 sm:px-6 py-2.5 pb-[max(12px,env(safe-area-inset-bottom))] bg-white border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 shrink-0">
           <div className="flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-teal-600" />
             <span>
