@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Trash2 } from 'lucide-react';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { useToastStore } from '../../../store/useToastStore';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -151,6 +152,13 @@ export const AcademicCalendarManagement: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleRequestDeleteFromEdit = () => {
+    if (!editingHoliday) return;
+    const target = editingHoliday;
+    setIsFormModalOpen(false);
+    setDeletingHoliday(target);
   };
 
   const handleDeleteConfirm = async () => {
@@ -631,6 +639,7 @@ export const AcademicCalendarManagement: React.FC = () => {
         isOpen={isFormModalOpen}
         onClose={() => setIsFormModalOpen(false)}
         title={editingHoliday ? '✏️ Edit Kalender / Agenda Sekolah' : '➕ Tambah Kalender / Agenda Baru'}
+        mobileFullscreen
       >
         <form onSubmit={handleSubmitForm} className="space-y-4">
           {/* Pilihan 1: Schedule vs 2: Hari Libur */}
@@ -773,22 +782,42 @@ export const AcademicCalendarManagement: React.FC = () => {
             />
           </div>
 
-          <div className="pt-2 flex items-center gap-2">
-            <Button type="button" variant="secondary" className="w-1/2" onClick={() => setIsFormModalOpen(false)}>
-              Batal
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              className={`w-1/2 ${
-                formData.category_type === 'SCHEDULE'
-                  ? 'bg-blue-600 hover:bg-blue-700'
-                  : 'bg-purple-600 hover:bg-purple-700'
-              }`}
-              isLoading={isSubmitting}
-            >
-              {editingHoliday ? 'Simpan Perubahan' : 'Tambah Ke Kalender'}
-            </Button>
+          <div className="sticky bottom-0 bg-white pt-3 pb-1 border-t border-slate-100 space-y-2">
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                disabled={isSubmitting}
+                onClick={() => setIsFormModalOpen(false)}
+              >
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                className={`flex-1 ${
+                  formData.category_type === 'SCHEDULE'
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-purple-600 hover:bg-purple-700'
+                }`}
+                isLoading={isSubmitting}
+              >
+                {editingHoliday ? 'Simpan Perubahan' : 'Tambah Ke Kalender'}
+              </Button>
+            </div>
+            {editingHoliday && (
+              <Button
+                type="button"
+                variant="danger"
+                className="w-full"
+                disabled={isSubmitting}
+                leftIcon={<Trash2 className="w-4 h-4" />}
+                onClick={handleRequestDeleteFromEdit}
+              >
+                Hapus &amp; Batalkan {formData.category_type === 'HOLIDAY' ? 'Hari Libur' : 'Agenda'}
+              </Button>
+            )}
           </div>
         </form>
       </Modal>
@@ -796,8 +825,11 @@ export const AcademicCalendarManagement: React.FC = () => {
       {/* Delete Confirmation Modal */}
       <Modal
         isOpen={!!deletingHoliday}
-        onClose={() => setDeletingHoliday(null)}
+        onClose={() => {
+          if (!isDeleting) setDeletingHoliday(null);
+        }}
         title="⚠️ Konfirmasi Hapus Data Kalender"
+        mobileFullscreen
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-600 leading-relaxed">
@@ -809,10 +841,22 @@ export const AcademicCalendarManagement: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 pt-2">
-            <Button variant="secondary" className="w-1/2" onClick={() => setDeletingHoliday(null)}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-1/2"
+              disabled={isDeleting}
+              onClick={() => setDeletingHoliday(null)}
+            >
               Batal
             </Button>
-            <Button variant="danger" className="w-1/2" isLoading={isDeleting} onClick={handleDeleteConfirm}>
+            <Button
+              type="button"
+              variant="danger"
+              className="w-1/2"
+              isLoading={isDeleting}
+              onClick={handleDeleteConfirm}
+            >
               Ya, Hapus
             </Button>
           </div>
