@@ -176,11 +176,14 @@ export const WeeklyResearchSurveyModal: React.FC<WeeklyResearchSurveyModalProps>
     }
   }, [userId, onCompleted, registerBackGuard]);
 
-  // Registrasi back guard saat modal terbuka
+  const handleBackAttemptRef = useRef(handleBackAttempt);
+  handleBackAttemptRef.current = handleBackAttempt;
+
+  // Registrasi back guard saat modal terbuka (stabil: tidak memicu cleanup saat parent re-render)
   useEffect(() => {
     if (!isOpen || isSubmitted) return;
 
-    registerBackGuard(handleBackAttempt);
+    registerBackGuard(() => handleBackAttemptRef.current());
 
     return () => {
       if (unregisterRef.current) {
@@ -188,7 +191,7 @@ export const WeeklyResearchSurveyModal: React.FC<WeeklyResearchSurveyModalProps>
         unregisterRef.current = null;
       }
     };
-  }, [isOpen, isSubmitted, registerBackGuard, handleBackAttempt]);
+  }, [isOpen, isSubmitted, registerBackGuard]);
 
   // Tangkap tombol Escape pada keyboard fisik desktop/laptop
   useEffect(() => {

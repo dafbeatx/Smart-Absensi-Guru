@@ -31,16 +31,13 @@ export interface RegisterBackHandlerOptions {
 class BackNavigationManager {
   private stack: BackHandlerItem[] = [];
   private sequenceCounter = 0;
-  private isPoppingFromBackButton = false;
-  private isProgrammaticPop = false;
-  private lastHandledTime = 0;
+  private lastCapBackTime = 0;
   private lastRootBackPressTime = 0;
   private isInitialized = false;
-  private pushedHistoryCount = 0;
 
   /**
    * Inisialisasi listener global (Web Browser popstate & Capacitor Android backButton).
-   * Dipanggil satu kali saat App mount.
+   * Idempoten dan aman terhadap React StrictMode double-mount maupun reload halaman.
    */
   public init(): () => void {
     if (this.isInitialized) {
@@ -51,11 +48,16 @@ class BackNavigationManager {
     // 1. Web Browser & PWA History Guard Setup
     if (typeof window !== 'undefined' && window.history) {
       try {
-        const currentState = window.history.state;
-        if (!currentState || !currentState.sagRootGuard) {
+        const currentState = window.history.state as Record<string, unknown> | null;
+        const alreadyInAppHistory = Boolean(
+          currentState?.sagRootGuard || currentState?.sagAppActive || currentState?.sagModalTrap
+        );
+
+        if (!alreadyInAppHistory) {
           window.history.replaceState({ sagRootGuard: true, level: 0 }, '');
           window.history.pushState({ sagAppActive: true, level: 1 }, '');
-          this.pushedHistoryCount = 1;
+        } else if (currentState?.sagRootGuard) {
+          window.history.pushState({ sagAppActive: true, level: 1 }, '');
         }
       } catch (err) {
         console.warn('[BackNavigation] Failed to setup initial history guard:', err);
@@ -69,10 +71,10 @@ class BackNavigationManager {
       .then(({ App: CapApp }) => {
         CapApp.addListener('backButton', () => {
           const now = Date.now();
-          if (now - this.lastHandledTime < 150) {
+          if (now - this.lastCapBackTime < 150) {
             return;
           }
-          this.lastHandledTime = now;
+          this.lastCapBackTime = now;
 
           const handled = this.handleBack();
           if (!handled) {
@@ -95,6 +97,27 @@ class BackNavigationManager {
   }
 
   /**
+   * Pastikan terdapat paling banyak satu state sentinel `sagModalTrap` di atas `sagAppActive`
+   * saat modal/sub-layer/tab terbuka, sehingga tombol Back/Swipe tidak langsung menyentuh root guard
+   * maupun menumpuk entry history yang dapat menyebabkan mismatch saat ditutup via UI.
+   */
+  private armHistoryGuard(trapKey: 'sagAppActive' | 'sagModalTrap', extra?: Record<string, unknown>): void {
+    if (typeof window === 'undefined' || !window.history) return;
+    try {
+      const currentState = window.history.state as Record<string, unknown> | null;
+      if (trapKey === 'sagModalTrap') {
+        if (currentState?.sagModalTrap) return;
+        window.history.pushState({ sagModalTrap: true, level: 2, ...extra }, '');
+      } else {
+        if (currentState?.sagAppActive || currentState?.sagModalTrap) return;
+        window.history.pushState({ sagAppActive: true, level: 1, ...extra }, '');
+      }
+    } catch {
+      // Abaikan error history API pada environment terbatas
+    }
+  }
+
+  /**
    * Daftarkan handler navigasi kembali ke dalam stack.
    * Mengembalikan fungsi unregister untuk membersihkan stack saat modal/komponen ditutup.
    */
@@ -107,7 +130,6 @@ class BackNavigationManager {
       pushHistory = priority >= BACK_PRIORITIES.SUB_LAYER,
     } = options;
 
-    // Hapus pendaftaran lama jika ID yang sama sudah ada untuk menghindari duplikasi
     this.stack = this.stack.filter((item) => item.id !== id);
 
     const item: BackHandlerItem = {
@@ -122,22 +144,8 @@ class BackNavigationManager {
 
     this.stack.push(item);
 
-    // Dorong history state ke browser agar tombol back bawaan HP / gesture swipe back
-    // menghasilkan event popstate dan tidak langsung keluar dari situs/PWA
-    if (pushHistory && typeof window !== 'undefined' && window.history) {
-      try {
-        window.history.pushState(
-          {
-            sagBackId: id,
-            priority,
-            seq: item.seq,
-          },
-          ''
-        );
-        this.pushedHistoryCount++;
-      } catch (err) {
-        console.warn('[BackNavigation] pushState error for modal:', id, err);
-      }
+    if (pushHistory) {
+      this.armHistoryGuard('sagModalTrap', { sagBackId: id, priority, seq: item.seq });
     }
 
     return () => {
@@ -146,32 +154,14 @@ class BackNavigationManager {
   }
 
   /**
-   * Hapus handler dari stack saat komponen ditutup secara normal lewat UI (misal tombol ✕).
+   * Hapus handler dari stack saat komponen ditutup lewat UI atau unmount.
+   * Sengaja TIDAK memanggil `window.history.back()` pada cleanup React untuk mencegah
+   * race condition popstate asinkron yang dapat mengeluarkan tab browser ke halaman sebelumnya.
    */
   public unregister(id: string): void {
     const index = this.stack.findIndex((item) => item.id === id);
     if (index === -1) return;
-
-    const [removedItem] = this.stack.splice(index, 1);
-
-    // Jika komponen ditutup melalui aksi UI (bukan dipicu oleh tombol back HP),
-    // maka kita harus membersihkan history entry yang telah di-push sebelumnya
-    if (
-      removedItem &&
-      removedItem.pushHistory &&
-      !this.isPoppingFromBackButton &&
-      typeof window !== 'undefined' &&
-      window.history &&
-      this.pushedHistoryCount > 0
-    ) {
-      try {
-        this.pushedHistoryCount = Math.max(0, this.pushedHistoryCount - 1);
-        this.isProgrammaticPop = true;
-        window.history.back();
-      } catch (err) {
-        console.warn('[BackNavigation] Programmatic history.back error:', err);
-      }
-    }
+    this.stack.splice(index, 1);
   }
 
   /**
@@ -183,8 +173,6 @@ class BackNavigationManager {
       return false;
     }
 
-    // Urutkan stack: prioritas lebih tinggi didahulukan.
-    // Jika prioritas sama, urutan registrasi terbaru (seq tertinggi) didahulukan (LIFO).
     this.stack.sort((a, b) => {
       if (b.priority !== a.priority) {
         return b.priority - a.priority;
@@ -192,16 +180,11 @@ class BackNavigationManager {
       return b.seq - a.seq;
     });
 
-    const topItem = this.stack[0];
+    const topItem = this.stack.shift();
     if (!topItem) return false;
 
-    // Hapus dari stack
-    this.stack.shift();
-
-    this.isPoppingFromBackButton = true;
     try {
       const result = topItem.onBack();
-      // Jika onBack mengembalikan false secara eksplisit, anggap tidak tertangani
       if (result === false) {
         return false;
       }
@@ -209,11 +192,6 @@ class BackNavigationManager {
     } catch (err) {
       console.error('[BackNavigation] Error executing onBack handler for:', topItem.id, err);
       return false;
-    } finally {
-      // Reset flag pada tick berikutnya agar unregister synchronous mendeteksi status popping
-      setTimeout(() => {
-        this.isPoppingFromBackButton = false;
-      }, 50);
     }
   }
 
@@ -226,56 +204,51 @@ class BackNavigationManager {
     const isDoubleBack = now - this.lastRootBackPressTime < 2000;
 
     if (isDoubleBack) {
-      // Pengguna menekan tombol kembali 2x dalam 2 detik: izinkan keluar
+      this.lastRootBackPressTime = 0;
       if (exitCallback) {
         exitCallback();
       } else if (typeof window !== 'undefined' && window.history) {
         window.history.back();
       }
-    } else {
-      // Tekanan pertama di root screen: ingatkan pengguna & amankan history
-      this.lastRootBackPressTime = now;
-
-      if (typeof window !== 'undefined' && window.history) {
-        try {
-          window.history.pushState({ sagAppActive: true, level: 1 }, '');
-          this.pushedHistoryCount = 1;
-        } catch {}
-      }
-
-      useToastStore
-        .getState()
-        .showToast(
-          'info',
-          'Tekan Sekali Lagi Untuk Keluar',
-          'Tekan tombol kembali sekali lagi untuk menutup aplikasi.'
-        );
+      return;
     }
+
+    this.lastRootBackPressTime = now;
+    this.armHistoryGuard('sagAppActive');
+
+    useToastStore
+      .getState()
+      .showToast(
+        'info',
+        'Tekan Sekali Lagi Untuk Keluar',
+        'Tekan tombol kembali sekali lagi untuk menutup aplikasi.'
+      );
   }
 
   /**
    * Listener event popstate browser (HP swipe back / tombol kembali Chrome/Safari/PWA)
    */
-  private handlePopState = (_event: PopStateEvent): void => {
-    // Abaikan jika popstate dipicu secara programatik oleh unregister modal
-    if (this.isProgrammaticPop) {
-      this.isProgrammaticPop = false;
-      return;
-    }
-
-    const now = Date.now();
-    if (now - this.lastHandledTime < 150) {
-      return;
-    }
-    this.lastHandledTime = now;
-
-    this.pushedHistoryCount = Math.max(0, this.pushedHistoryCount - 1);
-
+  private handlePopState = (event: PopStateEvent): void => {
+    const state = event.state as Record<string, unknown> | null;
     const handled = this.handleBack();
-    if (!handled) {
-      // Jika stack kosong dan pengguna menekan back di root:
-      this.handleRootExit();
+
+    if (handled) {
+      // Pastikan browser selalu memiliki guard di atas sagRootGuard setelah menutup layer
+      if (this.stack.length > 0) {
+        this.armHistoryGuard('sagModalTrap');
+      } else if (state?.sagRootGuard) {
+        this.armHistoryGuard('sagAppActive');
+      }
+      return;
     }
+
+    // Jika event mendarat di sagModalTrap -> sagAppActive dengan stack kosong, tetap jaga di sagAppActive
+    // dan hanya izinkan root exit bila berada di sagRootGuard atau double-back disengaja.
+    if (state?.sagAppActive) {
+      this.armHistoryGuard('sagAppActive');
+    }
+
+    this.handleRootExit();
   };
 
   /**
@@ -291,11 +264,8 @@ class BackNavigationManager {
   public reset(): void {
     this.stack = [];
     this.sequenceCounter = 0;
-    this.isPoppingFromBackButton = false;
-    this.isProgrammaticPop = false;
-    this.lastHandledTime = 0;
+    this.lastCapBackTime = 0;
     this.lastRootBackPressTime = 0;
-    this.pushedHistoryCount = 0;
   }
 }
 

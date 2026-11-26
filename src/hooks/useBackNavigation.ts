@@ -29,6 +29,8 @@ export function useBackHandler({
 }: UseBackHandlerOptions): void {
   const onBackRef = useRef(onBack);
   onBackRef.current = onBack;
+  const titleRef = useRef(title);
+  titleRef.current = title;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -37,14 +39,14 @@ export function useBackHandler({
       id,
       onBack: () => onBackRef.current(),
       priority,
-      title,
+      title: titleRef.current,
       pushHistory,
     });
 
     return () => {
       unregister();
     };
-  }, [id, isOpen, priority, title, pushHistory]);
+  }, [id, isOpen, priority, pushHistory]);
 }
 
 export interface ModalBackItem {
