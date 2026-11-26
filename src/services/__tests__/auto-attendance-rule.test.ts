@@ -15,7 +15,7 @@ import {
   generateRandomLateCheckInTime,
   resolveAutoCheckoutTimeHhMm,
 } from '../../utils/time.utils';
-import { DEFAULT_SYSTEM_SETTINGS } from '../../store/useSettingsStore';
+import { DEFAULT_SYSTEM_SETTINGS, useSettingsStore } from '../../store/useSettingsStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { setServerSupabaseClient, resetServerSupabaseClient } from '../../../api/_shared/session-auth';
 import { runAutoCheckout } from '../../../api/_shared/auto-checkout';
@@ -1138,8 +1138,40 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
           mockRunDisabled.skippedReason === 'DISABLED_BY_SETTINGS',
         `master=${masterOffCron.skippedReason}, co=${coOffCron.skippedReason}, out=${forceRows[0].check_out_time}, pts=${forcePts[0]?.points}, mockDis=${mockRunDisabled.skippedReason}`
       );
+
+      // ── Test 20: Dedicated section save via useSettingsStore preserves non-auto settings while persisting Auto Absen rules
+      await useSettingsStore.getState().updateSettings(
+        {
+          ...DEFAULT_SYSTEM_SETTINGS,
+          geofence_radius: 750,
+          work_checkin_start: '06:15',
+        },
+        'MOCK_ADMIN_TOKEN'
+      );
+      const currentBase = useSettingsStore.getState().settings;
+      await useSettingsStore.getState().updateSettings(
+        {
+          ...currentBase,
+          auto_checkout_time_mode: 'CUSTOM',
+          auto_checkout_custom_time: '15:30',
+          auto_checkout_points: 4,
+          auto_attendance_allow_override_scan: false,
+        },
+        'MOCK_ADMIN_TOKEN'
+      );
+      const afterPartialSave = await mockProvider.getSettings();
+      assert(
+        'AutoAttendance 20: Section save via useSettingsStore updates Auto Absen rules without losing geofence or work schedule settings',
+        afterPartialSave.geofence_radius === 750 &&
+          afterPartialSave.work_checkin_start === '06:15' &&
+          afterPartialSave.auto_checkout_time_mode === 'CUSTOM' &&
+          afterPartialSave.auto_checkout_custom_time === '15:30' &&
+          afterPartialSave.auto_checkout_points === 4 &&
+          afterPartialSave.auto_attendance_allow_override_scan === false,
+        `radius=${afterPartialSave.geofence_radius}, in=${afterPartialSave.work_checkin_start}, co=${afterPartialSave.auto_checkout_custom_time}, pts=${afterPartialSave.auto_checkout_points}`
+      );
     } finally {
-      await mockProvider.updateSettings({ ...DEFAULT_SYSTEM_SETTINGS }, 'MOCK_ADMIN_TOKEN');
+      await useSettingsStore.getState().updateSettings({ ...DEFAULT_SYSTEM_SETTINGS }, 'MOCK_ADMIN_TOKEN');
     }
   } finally {
     useAuthStore.setState(prevAuthState);

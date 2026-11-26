@@ -13,7 +13,7 @@ import { formatTimeForInput, timeToMinutes } from '../../../utils/time.utils';
 import { GPSService } from '../../../services/gps.service';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { handleAppError } from '../../../utils/error.utils';
-import { SlidersHorizontal, Clock, Play, RotateCcw, ShieldCheck } from 'lucide-react';
+import { SlidersHorizontal, Clock, Play, RotateCcw, Save, ShieldCheck } from 'lucide-react';
 import { ExamPeriodRepository, EXAM_PERIOD_CHANGED_EVENT } from '../../../repositories/ExamPeriodRepository';
 import { ExamPeriodSettingsModal } from '../../administration/components/ExamPeriodSettingsModal';
 import type { ExamPeriodStatus } from '../../../types/exam-schedule.types';
@@ -85,6 +85,9 @@ export const SystemSettingsForm: React.FC = () => {
   const [allowOverrideScan, setAllowOverrideScan] = useState<boolean>(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_SCAN);
   const [allowOverrideLeave, setAllowOverrideLeave] = useState<boolean>(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_LEAVE);
   const [preserveCheckInSource, setPreserveCheckInSource] = useState<boolean>(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_PRESERVE_CHECKIN_SOURCE);
+  const [isSavingAutoSettings, setIsSavingAutoSettings] = useState<boolean>(false);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<string | null>(null);
+  const [savedAutoSnapshot, setSavedAutoSnapshot] = useState<string>('');
   const [isRunningAutoCheckout, setIsRunningAutoCheckout] = useState<boolean>(false);
   const [lastAutoCheckoutResult, setLastAutoCheckoutResult] = useState<ServerAutoCheckoutSummary | null>(null);
   const [autoCheckoutExecError, setAutoCheckoutExecError] = useState<string | null>(null);
@@ -112,6 +115,72 @@ export const SystemSettingsForm: React.FC = () => {
     const parsed = parseFloat(str);
     return !isNaN(parsed) ? String(parsed) : String(isLat ? CONSTANTS.DEFAULTS.GEOFENCE_LAT : CONSTANTS.DEFAULTS.GEOFENCE_LNG);
   };
+
+  const normalizeAutoSettingsFromPartial = (src: Partial<SystemSettings>) => ({
+    auto_attendance_enabled: src.auto_attendance_enabled !== undefined ? src.auto_attendance_enabled !== false : CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ENABLED,
+    auto_checkout_enabled: src.auto_checkout_enabled !== undefined ? src.auto_checkout_enabled !== false : CONSTANTS.DEFAULTS.AUTO_CHECKOUT_ENABLED,
+    auto_checkin_mode: (src.auto_checkin_mode === 'DISABLED' || src.auto_checkin_mode === 'MANUAL_ONLY')
+      ? src.auto_checkin_mode
+      : CONSTANTS.DEFAULTS.AUTO_CHECKIN_MODE,
+    auto_checkout_time_mode: (src.auto_checkout_time_mode === 'CUSTOM' || src.auto_checkout_time_mode === 'FOLLOW_SCHEDULE')
+      ? src.auto_checkout_time_mode
+      : CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TIME_MODE,
+    auto_checkout_custom_time: formatTimeForInput(src.auto_checkout_custom_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME),
+    auto_checkout_custom_friday_time: formatTimeForInput(src.auto_checkout_custom_friday_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME),
+    auto_checkout_trigger_time: formatTimeForInput(src.auto_checkout_trigger_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME),
+    auto_checkin_time_min: formatTimeForInput(src.auto_checkin_time_min, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN),
+    auto_checkin_time_max: formatTimeForInput(src.auto_checkin_time_max, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX),
+    auto_checkin_points: Math.max(0, Math.min(15, Math.round(Number(src.auto_checkin_points ?? CONSTANTS.DEFAULTS.AUTO_CHECKIN_POINTS) || 0))),
+    auto_checkout_points: Math.max(0, Math.min(20, Math.round(Number(src.auto_checkout_points ?? CONSTANTS.DEFAULTS.AUTO_CHECKOUT_POINTS) || 0))),
+    auto_attendance_skip_holidays: src.auto_attendance_skip_holidays !== undefined ? src.auto_attendance_skip_holidays !== false : CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_SKIP_HOLIDAYS,
+    auto_attendance_skip_leaves: src.auto_attendance_skip_leaves !== undefined ? src.auto_attendance_skip_leaves !== false : CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_SKIP_LEAVES,
+    auto_attendance_allow_override_scan: src.auto_attendance_allow_override_scan !== undefined ? src.auto_attendance_allow_override_scan !== false : CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_SCAN,
+    auto_attendance_allow_override_leave: src.auto_attendance_allow_override_leave !== undefined ? src.auto_attendance_allow_override_leave !== false : CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_LEAVE,
+    auto_checkout_preserve_checkin_source: src.auto_checkout_preserve_checkin_source !== undefined ? src.auto_checkout_preserve_checkin_source !== false : CONSTANTS.DEFAULTS.AUTO_CHECKOUT_PRESERVE_CHECKIN_SOURCE,
+  });
+
+  const buildCurrentAutoSettings = () => normalizeAutoSettingsFromPartial({
+    auto_attendance_enabled: autoAttendanceEnabled,
+    auto_checkout_enabled: autoCheckoutEnabled,
+    auto_checkin_mode: autoCheckinMode,
+    auto_checkout_time_mode: autoCheckoutTimeMode,
+    auto_checkout_custom_time: autoCheckoutCustomTime,
+    auto_checkout_custom_friday_time: autoCheckoutCustomFridayTime,
+    auto_checkout_trigger_time: autoCheckoutTriggerTime,
+    auto_checkin_time_min: autoCheckinTimeMin,
+    auto_checkin_time_max: autoCheckinTimeMax,
+    auto_checkin_points: autoCheckinPoints,
+    auto_checkout_points: autoCheckoutPoints,
+    auto_attendance_skip_holidays: autoSkipHolidays,
+    auto_attendance_skip_leaves: autoSkipLeaves,
+    auto_attendance_allow_override_scan: allowOverrideScan,
+    auto_attendance_allow_override_leave: allowOverrideLeave,
+    auto_checkout_preserve_checkin_source: preserveCheckInSource,
+  });
+
+  const applyAutoSettingsToState = (src: Partial<SystemSettings>) => {
+    const norm = normalizeAutoSettingsFromPartial(src);
+    setAutoAttendanceEnabled(norm.auto_attendance_enabled);
+    setAutoCheckoutEnabled(norm.auto_checkout_enabled);
+    setAutoCheckinMode(norm.auto_checkin_mode);
+    setAutoCheckoutTimeMode(norm.auto_checkout_time_mode);
+    setAutoCheckoutCustomTime(norm.auto_checkout_custom_time);
+    setAutoCheckoutCustomFridayTime(norm.auto_checkout_custom_friday_time);
+    setAutoCheckoutTriggerTime(norm.auto_checkout_trigger_time);
+    setAutoCheckinTimeMin(norm.auto_checkin_time_min);
+    setAutoCheckinTimeMax(norm.auto_checkin_time_max);
+    setAutoCheckinPoints(norm.auto_checkin_points);
+    setAutoCheckoutPoints(norm.auto_checkout_points);
+    setAutoSkipHolidays(norm.auto_attendance_skip_holidays);
+    setAutoSkipLeaves(norm.auto_attendance_skip_leaves);
+    setAllowOverrideScan(norm.auto_attendance_allow_override_scan);
+    setAllowOverrideLeave(norm.auto_attendance_allow_override_leave);
+    setPreserveCheckInSource(norm.auto_checkout_preserve_checkin_source);
+    setSavedAutoSnapshot(JSON.stringify(norm));
+  };
+
+  const isAutoDirty =
+    savedAutoSnapshot !== '' && JSON.stringify(buildCurrentAutoSettings()) !== savedAutoSnapshot;
 
   // Load existing settings from localStorage and Provider API
   useEffect(() => {
@@ -142,25 +211,12 @@ export const SystemSettingsForm: React.FC = () => {
             setAdminResetPassword(parsed.admin_reset_password);
             setConfirmResetPassword(parsed.admin_reset_password);
           }
-          if (parsed.auto_attendance_enabled !== undefined) setAutoAttendanceEnabled(parsed.auto_attendance_enabled !== false);
-          if (parsed.auto_checkout_enabled !== undefined) setAutoCheckoutEnabled(parsed.auto_checkout_enabled !== false);
-          if (parsed.auto_checkin_mode === 'DISABLED' || parsed.auto_checkin_mode === 'MANUAL_ONLY') setAutoCheckinMode(parsed.auto_checkin_mode);
-          if (parsed.auto_checkout_time_mode === 'CUSTOM' || parsed.auto_checkout_time_mode === 'FOLLOW_SCHEDULE') setAutoCheckoutTimeMode(parsed.auto_checkout_time_mode);
-          if (parsed.auto_checkout_custom_time) setAutoCheckoutCustomTime(formatTimeForInput(parsed.auto_checkout_custom_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME));
-          if (parsed.auto_checkout_custom_friday_time) setAutoCheckoutCustomFridayTime(formatTimeForInput(parsed.auto_checkout_custom_friday_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME));
-          if (parsed.auto_checkout_trigger_time) setAutoCheckoutTriggerTime(formatTimeForInput(parsed.auto_checkout_trigger_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME));
-          if (parsed.auto_checkin_time_min) setAutoCheckinTimeMin(formatTimeForInput(parsed.auto_checkin_time_min, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN));
-          if (parsed.auto_checkin_time_max) setAutoCheckinTimeMax(formatTimeForInput(parsed.auto_checkin_time_max, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX));
-          if (parsed.auto_checkin_points !== undefined) setAutoCheckinPoints(Math.max(0, Math.min(15, Number(parsed.auto_checkin_points) || 0)));
-          if (parsed.auto_checkout_points !== undefined) setAutoCheckoutPoints(Math.max(0, Math.min(20, Number(parsed.auto_checkout_points) || 0)));
-          if (parsed.auto_attendance_skip_holidays !== undefined) setAutoSkipHolidays(parsed.auto_attendance_skip_holidays !== false);
-          if (parsed.auto_attendance_skip_leaves !== undefined) setAutoSkipLeaves(parsed.auto_attendance_skip_leaves !== false);
-          if (parsed.auto_attendance_allow_override_scan !== undefined) setAllowOverrideScan(parsed.auto_attendance_allow_override_scan !== false);
-          if (parsed.auto_attendance_allow_override_leave !== undefined) setAllowOverrideLeave(parsed.auto_attendance_allow_override_leave !== false);
-          if (parsed.auto_checkout_preserve_checkin_source !== undefined) setPreserveCheckInSource(parsed.auto_checkout_preserve_checkin_source !== false);
+          applyAutoSettingsToState(parsed);
         } catch (e) {
           console.error('Failed to parse local settings:', e);
         }
+      } else {
+        setSavedAutoSnapshot(JSON.stringify(normalizeAutoSettingsFromPartial({})));
       }
 
       // 2. Fetch authoritative settings from backend
@@ -189,22 +245,7 @@ export const SystemSettingsForm: React.FC = () => {
             setAdminResetPassword(fetched.admin_reset_password);
             setConfirmResetPassword(fetched.admin_reset_password);
           }
-          if (fetched.auto_attendance_enabled !== undefined) setAutoAttendanceEnabled(fetched.auto_attendance_enabled !== false);
-          if (fetched.auto_checkout_enabled !== undefined) setAutoCheckoutEnabled(fetched.auto_checkout_enabled !== false);
-          if (fetched.auto_checkin_mode === 'DISABLED' || fetched.auto_checkin_mode === 'MANUAL_ONLY') setAutoCheckinMode(fetched.auto_checkin_mode);
-          if (fetched.auto_checkout_time_mode === 'CUSTOM' || fetched.auto_checkout_time_mode === 'FOLLOW_SCHEDULE') setAutoCheckoutTimeMode(fetched.auto_checkout_time_mode);
-          if (fetched.auto_checkout_custom_time) setAutoCheckoutCustomTime(formatTimeForInput(fetched.auto_checkout_custom_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME));
-          if (fetched.auto_checkout_custom_friday_time) setAutoCheckoutCustomFridayTime(formatTimeForInput(fetched.auto_checkout_custom_friday_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME));
-          if (fetched.auto_checkout_trigger_time) setAutoCheckoutTriggerTime(formatTimeForInput(fetched.auto_checkout_trigger_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME));
-          if (fetched.auto_checkin_time_min) setAutoCheckinTimeMin(formatTimeForInput(fetched.auto_checkin_time_min, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN));
-          if (fetched.auto_checkin_time_max) setAutoCheckinTimeMax(formatTimeForInput(fetched.auto_checkin_time_max, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX));
-          if (fetched.auto_checkin_points !== undefined) setAutoCheckinPoints(Math.max(0, Math.min(15, Number(fetched.auto_checkin_points) || 0)));
-          if (fetched.auto_checkout_points !== undefined) setAutoCheckoutPoints(Math.max(0, Math.min(20, Number(fetched.auto_checkout_points) || 0)));
-          if (fetched.auto_attendance_skip_holidays !== undefined) setAutoSkipHolidays(fetched.auto_attendance_skip_holidays !== false);
-          if (fetched.auto_attendance_skip_leaves !== undefined) setAutoSkipLeaves(fetched.auto_attendance_skip_leaves !== false);
-          if (fetched.auto_attendance_allow_override_scan !== undefined) setAllowOverrideScan(fetched.auto_attendance_allow_override_scan !== false);
-          if (fetched.auto_attendance_allow_override_leave !== undefined) setAllowOverrideLeave(fetched.auto_attendance_allow_override_leave !== false);
-          if (fetched.auto_checkout_preserve_checkin_source !== undefined) setPreserveCheckInSource(fetched.auto_checkout_preserve_checkin_source !== false);
+          applyAutoSettingsToState(fetched);
 
           localStorage.setItem('smart_absensi_system_settings', JSON.stringify({
             ...fetched,
@@ -220,11 +261,7 @@ export const SystemSettingsForm: React.FC = () => {
             reminder_friday_checkout_time: formatTimeForInput(fetched.reminder_friday_checkout_time, CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME),
             reminder_checkout_enabled: fetched.reminder_checkout_enabled !== false,
             reminder_early_checkout_enabled: fetched.reminder_early_checkout_enabled !== false,
-            auto_checkout_custom_time: formatTimeForInput(fetched.auto_checkout_custom_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME),
-            auto_checkout_custom_friday_time: formatTimeForInput(fetched.auto_checkout_custom_friday_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME),
-            auto_checkout_trigger_time: formatTimeForInput(fetched.auto_checkout_trigger_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME),
-            auto_checkin_time_min: formatTimeForInput(fetched.auto_checkin_time_min, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN),
-            auto_checkin_time_max: formatTimeForInput(fetched.auto_checkin_time_max, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX),
+            ...normalizeAutoSettingsFromPartial(fetched),
           }));
         }
       } catch (err) {
@@ -267,10 +304,64 @@ export const SystemSettingsForm: React.FC = () => {
     setAllowOverrideScan(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_SCAN);
     setAllowOverrideLeave(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_LEAVE);
     setPreserveCheckInSource(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_PRESERVE_CHECKIN_SOURCE);
-    showToast('info', 'Setelan Auto Absen Direset', 'Nilai dikembalikan ke standar bawaan. Klik "Simpan Perubahan Pengaturan Permanen" untuk menerapkan ke server.');
+    setLastAutoSavedAt(null);
+    showToast('info', 'Setelan Auto Absen Direset', 'Nilai dikembalikan ke standar bawaan. Klik "Simpan Pengaturan Auto Absen" di bagian ini untuk menerapkan ke server.');
+  };
+
+  const handleSaveAutoSettings = async (silentSuccessToast = false): Promise<boolean> => {
+    if (autoCheckinMode === 'MANUAL_ONLY' && timeToMinutes(autoCheckinTimeMin) > timeToMinutes(autoCheckinTimeMax)) {
+      showToast('error', 'Rentang Jam Auto Masuk Tidak Valid', 'Jam awal acak Auto Masuk tidak boleh lebih lambat dari jam batas akhirnya.');
+      return false;
+    }
+
+    setIsSavingAutoSettings(true);
+    try {
+      const token = useAuthStore.getState().token || '';
+      const baseSettings = useSettingsStore.getState().settings;
+      const autoPayload = buildCurrentAutoSettings();
+      const updatedSettings: SystemSettings = {
+        ...baseSettings,
+        work_checkout_start: formatTimeForInput(checkOutStart, baseSettings.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START),
+        friday_checkout_start: formatTimeForInput(fridayCheckoutStart, baseSettings.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START),
+        ...autoPayload,
+      };
+
+      await useSettingsStore.getState().updateSettings(updatedSettings, token);
+      setSavedAutoSnapshot(JSON.stringify(autoPayload));
+      const savedClock = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      setLastAutoSavedAt(`${savedClock} WIB`);
+
+      await AuditLogger.log({
+        actorId: user?.id || 'op_1',
+        actorRole: user?.role || 'ADMIN',
+        actionType: 'UPDATE_SETTINGS',
+        targetEntity: 'System_Settings',
+        newValue: JSON.stringify(autoPayload),
+        reason: 'Pembaruan Pengaturan Auto Absen & Kebijakan Penggantian',
+      });
+
+      if (!silentSuccessToast) {
+        showToast(
+          'success',
+          'Pengaturan Auto Absen Tersimpan!',
+          'Semua kebijakan Auto Absen dan hak penggantian berhasil disimpan permanen ke server.'
+        );
+      }
+      return true;
+    } catch (err: unknown) {
+      handleAppError(err, 'SystemSettingsForm.handleSaveAutoSettings', 'Gagal Menyimpan Pengaturan Auto Absen');
+      return false;
+    } finally {
+      setIsSavingAutoSettings(false);
+    }
   };
 
   const handleTriggerServerAutoCheckout = async () => {
+    if (isAutoDirty) {
+      const savedFirst = await handleSaveAutoSettings(true);
+      if (!savedFirst) return;
+    }
+
     setIsRunningAutoCheckout(true);
     setAutoCheckoutExecError(null);
     try {
@@ -340,6 +431,7 @@ export const SystemSettingsForm: React.FC = () => {
     const finalLat = parseCoord(geofenceLat, true);
     const finalLng = parseCoord(geofenceLng, false);
     const finalRadius = parseInt(geofenceRadius, 10) || CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS;
+    const autoPayload = buildCurrentAutoSettings();
 
     const updatedSettings: SystemSettings = {
       app_name: appName,
@@ -360,28 +452,16 @@ export const SystemSettingsForm: React.FC = () => {
       reminder_friday_checkout_time: reminderFridayCheckoutTime,
       reminder_checkout_enabled: reminderCheckoutEnabled,
       reminder_early_checkout_enabled: reminderEarlyCheckoutEnabled,
-      auto_attendance_enabled: autoAttendanceEnabled,
-      auto_checkout_enabled: autoCheckoutEnabled,
-      auto_checkin_mode: autoCheckinMode,
-      auto_checkout_time_mode: autoCheckoutTimeMode,
-      auto_checkout_custom_time: formatTimeForInput(autoCheckoutCustomTime, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME),
-      auto_checkout_custom_friday_time: formatTimeForInput(autoCheckoutCustomFridayTime, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME),
-      auto_checkout_trigger_time: formatTimeForInput(autoCheckoutTriggerTime, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME),
-      auto_checkin_time_min: formatTimeForInput(autoCheckinTimeMin, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN),
-      auto_checkin_time_max: formatTimeForInput(autoCheckinTimeMax, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX),
-      auto_checkin_points: Math.max(0, Math.min(15, Math.round(Number(autoCheckinPoints) || 0))),
-      auto_checkout_points: Math.max(0, Math.min(20, Math.round(Number(autoCheckoutPoints) || 0))),
-      auto_attendance_skip_holidays: autoSkipHolidays,
-      auto_attendance_skip_leaves: autoSkipLeaves,
-      auto_attendance_allow_override_scan: allowOverrideScan,
-      auto_attendance_allow_override_leave: allowOverrideLeave,
-      auto_checkout_preserve_checkin_source: preserveCheckInSource,
+      ...autoPayload,
     };
 
     try {
       // 1. Persist to backend and update centralized settings store
       const token = useAuthStore.getState().token || '';
       await useSettingsStore.getState().updateSettings(updatedSettings, token);
+      setSavedAutoSnapshot(JSON.stringify(autoPayload));
+      const savedClock = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      setLastAutoSavedAt(`${savedClock} WIB`);
 
       // Update state to formatted values
       setGeofenceLat(String(finalLat));
@@ -921,13 +1001,25 @@ export const SystemSettingsForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Aksi Eksekusi Langsung Server Auto Pulang */}
-        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Aksi Simpan & Eksekusi Langsung Server Auto Pulang */}
+        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="space-y-1 min-w-0">
-            <p className="text-xs font-bold text-slate-900">Uji &amp; Jalankan Auto Pulang Hari Ini (Server)</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-xs font-bold text-slate-900">Simpan Kebijakan &amp; Eksekusi Auto Pulang (Server)</p>
+              {isAutoDirty && (
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                  Belum Disimpan
+                </span>
+              )}
+            </div>
             <p className="text-[11px] text-slate-500">
-              Menjalankan Auto Pulang sekarang sesuai pengaturan yang sudah tersimpan di server untuk guru yang sudah masuk hari ini.
+              Simpan perubahan aturan Auto Absen di bagian ini ke server, atau jalankan Auto Pulang sekarang untuk guru yang sudah absen masuk hari ini.
             </p>
+            {lastAutoSavedAt && !isAutoDirty && (
+              <p className="text-[11px] font-semibold text-emerald-700">
+                Pengaturan Auto Absen tersimpan permanen pukul {lastAutoSavedAt}.
+              </p>
+            )}
             {lastAutoCheckoutResult && (
               <p className="text-[11px] font-semibold text-emerald-700">
                 Hasil ({lastAutoCheckoutResult.date}): {lastAutoCheckoutResult.skippedReason
@@ -940,15 +1032,27 @@ export const SystemSettingsForm: React.FC = () => {
             )}
           </div>
 
-          <button
-            type="button"
-            disabled={!autoAttendanceEnabled || !autoCheckoutEnabled || isRunningAutoCheckout}
-            onClick={handleTriggerServerAutoCheckout}
-            className="h-11 px-4 rounded-xl bg-[#023246] hover:bg-[#034560] disabled:opacity-50 text-white text-xs font-bold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
-          >
-            <Play className="w-3.5 h-3.5" />
-            <span>{isRunningAutoCheckout ? 'Menjalankan...' : 'Jalankan Auto Pulang Sekarang'}</span>
-          </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0 w-full lg:w-auto">
+            <button
+              type="button"
+              disabled={isSavingAutoSettings || isLoading}
+              onClick={() => handleSaveAutoSettings()}
+              className="h-11 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{isSavingAutoSettings ? 'Menyimpan...' : 'Simpan Pengaturan Auto Absen'}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={!autoAttendanceEnabled || !autoCheckoutEnabled || isRunningAutoCheckout || isSavingAutoSettings}
+              onClick={handleTriggerServerAutoCheckout}
+              className="h-11 px-4 rounded-xl bg-[#023246] hover:bg-[#034560] disabled:opacity-50 text-white text-xs font-bold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span>{isRunningAutoCheckout ? 'Menjalankan...' : 'Jalankan Auto Pulang Sekarang'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
