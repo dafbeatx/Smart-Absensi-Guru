@@ -128,6 +128,8 @@ import {
   getMonthWorkingDays,
   getPaydayReminderInfo,
   evaluateDisciplinePeriodTiming,
+  isAutoCheckInRecord,
+  isAutoCheckOutRecord,
 } from '../../../utils/time.utils';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
@@ -1777,23 +1779,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             continue;
           }
 
-          // Sesuai aturan baru: Guru yang belum absen otomatis di-absenkan oleh sistem sebagai TERLAMBAT (0 Poin)
-          try {
-            const autoRec = await ProviderFactory.getProvider().autoAttendTeacher({
-              user_id: effectiveUser.id,
-              date: dateStr,
-              teacher_name: effectiveUser.full_name,
-            });
-            if (autoRec) {
-              loadedHistory.push(autoRec);
-              NotificationService.dismissMissingAttendanceNotification(effectiveUser.id, dateStr);
-              continue;
-            }
-          } catch (eAuto) {
-            console.warn('Auto attendance failed for guru:', eAuto);
-          }
-
-          // Missing attendance identified fallback (jika offline/gagal)
+          // Masuk tetap manual / mandiri guru (tidak otomatis mengisi masuk saat buka dashboard);
+          // tampilkan notifikasi peringatan agar guru dapat absen, mengajukan izin, atau koreksi.
           const notifId = `notif_missing_att_${effectiveUser.id}_${dateStr}`;
           const isRead = NotificationService.isNotificationRead(effectiveUser.id, notifId);
 
@@ -3473,6 +3460,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 return null;
               })();
 
+              const isAutoCheckInToday = isAutoCheckInRecord(todayAttendance);
+              const isAutoCheckOutToday = isAutoCheckOutRecord(todayAttendance);
+
               let statusLabel = 'Belum Absen';
               let statusBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
               let ctaText = 'Absen Masuk Sekarang';
@@ -3484,8 +3474,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 statusBadgeStyle = 'bg-slate-100 text-slate-700 border-slate-200';
                 ctaText = `Hari Libur (${isTodayOff.reason || 'Tidak Ada KBM'})`;
                 isCtaDisabled = true;
+              } else if (isAutoCheckInToday) {
+                const isReadyToCheckout = nowTimeJakarta >= checkoutStart;
+                if (isReadyToCheckout) {
+                  statusLabel = isAutoCheckOutToday ? 'Auto Sistem (Dapat Diganti)' : 'Auto Masuk • Siap Pulang';
+                  statusBadgeStyle = 'bg-blue-50 text-blue-800 border-blue-200';
+                  ctaText = isAutoCheckOutToday ? 'Ganti dengan Absen Asli' : 'Absen Pulang Sekarang';
+                  ctaAction = handleOpenAttendanceChoice;
+                } else {
+                  statusLabel = 'Auto Masuk (Dapat Diganti)';
+                  statusBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
+                  ctaText = 'Absen Masuk Mandiri Sekarang';
+                  ctaAction = handleOpenAttendanceChoice;
+                }
               } else if (todayAttendance?.check_out_time) {
-                statusLabel = 'Presensi Selesai';
+                statusLabel = isAutoCheckOutToday ? 'Presensi Selesai (Auto Pulang)' : 'Presensi Selesai';
                 statusBadgeStyle = 'bg-emerald-50 text-emerald-800 border-emerald-200';
                 ctaText = 'Lihat Rekap Kehadiran Hari Ini';
                 ctaAction = () => setIsRecapModalOpen(true);

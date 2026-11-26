@@ -296,6 +296,7 @@ export default async function handler(req: any, res: any) {
         title: customTitle,
         description,
         idempotency_key: rawIdempotencyKey,
+        replace_auto_zero_checkin: replaceAutoZeroCheckin,
       } = body;
 
       const cleanActivity = String(activity_type || '').trim();
@@ -316,6 +317,39 @@ export default async function handler(req: any, res: any) {
           errorCode: 'VALIDATION_ERROR',
           errorMessage: 'Field recipient_user_id wajib disertakan.',
         });
+      }
+
+      // Bila guru baru saja mengganti catatan Auto Masuk (0 Poin) dengan absensi fisik nyata,
+      // bersihkan placeholder 0 Poin sebelumnya agar poin absen fisik dapat tercatat normal.
+      const isPhysicalCheckInOverride =
+        Boolean(replaceAutoZeroCheckin) &&
+        (cleanActivity === 'CHECK_IN_ON_TIME' || cleanActivity === 'CHECK_IN_LATE') &&
+        (callerRole !== 'GURU' || targetUserId === callerUser.id);
+
+      if (isPhysicalCheckInOverride) {
+        try {
+          const { data: autoRows } = await serverSupabase
+            .from('teacher_point_history')
+            .select('id, points, title, description')
+            .eq('user_id', targetUserId)
+            .eq('date', targetDate)
+            .eq('activity_type', 'CHECK_IN_LATE');
+
+          const placeholderIds = (autoRows || [])
+            .filter(
+              (r: any) =>
+                Number(r.points) === 0 &&
+                (String(r.title || '').includes('Otomatis Sistem') ||
+                  String(r.description || '').includes('0 Poin'))
+            )
+            .map((r: any) => r.id);
+
+          if (placeholderIds.length > 0) {
+            await serverSupabase.from('teacher_point_history').delete().in('id', placeholderIds);
+          }
+        } catch (cleanupErr) {
+          console.warn('[teacher-points] Auto zero-point cleanup warning:', cleanupErr);
+        }
       }
 
       // 1. Idempotency Check: Jika idempotency_key sudah diproses, return langsung data yang sudah ada

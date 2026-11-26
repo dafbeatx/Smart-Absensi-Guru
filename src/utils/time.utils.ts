@@ -307,6 +307,48 @@ export function getJakartaDayOfWeek(dateOrStr?: Date | string): number {
   }
 }
 
+export interface AutoAttendanceFlagsInput {
+  attendance_source?: string | null;
+  verification_method?: string | null;
+  is_auto_attendance?: boolean | null;
+  notes?: string | null;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
+}
+
+/**
+ * Mengembalikan true bila record absensi berasal dari penandaan otomatis sistem (SYSTEM_AUTO),
+ * sehingga masih boleh digantikan oleh absen fisik mandiri guru atau pengajuan izin resmi.
+ */
+export function isAutoAttendanceRecord(record?: AutoAttendanceFlagsInput | null): boolean {
+  if (!record) return false;
+  return (
+    record.attendance_source === 'SYSTEM_AUTO' ||
+    record.verification_method === 'SYSTEM_AUTO' ||
+    Boolean(record.is_auto_attendance) ||
+    Boolean(record.notes && record.notes.includes('0 Poin'))
+  );
+}
+
+/**
+ * Mengembalikan true bila bagian check-in (masuk) masih berstatus otomatis sistem (belum scan fisik).
+ */
+export function isAutoCheckInRecord(record?: AutoAttendanceFlagsInput | null): boolean {
+  if (!record || !record.check_in_time) return false;
+  return isAutoAttendanceRecord(record);
+}
+
+/**
+ * Mengembalikan true bila bagian check-out (pulang) diisi otomatis oleh sistem/Auto Pulang.
+ */
+export function isAutoCheckOutRecord(record?: AutoAttendanceFlagsInput | null): boolean {
+  if (!record || !record.check_out_time) return false;
+  return (
+    isAutoAttendanceRecord(record) ||
+    Boolean(record.notes && (record.notes.includes('Auto Pulang') || record.notes.includes('Pulang Tuntas')))
+  );
+}
+
 export interface ValidateAttendanceTimeWindowParams {
   checkInTime?: string | null;
   checkOutTime?: string | null;
@@ -316,6 +358,8 @@ export interface ValidateAttendanceTimeWindowParams {
   fridayCheckoutStart?: string;
   isFriday?: boolean;
   bypassTimeWindow?: boolean;
+  isAutoCheckIn?: boolean;
+  isAutoCheckOut?: boolean;
 }
 
 export interface AttendanceTimeWindowValidationResult {
@@ -326,6 +370,8 @@ export interface AttendanceTimeWindowValidationResult {
   currentJakartaTime: string;
   targetCheckoutStart: string;
   isFriday: boolean;
+  isOverrideAutoCheckIn?: boolean;
+  isOverrideAutoCheckOut?: boolean;
 }
 
 /**
@@ -335,8 +381,10 @@ export interface AttendanceTimeWindowValidationResult {
  *    - Friday: >= 10:00 WIB onwards
  *    - Other days: >= 12:00 WIB onwards
  * 3. Double-attendance protection:
- *    - If already checked in and attempts scan before checkout window -> REJECT ("harus nanti absensi pulang")
- *    - If both check-in and check-out are already completed -> REJECT (presensi lengkap, tidak bisa absen 2x)
+ *    - If already physically checked in and attempts scan before checkout window -> REJECT ("harus nanti absensi pulang")
+ *    - If check-in is only SYSTEM_AUTO (no physical scan yet) -> ALLOW override to genuine CHECK_IN
+ *    - If both physical check-in and check-out are already completed -> REJECT (presensi lengkap, tidak bisa absen 2x)
+ *    - If check-out was Auto Pulang -> ALLOW override with genuine physical CHECK_OUT scan in checkout window
  */
 export function validateAttendanceTimeWindow(
   params: ValidateAttendanceTimeWindowParams
@@ -356,6 +404,16 @@ export function validateAttendanceTimeWindow(
   const coutStartMin = timeToMinutes(coutStart);
 
   if (params.bypassTimeWindow) {
+    if (params.isAutoCheckIn && (!params.checkOutTime || params.isAutoCheckOut)) {
+      return {
+        isValid: true,
+        action: 'CHECK_IN',
+        currentJakartaTime,
+        targetCheckoutStart: coutStart,
+        isFriday: isFri,
+        isOverrideAutoCheckIn: true,
+      };
+    }
     return {
       isValid: true,
       action: params.checkInTime ? 'CHECK_OUT' : 'CHECK_IN',
@@ -365,8 +423,9 @@ export function validateAttendanceTimeWindow(
     };
   }
 
-  // 1. Belum pernah check-in hari ini -> Absen Masuk
-  if (!params.checkInTime) {
+  // 1. Belum pernah check-in hari ini, ATAU check-in masih berupa catatan auto sistem (sebelum jam pulang)
+  const canOverrideAutoAsCheckIn = Boolean(params.isAutoCheckIn && currentMin < coutStartMin);
+  if (!params.checkInTime || canOverrideAutoAsCheckIn) {
     if (currentMin < cinStartMin) {
       return {
         isValid: false,
@@ -384,12 +443,13 @@ export function validateAttendanceTimeWindow(
       currentJakartaTime,
       targetCheckoutStart: coutStart,
       isFriday: isFri,
+      isOverrideAutoCheckIn: canOverrideAutoAsCheckIn,
     };
   }
 
   // 2. Sudah pernah check-in hari ini
-  // A. Cek apakah check-out juga sudah lengkap hari ini
-  if (params.checkOutTime) {
+  // A. Cek apakah check-out juga sudah lengkap hari ini (kecuali Auto Pulang yang boleh diperbarui scan nyata)
+  if (params.checkOutTime && !params.isAutoCheckOut) {
     const formattedIn = formatTimeForInput(params.checkInTime);
     const formattedOut = formatTimeForInput(params.checkOutTime);
     return {
@@ -418,13 +478,14 @@ export function validateAttendanceTimeWindow(
     };
   }
 
-  // C. Waktu kepulangan sudah tiba dan belum check-out -> Valid Absen Pulang
+  // C. Waktu kepulangan sudah tiba dan belum check-out (atau mengganti Auto Pulang) -> Valid Absen Pulang
   return {
     isValid: true,
     action: 'CHECK_OUT',
     currentJakartaTime,
     targetCheckoutStart: coutStart,
     isFriday: isFri,
+    isOverrideAutoCheckOut: Boolean(params.checkOutTime && params.isAutoCheckOut),
   };
 }
 

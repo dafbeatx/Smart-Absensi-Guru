@@ -391,6 +391,7 @@ export interface TeacherPointLog {
   idempotency_key?: string | null;
   source?: string;
   occurred_at?: string;
+  replace_auto_zero_checkin?: boolean;
 }
 
 export type TeacherLeaderboardDataStatus =

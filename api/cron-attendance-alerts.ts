@@ -1,9 +1,15 @@
 // Vercel Serverless Function: api/cron-attendance-alerts.ts
-// Handles scheduled background push notifications for Teachers & Staff
-// Runs automatically via Vercel Cron (or manual trigger) even when phone is sleeping/closed
+// Handles scheduled background push notifications & server-side Auto Check-Out Only
+// Runs automatically via Vercel Cron even when phone/browser is closed
 
+import crypto from 'node:crypto';
 import webpush from 'web-push';
-import { createClient } from '@supabase/supabase-js';
+import {
+  serverSupabase,
+  authenticateUser,
+  applyAuthCorsHeaders,
+} from './_shared/session-auth.js';
+import { runAutoCheckout } from './_shared/auto-checkout.js';
 
 const safeEnv: Record<string, string | undefined> =
   typeof process !== 'undefined' && process?.env
@@ -26,28 +32,87 @@ try {
   console.error('[CronPush] VAPID configuration error:', err);
 }
 
-// Supabase client initialization
-const SUPABASE_URL =
-  safeEnv.VITE_SUPABASE_URL_TOREN2 ||
-  safeEnv.VITE_SUPABASE_URL ||
-  'https://fnppfmjsbqxbtioypnap.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY =
-  safeEnv.SUPABASE_SERVICE_ROLE_KEY_TOREN2 ||
-  safeEnv.SUPABASE_SERVICE_ROLE_KEY ||
-  safeEnv.VITE_SUPABASE_ANON_KEY_TOREN2 ||
-  safeEnv.VITE_SUPABASE_ANON_KEY ||
-  '';
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+function timingSafeBearerEquals(authHeader: string, expectedSecret: string): boolean {
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!token || !expectedSecret) return false;
+  const bufA = crypto.createHash('sha256').update(token, 'utf8').digest();
+  const bufB = crypto.createHash('sha256').update(expectedSecret, 'utf8').digest();
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+async function authorizeAutoCheckoutRequest(req: any): Promise<{ ok: true; via: string } | { ok: false; status: number; message: string }> {
+  const authHeader = typeof req?.headers?.authorization === 'string' ? req.headers.authorization : '';
+  const cronSecret = (safeEnv.CRON_SECRET || '').trim();
+
+  // 1. Authorized Vercel Cron via CRON_SECRET
+  if (cronSecret && authHeader && timingSafeBearerEquals(authHeader, cronSecret)) {
+    return { ok: true, via: 'cron_secret' };
+  }
+
+  // 2. Authorized ADMIN / OPERATOR session (e.g., manual trigger from Admin panel or verified test)
+  const auth = await authenticateUser(req);
+  if (auth.ok) {
+    const role = String(auth.role || auth.user?.role || '').toUpperCase().trim();
+    if (role === 'ADMIN' || role === 'OPERATOR') {
+      return { ok: true, via: `admin_session:${auth.userId}` };
+    }
+    return { ok: false, status: 403, message: 'Akses ditolak: hanya Admin/Operator atau Cron Server yang diizinkan.' };
+  }
+
+  // 3. If CRON_SECRET is not configured yet in deployment env, permit Vercel Cron signature headers
+  if (!cronSecret) {
+    const isVercelCronHeader = String(req?.headers?.['x-vercel-cron'] || '') === '1';
+    const userAgent = String(req?.headers?.['user-agent'] || '').toLowerCase();
+    if (isVercelCronHeader || userAgent.includes('vercel-cron')) {
+      return { ok: true, via: 'vercel_cron_header' };
+    }
+  }
+
+  return { ok: false, status: 401, message: 'Unauthorized auto-checkout request.' };
+}
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  const reqType = (req.query && req.query.type) || (req.body && req.body.type) || 'auto';
+
+  if (reqType === 'auto-checkout') {
+    applyAuthCorsHeaders(req, res, 'GET, POST, OPTIONS');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  // Dedicated route: Server-Side Auto Check-Out Only (Hanya Pulang)
+  if (reqType === 'auto-checkout') {
+    const gate = await authorizeAutoCheckoutRequest(req);
+    if (!gate.ok) {
+      return res.status(gate.status).json({ ok: false, errorMessage: gate.message });
+    }
+
+    try {
+      const targetDateParam = gate.via.startsWith('admin_session:')
+        ? (req.query?.date || req.body?.date || undefined)
+        : undefined;
+      const result = await runAutoCheckout(serverSupabase, {
+        targetDateStr: typeof targetDateParam === 'string' ? targetDateParam : undefined,
+      });
+      return res.status(200).json({
+        ...result,
+        type: 'auto-checkout',
+        triggeredBy: gate.via,
+      });
+    } catch (err: any) {
+      console.error('[CronAutoCheckout] Error:', err);
+      return res.status(500).json({
+        ok: false,
+        type: 'auto-checkout',
+        errorMessage: err?.message || 'Gagal menjalankan auto check-out server.',
+      });
+    }
   }
 
   if (!isVapidReady) {
@@ -57,7 +122,7 @@ export default async function handler(req: any, res: any) {
   // Calculate Jakarta Time (WIB, UTC+7)
   const now = new Date();
   const jakartaTimeStr = now.toLocaleTimeString('en-US', { timeZone: 'Asia/Jakarta', hour12: false });
-  const [curH, curM] = jakartaTimeStr.split(':').map((n) => parseInt(n, 10));
+  const [curH] = jakartaTimeStr.split(':').map((n) => parseInt(n, 10));
   
   // Format Date in Jakarta
   const jakartaDateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' });
@@ -69,8 +134,6 @@ export default async function handler(req: any, res: any) {
   const dayName = jakartaDayFormatter.format(now);
   const isWeekend = dayName === 'Sat' || dayName === 'Sun';
 
-  const reqType = (req.query && req.query.type) || (req.body && req.body.type) || 'auto';
-
   // Dynamic system settings from Supabase
   let reminderCheckinTime = '06:30';
   let reminderCheckoutTime = '13:00';
@@ -79,7 +142,7 @@ export default async function handler(req: any, res: any) {
   let reminderCheckoutEnabled = true;
 
   try {
-    const { data: dbSettings } = await supabase.from('system_settings').select('key, value');
+    const { data: dbSettings } = await serverSupabase.from('system_settings').select('key, value');
     if (dbSettings && Array.isArray(dbSettings)) {
       const map: Record<string, string> = {};
       dbSettings.forEach((item) => {
@@ -172,7 +235,7 @@ export default async function handler(req: any, res: any) {
 
   // 4. 📢 AGENDA SEKOLAH HARI INI
   try {
-    const { data: events } = await supabase
+    const { data: events } = await serverSupabase
       .from('school_events')
       .select('id, title, description')
       .eq('event_date', todayDateStr);
@@ -201,7 +264,7 @@ export default async function handler(req: any, res: any) {
   }
 
   // Fetch all active push subscriptions
-  const { data: subscriptions, error: subErr } = await supabase
+  const { data: subscriptions, error: subErr } = await serverSupabase
     .from('push_subscriptions')
     .select('endpoint, p256dh, auth');
 
@@ -253,7 +316,7 @@ export default async function handler(req: any, res: any) {
 
   // Clean stale endpoints
   if (staleEndpoints.length > 0) {
-    await supabase.from('push_subscriptions').delete().in('endpoint', staleEndpoints);
+    await serverSupabase.from('push_subscriptions').delete().in('endpoint', staleEndpoints);
   }
 
   return res.status(200).json({

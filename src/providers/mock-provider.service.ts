@@ -101,6 +101,8 @@ import {
   timeToMinutes,
   generatePaydayEventsForYear,
   generateRandomLateCheckInTime,
+  isAutoCheckInRecord,
+  isAutoCheckOutRecord,
 } from '../utils/time.utils';
 import { normalizeClassCode } from '../utils/class.utils';
 import {
@@ -425,6 +427,9 @@ export class MockProvider implements IDataProvider {
       } catch {}
     }
 
+    const existingIsAutoCheckIn = isAutoCheckInRecord(existingRecord);
+    const existingIsAutoCheckOut = isAutoCheckOutRecord(existingRecord);
+
     // Strict Jakarta Time Window & Double Attendance Validation (Anti Absen Ganda)
     const effectiveCheckInTime = existingRecord?.check_in_time || (shouldReconcileAsCheckout ? (pendingCorrection?.targetIn || '07:00:00') : null);
     const isTestBioBypass = Boolean(dto.user_id && dto.user_id.includes('bio_suite') && !dto.timestamp);
@@ -437,6 +442,8 @@ export class MockProvider implements IDataProvider {
       fridayCheckoutStart: settings.friday_checkout_start,
       isFriday: dayOfWeek === 5,
       bypassTimeWindow: dto.bypass_time_window || isTestBioBypass,
+      isAutoCheckIn: existingIsAutoCheckIn,
+      isAutoCheckOut: existingIsAutoCheckOut,
     });
 
     if (!timeValidation.isValid) {
@@ -453,17 +460,30 @@ export class MockProvider implements IDataProvider {
       throw new Error(timeValidation.errorMessage);
     }
 
-    if (existingRecord) {
-      if (existingRecord.check_in_time && existingRecord.check_out_time) {
+    if (existingRecord && !timeValidation.isOverrideAutoCheckIn) {
+      if (existingRecord.check_in_time && existingRecord.check_out_time && !timeValidation.isOverrideAutoCheckOut) {
         record = existingRecord;
         action = 'ALREADY_COMPLETED';
       } else if (existingRecord.check_in_time) {
-        // Check-out / Update Check-out (Absen Pulang)
+        // Check-out / Update Check-out (Absen Pulang) — pertahankan sumber check-in fisik bila bukan auto
+        const resolvedVMethod = existingIsAutoCheckIn ? vMethod : (existingRecord.verification_method || vMethod);
+        const resolvedASource = existingIsAutoCheckIn ? aSource : (existingRecord.attendance_source || aSource);
+        const cleanedPrevNotes = String(existingRecord.notes || '')
+          .replace(/\s*•?\s*Auto Pulang \([^)]*\)/gi, '')
+          .replace(/Presensi pulang otomatis sistem \([^)]*\)/gi, '')
+          .trim();
+
         record = {
           ...existingRecord,
           check_out_time: timeStr,
-          verification_method: vMethod,
-          attendance_source: aSource,
+          verification_method: resolvedVMethod,
+          attendance_source: resolvedASource,
+          is_auto_attendance: existingIsAutoCheckIn ? false : existingRecord.is_auto_attendance,
+          notes: timeValidation.isOverrideAutoCheckOut
+            ? (cleanedPrevNotes
+                ? `${cleanedPrevNotes} • Scan Pulang Aktual (${timeStr})`
+                : `Scan Pulang Aktual (${timeStr}, menggantikan Auto Pulang)`)
+            : existingRecord.notes,
         };
         action = 'CHECK_OUT';
       } else if (shouldReconcileAsCheckout) {
@@ -494,6 +514,7 @@ export class MockProvider implements IDataProvider {
           verification_method: vMethod,
           attendance_source: aSource,
           is_offline: false,
+          is_auto_attendance: false,
           created_at: new Date().toISOString(),
         };
         action = 'CHECK_IN';
@@ -501,7 +522,7 @@ export class MockProvider implements IDataProvider {
     } else if (shouldReconcileAsCheckout) {
       // SDC-AIR Reconciliation without prior storage record
       record = {
-        id: 'att_' + Date.now(),
+        id: existingRecord?.id || ('att_' + Date.now()),
         user_id: userId,
         date: dateStr,
         check_in_time: pendingCorrection?.targetIn || '07:00:00',
@@ -513,7 +534,8 @@ export class MockProvider implements IDataProvider {
         verification_method: vMethod,
         attendance_source: aSource,
         is_offline: false,
-        created_at: new Date().toISOString(),
+        is_auto_attendance: false,
+        created_at: existingRecord?.created_at || new Date().toISOString(),
         notes: pendingCorrection
           ? `Koreksi Masuk Diajukan (${pendingCorrection.reason}) + Scan Pulang Aktual (${timeStr})`
           : `Scan Pulang Aktual (${timeStr}) dengan Koreksi Masuk Default`,
@@ -521,7 +543,7 @@ export class MockProvider implements IDataProvider {
       action = 'CHECK_OUT';
     } else {
       record = {
-        id: 'att_' + Date.now(),
+        id: existingRecord?.id || ('att_' + Date.now()),
         user_id: userId,
         date: dateStr,
         check_in_time: timeStr,
@@ -533,7 +555,9 @@ export class MockProvider implements IDataProvider {
         verification_method: vMethod,
         attendance_source: aSource,
         is_offline: false,
-        created_at: new Date().toISOString(),
+        is_auto_attendance: false,
+        notes: existingIsAutoCheckIn ? `Presensi mandiri guru (${timeStr} • menggantikan auto absen)` : undefined,
+        created_at: existingRecord?.created_at || new Date().toISOString(),
       };
       action = 'CHECK_IN';
     }
@@ -610,6 +634,7 @@ export class MockProvider implements IDataProvider {
           activity_type: attendanceType,
           title: attendanceTitle,
           description: attendanceDesc,
+          replace_auto_zero_checkin: Boolean(timeValidation.isOverrideAutoCheckIn),
         });
 
         // 🌅 Bonus Teladan Fajar (Early Bird ≤ 07:00 WIB)
@@ -892,6 +917,16 @@ export class MockProvider implements IDataProvider {
       defaultNotes = 'Presensi otomatis sistem (Masuk Terlambat 0 Poin & Pulang Tuntas)';
     }
 
+    const existingCheckInIsReal = Boolean(existing?.check_in_time && !isAutoCheckInRecord(existing));
+    const resolvedVerificationMethod: VerificationMethod =
+      mode === 'CHECK_OUT' && existingCheckInIsReal
+        ? (existing!.verification_method || 'QR_GPS')
+        : 'SYSTEM_AUTO';
+    const resolvedAttendanceSource: AttendanceSource =
+      mode === 'CHECK_OUT' && existingCheckInIsReal
+        ? (existing!.attendance_source || 'QR')
+        : 'SYSTEM_AUTO';
+
     const autoRecord: AttendanceRecord = {
       id: existing?.id || `att_${dto.user_id}_${dto.date}`,
       user_id: dto.user_id,
@@ -899,13 +934,13 @@ export class MockProvider implements IDataProvider {
       status: finalStatus,
       check_in_time: finalCheckInTime,
       check_out_time: finalCheckOutTime,
-      check_in_lat: settings?.geofence_lat || -6.613144,
-      check_in_lng: settings?.geofence_lng || 106.684975,
-      check_in_distance_meters: 0,
-      verification_method: 'SYSTEM_AUTO',
-      attendance_source: 'SYSTEM_AUTO',
+      check_in_lat: existingCheckInIsReal ? (existing!.check_in_lat ?? (settings?.geofence_lat || -6.613144)) : (settings?.geofence_lat || -6.613144),
+      check_in_lng: existingCheckInIsReal ? (existing!.check_in_lng ?? (settings?.geofence_lng || 106.684975)) : (settings?.geofence_lng || 106.684975),
+      check_in_distance_meters: existingCheckInIsReal ? (existing!.check_in_distance_meters ?? 0) : 0,
+      verification_method: resolvedVerificationMethod,
+      attendance_source: resolvedAttendanceSource,
       is_offline: false,
-      is_auto_attendance: true,
+      is_auto_attendance: !(mode === 'CHECK_OUT' && existingCheckInIsReal),
       notes: dto.notes || defaultNotes,
       points_awarded: (mode === 'CHECK_IN' || mode === 'BOTH') ? 0 : (existing?.points_awarded || 0),
       created_at: existing?.created_at || new Date().toISOString(),
@@ -1284,13 +1319,25 @@ export class MockProvider implements IDataProvider {
       while (curr <= endDate) {
         const dateStr = curr.toISOString().substring(0, 10);
         const existingIdx = allRecords.findIndex((r) => r.user_id === targetLeave.user_id && r.date === dateStr);
+        const existingRec = existingIdx !== -1 ? allRecords[existingIdx] : null;
+
+        let resolvedCheckIn = checkInTime;
+        let resolvedCheckOut = checkOutTime;
+        if (targetLeave.leave_type === 'KOREKSI_ABSEN' && existingRec) {
+          if (!resolvedCheckIn && existingRec.check_in_time && !isAutoCheckInRecord(existingRec)) {
+            resolvedCheckIn = existingRec.check_in_time;
+          }
+          if (!resolvedCheckOut && existingRec.check_out_time && !isAutoCheckOutRecord(existingRec)) {
+            resolvedCheckOut = existingRec.check_out_time;
+          }
+        }
 
         const newRec: AttendanceRecord = {
-          id: existingIdx !== -1 ? allRecords[existingIdx].id : 'att_leave_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+          id: existingRec ? existingRec.id : 'att_leave_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
           user_id: targetLeave.user_id,
           date: dateStr,
-          check_in_time: checkInTime,
-          check_out_time: checkOutTime,
+          check_in_time: resolvedCheckIn,
+          check_out_time: resolvedCheckOut,
           status: leaveStatus,
           check_in_lat: null,
           check_in_lng: null,
@@ -1298,14 +1345,46 @@ export class MockProvider implements IDataProvider {
           verification_method: 'MANUAL_OPERATOR',
           attendance_source: 'MANUAL',
           is_offline: false,
+          is_auto_attendance: false,
           notes: targetLeave.leave_type === 'KOREKSI_ABSEN' ? `Koreksi Disetujui: ${notes || targetLeave.reason}` : `Izin Disetujui Kepsek: ${notes || targetLeave.reason}`,
-          created_at: new Date().toISOString(),
+          created_at: existingRec?.created_at || new Date().toISOString(),
         };
 
         if (existingIdx !== -1) {
           allRecords[existingIdx] = newRec;
         } else {
           allRecords.push(newRec);
+        }
+
+        // Bersihkan log poin otomatis (0 Poin / Auto Pulang) jika digantikan izin/sakit/cuti
+        if (targetLeave.leave_type !== 'KOREKSI_ABSEN' || leaveStatus !== 'HADIR') {
+          try {
+            const ptRaw = safeGetStorage('smart_absensi_teacher_point_history');
+            if (ptRaw) {
+              const ptList: TeacherPointLog[] = JSON.parse(ptRaw);
+              if (Array.isArray(ptList)) {
+                const updatedPts = ptList.map((pt) => {
+                  if (
+                    pt.user_id === targetLeave.user_id &&
+                    pt.date === dateStr &&
+                    pt.status !== 'VOIDED' &&
+                    (pt.title?.includes('Otomatis Sistem') ||
+                      pt.description?.includes('otomatis') ||
+                      pt.description?.includes('Auto Pulang'))
+                  ) {
+                    return {
+                      ...pt,
+                      status: 'VOIDED' as const,
+                      voided_at: new Date().toISOString(),
+                      void_reason: `Digantikan oleh pengajuan ${targetLeave.leave_type} yang disetujui`,
+                    };
+                  }
+                  return pt;
+                });
+                safeSetStorage('smart_absensi_teacher_point_history', JSON.stringify(updatedPts));
+              }
+            }
+          } catch {}
         }
 
         NotificationService.dismissMissingAttendanceNotification(targetLeave.user_id, dateStr);
@@ -3238,7 +3317,23 @@ export class MockProvider implements IDataProvider {
     _token?: string
   ): Promise<TeacherPointLog> {
     const KEY = 'smart_absensi_teacher_point_history';
-    const allLogs = await this.getTeacherPointHistory('ALL');
+    let allLogs = await this.getTeacherPointHistory('ALL');
+
+    if (
+      log.replace_auto_zero_checkin &&
+      (log.activity_type === 'CHECK_IN_ON_TIME' || log.activity_type === 'CHECK_IN_LATE')
+    ) {
+      allLogs = allLogs.filter(
+        (l) =>
+          !(
+            l.user_id === log.user_id &&
+            l.date === log.date &&
+            l.activity_type === 'CHECK_IN_LATE' &&
+            Number(l.points) === 0 &&
+            (l.title?.includes('Otomatis Sistem') || l.description?.includes('0 Poin'))
+          )
+      );
+    }
 
     const cleanIdempotencyKey = log.idempotency_key || `${log.user_id}:${log.date}:${log.activity_type}`;
     // Idempotency check: prevent duplicate point for the exact same user, date, and activity_type

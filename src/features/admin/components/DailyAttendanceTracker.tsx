@@ -1490,7 +1490,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                   )}
                 </div>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Mencatat presensi masuk otomatis berstatus <strong>Terlambat</strong> dengan <strong>0 Poin</strong> (jam pulang dibiarkan kosong/tidak diubah).
+                  Mencatat presensi masuk manual Admin berstatus <strong>Terlambat</strong> dengan <strong>0 Poin</strong> (guru tetap dapat mengganti dengan scan QR/Sidik Jari atau mengajukan izin).
                 </p>
                 <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-amber-900 bg-amber-100/60 px-2 py-0.5 rounded-lg w-fit">
                   <span>Jam Masuk: Acak 07:31 - 08:00 WIB</span>
@@ -1521,7 +1521,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                   )}
                 </div>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Mencatat presensi kepulangan dinas sekolah secara tuntas (jam masuk yang telah ada tidak diubah).
+                  Mencatat presensi kepulangan dinas sekolah secara tuntas (otomatis setiap hari kerja pukul 16:30 WIB oleh sistem server bagi guru yang sudah masuk, atau eksekusi manual di sini).
                 </p>
                 <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-blue-900 bg-blue-100/60 px-2 py-0.5 rounded-lg w-fit">
                   <span>Jam Pulang: {officialCheckoutDisplay} WIB</span>

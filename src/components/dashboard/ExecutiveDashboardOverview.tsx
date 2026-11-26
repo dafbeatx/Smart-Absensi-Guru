@@ -6,7 +6,7 @@ import { EarlyWarningSystemWidget } from './EarlyWarningSystemWidget';
 import { ExecutiveSurveySummaryWidget } from './ExecutiveSurveySummaryWidget';
 import { DailySurveyReminderBanner } from '../survey/DailySurveyReminderBanner';
 import { BurnoutEarlyWarningWidget } from '../../features/kepsek/components/BurnoutEarlyWarningWidget';
-import { evaluateAttendanceStatus, getTodayDateInJakarta, isDateOffDay } from '../../utils/time.utils';
+import { evaluateAttendanceStatus, getTodayDateInJakarta, isDateOffDay, isAutoAttendanceRecord } from '../../utils/time.utils';
 import {
   isTeacherLeaveMatch,
   isTeacherRecordMatch,
@@ -161,9 +161,8 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
     const activeEligible = (teachers || []).filter((t) => t.is_active !== false);
 
     for (const teacher of activeEligible) {
-      // If teacher already has an explicit attendance record for today, skip
-      const hasRecord = attendanceRecords.some((r) => r.date === todayStr && isTeacherRecordMatch(teacher, r));
-      if (hasRecord) continue;
+      // Check if teacher has explicit attendance record for today
+      const existingRec = attendanceRecords.find((r) => r.date === todayStr && isTeacherRecordMatch(teacher, r));
 
       const approvedLeave = leavesToEvaluate.find((leave) => {
         if (!isLeaveApprovedStatus(leave)) return false;
@@ -173,7 +172,11 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
         return startStr <= todayStr && todayStr <= endStr;
       });
 
-      if (approvedLeave && !todayUserMap.has(teacher.id)) {
+      const canOverrideRecord = !existingRec || isAutoAttendanceRecord(existingRec) || (approvedLeave && approvedLeave.leave_type !== 'KOREKSI_ABSEN');
+      if (approvedLeave && canOverrideRecord) {
+        if (existingRec && existingRec.user_id !== teacher.id) {
+          todayUserMap.delete(existingRec.user_id);
+        }
         let leaveStatus: AttendanceStatus = 'IZIN';
         if (approvedLeave.leave_type === 'SAKIT') {
           leaveStatus = 'SAKIT';

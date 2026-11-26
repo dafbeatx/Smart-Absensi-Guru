@@ -85,6 +85,8 @@ import {
   getJakartaDayOfWeek,
   validateAttendanceTimeWindow,
   generateRandomLateCheckInTime,
+  isAutoCheckInRecord,
+  isAutoCheckOutRecord,
 } from '../utils/time.utils';
 import { NotificationService } from '../services/notification-permission.service';
 import { hashPin } from '../utils/hash.utils';
@@ -871,15 +873,28 @@ export class SupabaseProvider implements IDataProvider {
     if (sessionUser?.phone_number && !userSearchIds.includes(sessionUser.phone_number)) userSearchIds.push(sessionUser.phone_number);
     if (sessionUser?.nip && !userSearchIds.includes(sessionUser.nip)) userSearchIds.push(sessionUser.nip);
 
-    const { data: existingRecords } = await this.client
+    const existingQuery = await this.client
       .from('attendance')
-      .select('id, user_id, date, status, check_in_time, check_out_time, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, created_at')
+      .select('id, user_id, date, status, check_in_time, check_out_time, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, notes, created_at')
       .eq('date', todayStr)
       .in('user_id', userSearchIds)
       .order('created_at', { ascending: false })
       .limit(1);
 
-    const existing = existingRecords?.[0] || null;
+    let existing: any = existingQuery.data?.[0] || null;
+    if (existingQuery.error && existingQuery.error.message?.includes('notes')) {
+      const fallbackQuery = await this.client
+        .from('attendance')
+        .select('id, user_id, date, status, check_in_time, check_out_time, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, created_at')
+        .eq('date', todayStr)
+        .in('user_id', userSearchIds)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      existing = fallbackQuery.data?.[0] || null;
+    }
+
+    const existingIsAutoCheckIn = isAutoCheckInRecord(existing);
+    const existingIsAutoCheckOut = isAutoCheckOutRecord(existing);
 
     // Strict Jakarta Time Window & Double Attendance Validation (Anti Absen Ganda)
     const timeValidation = validateAttendanceTimeWindow({
@@ -891,6 +906,8 @@ export class SupabaseProvider implements IDataProvider {
       fridayCheckoutStart: settings.friday_checkout_start,
       isFriday: dayOfWeek === 5,
       bypassTimeWindow: dto.bypass_time_window,
+      isAutoCheckIn: existingIsAutoCheckIn,
+      isAutoCheckOut: existingIsAutoCheckOut,
     });
 
     if (!timeValidation.isValid && !isOfflineSync) {
@@ -909,10 +926,10 @@ export class SupabaseProvider implements IDataProvider {
       throw new Error(timeValidation.errorMessage);
     }
 
-    if (existing) {
+    if (existing && !timeValidation.isOverrideAutoCheckIn) {
       if (existing.check_in_time) {
-        // If check-out is already recorded, return ALREADY_COMPLETED
-        if (existing.check_out_time) {
+        // If check-out is already recorded physically (not Auto Pulang), return ALREADY_COMPLETED
+        if (existing.check_out_time && !timeValidation.isOverrideAutoCheckOut) {
           logger.info('SupabaseProvider', 'Attendance already completed for today', { userId, date: todayStr });
           return {
             attendance_id: existing.id,
@@ -942,21 +959,40 @@ export class SupabaseProvider implements IDataProvider {
         const vMethod: VerificationMethod = dto.verification_method || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC_GPS' : 'QR_GPS');
         const aSource: AttendanceSource = dto.attendance_source || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC' : 'QR');
 
-        // Record or Update Check-out (Absen Pulang ke jam scan WIB pertama)
+        // Pertahankan sumber check-in fisik bila check-in sebelumnya QR/Biometric/Manual
+        const resolvedCheckoutVMethod: VerificationMethod = existingIsAutoCheckIn
+          ? vMethod
+          : ((existing.verification_method as VerificationMethod) || vMethod);
+        const resolvedCheckoutASource: AttendanceSource = existingIsAutoCheckIn
+          ? aSource
+          : ((existing.attendance_source as AttendanceSource) || aSource);
+
+        const cleanedPrevNotes = String(existing.notes || '')
+          .replace(/\s*•?\s*Auto Pulang \([^)]*\)/gi, '')
+          .replace(/Presensi pulang otomatis sistem \([^)]*\)/gi, '')
+          .trim();
+
         const updatePayload: Record<string, unknown> = {
           check_out_time: dbTime,
-          verification_method: vMethod,
-          attendance_source: aSource,
+          verification_method: resolvedCheckoutVMethod,
+          attendance_source: resolvedCheckoutASource,
         };
+
+        if (timeValidation.isOverrideAutoCheckOut) {
+          updatePayload.notes = cleanedPrevNotes
+            ? `${cleanedPrevNotes} • Scan Pulang Aktual (${displayTime} WIB)`
+            : `Scan Pulang Aktual (${displayTime} WIB, menggantikan Auto Pulang)`;
+        }
 
         let { error: updateErr } = await this.client
           .from('attendance')
           .update(updatePayload)
           .eq('id', existing.id);
 
-        if (updateErr && (updateErr.message.includes('column') || updateErr.message.includes('verification_method'))) {
+        if (updateErr && (updateErr.message.includes('column') || updateErr.message.includes('verification_method') || updateErr.message.includes('notes'))) {
           delete updatePayload.verification_method;
           delete updatePayload.attendance_source;
+          delete updatePayload.notes;
           const retryRes = await this.client
             .from('attendance')
             .update(updatePayload)
@@ -1154,13 +1190,14 @@ export class SupabaseProvider implements IDataProvider {
     const vMethod: VerificationMethod = dto.verification_method || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC_GPS' : 'QR_GPS');
     const aSource: AttendanceSource = dto.attendance_source || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC' : 'QR');
 
-    // Insert new check-in record using deterministic primary key 'id'
+    // Insert or replace new check-in record using deterministic primary key 'id'
     const targetRecordId = existing?.id || attId;
     const insertPayload: Record<string, unknown> = {
       id: targetRecordId,
       user_id: userId,
       date: todayStr,
       check_in_time: dbTime,
+      check_out_time: timeValidation.isOverrideAutoCheckIn ? null : (existing?.check_out_time || null),
       status: status,
       distance_meters: distanceMeters,
       device_uuid: dto.device_uuid,
@@ -1170,14 +1207,19 @@ export class SupabaseProvider implements IDataProvider {
       attendance_source: aSource,
     };
 
+    if (timeValidation.isOverrideAutoCheckIn) {
+      insertPayload.notes = `Presensi mandiri guru (${displayTime} WIB • menggantikan auto absen)`;
+    }
+
     let { error } = await this.client.from('attendance').upsert(
       insertPayload,
       { onConflict: 'id' }
     );
 
-    if (error && (error.message.includes('column') || error.message.includes('verification_method') || error.message.includes('attendance_source'))) {
+    if (error && (error.message.includes('column') || error.message.includes('verification_method') || error.message.includes('attendance_source') || error.message.includes('notes'))) {
       delete insertPayload.verification_method;
       delete insertPayload.attendance_source;
+      delete insertPayload.notes;
       const retryRes = await this.client.from('attendance').upsert(insertPayload, { onConflict: 'id' });
       error = retryRes.error;
     }
@@ -1251,6 +1293,7 @@ export class SupabaseProvider implements IDataProvider {
           activity_type: attendanceType,
           title: attendanceTitle,
           description: attendanceDesc,
+          replace_auto_zero_checkin: Boolean(timeValidation.isOverrideAutoCheckIn),
         });
 
         // 🌅 Bonus Teladan Fajar (Early Bird ≤ 07:00 WIB)
@@ -1342,15 +1385,26 @@ export class SupabaseProvider implements IDataProvider {
       if (sessionUser?.phone_number && !searchIds.includes(sessionUser.phone_number)) searchIds.push(sessionUser.phone_number);
       if (sessionUser?.nip && !searchIds.includes(sessionUser.nip)) searchIds.push(sessionUser.nip);
 
-      const { data: records } = await this.client
+      const todayAttRes = await this.client
         .from('attendance')
-        .select('id, user_id, date, check_in_time, check_out_time, status, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, created_at')
+        .select('id, user_id, date, check_in_time, check_out_time, status, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, notes, created_at')
         .eq('date', todayStr)
         .in('user_id', searchIds)
         .order('created_at', { ascending: false })
         .limit(1);
 
-      const data = records?.[0] || null;
+      let data: any = todayAttRes.data?.[0] || null;
+      if (todayAttRes.error && todayAttRes.error.message?.includes('notes')) {
+        const fallbackTodayRes = await this.client
+          .from('attendance')
+          .select('id, user_id, date, check_in_time, check_out_time, status, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, created_at')
+          .eq('date', todayStr)
+          .in('user_id', searchIds)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        data = fallbackTodayRes.data?.[0] || null;
+      }
+
       if (!data) {
         this.cachedTodayAttendance.set(cacheKey, { data: null, timestamp: Date.now() });
         return null;
@@ -1369,6 +1423,7 @@ export class SupabaseProvider implements IDataProvider {
         verification_method: (data.verification_method as VerificationMethod) || 'QR_GPS',
         attendance_source: (data.attendance_source as AttendanceSource) || 'QR',
         is_offline: false,
+        notes: (data as any).notes || undefined,
         created_at: data.created_at,
       };
 
@@ -1457,16 +1512,20 @@ export class SupabaseProvider implements IDataProvider {
       check_out_time: dto.check_out_time ? (dto.check_out_time.length === 5 ? `${dto.check_out_time}:00` : dto.check_out_time) : null,
     };
 
+    const fullPayload: Record<string, unknown> = {
+      ...basePayload,
+      verification_method: 'MANUAL_OPERATOR',
+      attendance_source: 'MANUAL',
+      notes: dto.notes || dto.reason,
+    };
+
     let { error } = await this.client.from('attendance').upsert(
-      {
-        ...basePayload,
-        notes: dto.notes || dto.reason,
-      },
+      fullPayload,
       { onConflict: 'id' }
     );
 
-    if (error && (error.message.includes("'notes'") || error.message.includes('"notes"'))) {
-      // Fallback: retry upsert without the optional 'notes' column if it does not exist in schema
+    if (error && (error.message.includes("'notes'") || error.message.includes('"notes"') || error.message.includes('verification_method') || error.message.includes('attendance_source'))) {
+      // Fallback: retry upsert without optional metadata columns if schema lacks them
       const retryRes = await this.client.from('attendance').upsert(
         basePayload,
         { onConflict: 'id' }
@@ -1540,6 +1599,16 @@ export class SupabaseProvider implements IDataProvider {
       defaultNotes = 'Presensi otomatis sistem (Masuk Terlambat 0 Poin & Pulang Tuntas)';
     }
 
+    const existingCheckInIsReal = Boolean(existing?.check_in_time && !isAutoCheckInRecord(existing));
+    const resolvedVerificationMethod: VerificationMethod =
+      mode === 'CHECK_OUT' && existingCheckInIsReal
+        ? ((existing.verification_method as VerificationMethod) || 'QR_GPS')
+        : 'SYSTEM_AUTO';
+    const resolvedAttendanceSource: AttendanceSource =
+      mode === 'CHECK_OUT' && existingCheckInIsReal
+        ? ((existing.attendance_source as AttendanceSource) || 'QR')
+        : 'SYSTEM_AUTO';
+
     const autoRecordId = existing?.id || `att_${dto.user_id}_${dto.date}`;
     const payload = {
       id: autoRecordId,
@@ -1548,11 +1617,11 @@ export class SupabaseProvider implements IDataProvider {
       status: finalStatus,
       check_in_time: finalCheckInTime,
       check_out_time: finalCheckOutTime,
-      check_in_lat: settings?.geofence_lat || -6.613144,
-      check_in_lng: settings?.geofence_lng || 106.684975,
-      check_in_distance_meters: 0,
-      verification_method: 'SYSTEM_AUTO' as VerificationMethod,
-      attendance_source: 'SYSTEM_AUTO' as AttendanceSource,
+      check_in_lat: existingCheckInIsReal ? (existing.check_in_lat ?? (settings?.geofence_lat || -6.613144)) : (settings?.geofence_lat || -6.613144),
+      check_in_lng: existingCheckInIsReal ? (existing.check_in_lng ?? (settings?.geofence_lng || 106.684975)) : (settings?.geofence_lng || 106.684975),
+      check_in_distance_meters: existingCheckInIsReal ? (existing.distance_meters ?? 0) : 0,
+      verification_method: resolvedVerificationMethod,
+      attendance_source: resolvedAttendanceSource,
       is_offline: false,
       notes: dto.notes || defaultNotes,
     };
@@ -1639,7 +1708,7 @@ export class SupabaseProvider implements IDataProvider {
 
     return {
       ...payload,
-      is_auto_attendance: true,
+      is_auto_attendance: !(mode === 'CHECK_OUT' && existingCheckInIsReal),
       points_awarded: (mode === 'CHECK_IN' || mode === 'BOTH') ? 0 : 10,
       created_at: existing?.created_at || new Date().toISOString(),
     } as AttendanceRecord;
@@ -2075,13 +2144,34 @@ export class SupabaseProvider implements IDataProvider {
 
             while (currDate <= endDateObj) {
               const dateStr = currDate.toISOString().substring(0, 10);
-              const attendancePayload = {
-                id: `att_${leaveRow.user_id}_${dateStr}`,
+
+              const { data: existingRow } = await this.client
+                .from('attendance')
+                .select('id, check_in_time, check_out_time, status, verification_method, attendance_source, notes')
+                .eq('user_id', leaveRow.user_id)
+                .eq('date', dateStr)
+                .maybeSingle();
+
+              let resolvedCheckIn = checkInTime;
+              let resolvedCheckOut = checkOutTime;
+              if (lType === 'KOREKSI_ABSEN' && existingRow) {
+                if (!resolvedCheckIn && existingRow.check_in_time && !isAutoCheckInRecord(existingRow)) {
+                  resolvedCheckIn = existingRow.check_in_time;
+                }
+                if (!resolvedCheckOut && existingRow.check_out_time && !isAutoCheckOutRecord(existingRow)) {
+                  resolvedCheckOut = existingRow.check_out_time;
+                }
+              }
+
+              const attendancePayload: Record<string, unknown> = {
+                id: existingRow?.id || `att_${leaveRow.user_id}_${dateStr}`,
                 user_id: leaveRow.user_id,
                 date: dateStr,
                 status: status,
-                check_in_time: checkInTime,
-                check_out_time: checkOutTime,
+                check_in_time: resolvedCheckIn,
+                check_out_time: resolvedCheckOut,
+                verification_method: 'MANUAL_OPERATOR',
+                attendance_source: 'MANUAL',
                 notes:
                   lType === 'KOREKSI_ABSEN'
                     ? `Koreksi Disetujui: ${notes || leaveRow.reason}`
@@ -2089,28 +2179,55 @@ export class SupabaseProvider implements IDataProvider {
               };
 
               // Try upsert first using deterministic id (Primary Key)
-              const { error: upsertErr } = await this.client
+              let { error: upsertErr } = await this.client
                 .from('attendance')
                 .upsert(attendancePayload, { onConflict: 'id' });
+
+              if (upsertErr && (upsertErr.message.includes('verification_method') || upsertErr.message.includes('attendance_source') || upsertErr.message.includes('notes'))) {
+                delete attendancePayload.verification_method;
+                delete attendancePayload.attendance_source;
+                delete attendancePayload.notes;
+                const retryUpsert = await this.client
+                  .from('attendance')
+                  .upsert(attendancePayload, { onConflict: 'id' });
+                upsertErr = retryUpsert.error;
+              }
 
               NotificationService.dismissMissingAttendanceNotification(leaveRow.user_id, dateStr);
 
               if (upsertErr) {
-                // Fallback: Check if record exists, then update or insert
-                const { data: existing } = await this.client
-                  .from('attendance')
-                  .select('id')
-                  .eq('user_id', leaveRow.user_id)
-                  .eq('date', dateStr)
-                  .maybeSingle();
-
-                if (existing) {
+                if (existingRow) {
                   await this.client
                     .from('attendance')
                     .update(attendancePayload)
-                    .eq('id', existing.id);
+                    .eq('id', existingRow.id);
                 } else {
                   await this.client.from('attendance').insert(attendancePayload);
+                }
+              }
+
+              // Void stale SYSTEM_AUTO / Auto Pulang points if teacher is excused for this date
+              if (lType !== 'KOREKSI_ABSEN' || status !== 'HADIR') {
+                try {
+                  const ptLogs = await this.getTeacherPointHistory(leaveRow.user_id, _token);
+                  for (const pt of ptLogs) {
+                    if (
+                      pt.date === dateStr &&
+                      pt.status !== 'VOIDED' &&
+                      (pt.title?.includes('Otomatis Sistem') ||
+                        pt.description?.includes('otomatis') ||
+                        pt.description?.includes('Auto Pulang'))
+                    ) {
+                      await this.voidTeacherPointLog(
+                        pt.id,
+                        `Digantikan oleh pengajuan ${lType} yang disetujui`,
+                        undefined,
+                        _token
+                      ).catch(() => {});
+                    }
+                  }
+                } catch {
+                  // Non-blocking best-effort cleanup
                 }
               }
 
@@ -6475,6 +6592,7 @@ export class SupabaseProvider implements IDataProvider {
       idempotency_key: idempotencyKey,
       source: log.source || 'SYSTEM',
       occurred_at: log.occurred_at || log.date,
+      replace_auto_zero_checkin: Boolean(log.replace_auto_zero_checkin),
     };
 
     try {

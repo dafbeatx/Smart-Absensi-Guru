@@ -74,6 +74,10 @@
     {
       "path": "/api/cron-attendance-alerts?type=checkout",
       "schedule": "0 4 * * 5"
+    },
+    {
+      "path": "/api/cron-attendance-alerts?type=auto-checkout",
+      "schedule": "30 9 * * 1-5"
     }
   ]
 }

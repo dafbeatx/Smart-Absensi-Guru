@@ -9,6 +9,11 @@ import { ProviderFactory } from '../../providers/provider-factory';
 import { AttendancePolicyService } from '../attendance-policy.service';
 import { TeacherPointReconciliationService } from '../teacher-point-reconciliation.service';
 import { calculateTeacherAppreciationScore } from '../../utils/teacher-appreciation.utils';
+import { validateAttendanceTimeWindow, getTodayDateInJakarta } from '../../utils/time.utils';
+import { useAuthStore } from '../../store/useAuthStore';
+import { setServerSupabaseClient, resetServerSupabaseClient } from '../../../api/_shared/session-auth';
+import { runAutoCheckout } from '../../../api/_shared/auto-checkout';
+import cronHandler from '../../../api/cron-attendance-alerts';
 import type { AttendanceRecord, HolidayRecord, LeaveRequest, UserProfile } from '../../types/database.types';
 
 export const runAutoAttendanceRuleTestSuite = async (): Promise<{
@@ -294,6 +299,430 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
     holidayBatchResults.length === 0,
     `Holiday attended count: ${holidayBatchResults.length}`
   );
+
+  // ── Test 10: Checkout Auto Preserves Physical QR Check-in Identity & Real Late Points
+  const prevAuthState = {
+    user: useAuthStore.getState().user,
+    token: useAuthStore.getState().token,
+  };
+  const todayStr = getTodayDateInJakarta();
+
+  try {
+    const qrLateUser: UserProfile = {
+      id: 'usr_auto_qr_late_preserve',
+      nip: '199104042024041004',
+      npp: 'NPP-910404',
+      full_name: 'Hendra Wijaya, S.Pd',
+      phone_number: '081234567894',
+      role: 'GURU',
+      position: 'Guru Fisika',
+      avatar_url: null,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+    };
+    useAuthStore.setState({ user: qrLateUser, token: 'MOCK_GURU_TOKEN' });
+
+    await mockProvider.scanAttendance({
+      token: 'MOCK_GURU_TOKEN',
+      user_id: qrLateUser.id,
+      qr_seed: 'SMART_ABSENSI_OFFICIAL_QR_2026',
+      user_lat: -6.613144,
+      user_lng: 106.684975,
+      device_uuid: 'dev_qr_late',
+      timestamp: `${todayStr}T07:40:00+07:00`,
+    });
+
+    const autoOutOnly = await mockProvider.autoAttendTeacher({
+      user_id: qrLateUser.id,
+      date: todayStr,
+      teacher_name: qrLateUser.full_name,
+      mode: 'CHECK_OUT',
+    });
+
+    const scoreQrLateWithAutoOut = calculateTeacherAppreciationScore([autoOutOnly], [], null, qrLateUser.id);
+    assert(
+      'AutoAttendance 10: autoAttend CHECK_OUT preserves physical QR_GPS check-in source and late appreciation points',
+      autoOutOnly.verification_method === 'QR_GPS' &&
+        autoOutOnly.attendance_source === 'QR' &&
+        autoOutOnly.is_auto_attendance === false &&
+        Boolean(autoOutOnly.check_out_time) &&
+        scoreQrLateWithAutoOut.totalPoints === 15,
+      `Method=${autoOutOnly.verification_method}, Source=${autoOutOnly.attendance_source}, Points=${scoreQrLateWithAutoOut.totalPoints}`
+    );
+
+    // ── Test 11: Guru yang sudah dicatat SYSTEM_AUTO (BOTH) tetap bisa tiba-tiba Absen Masuk mandiri sebelum jam pulang
+    const overrideTeacher: UserProfile = {
+      id: 'usr_auto_override_checkin',
+      nip: '199305052024051005',
+      npp: 'NPP-930505',
+      full_name: 'Rina Kusuma, M.Pd',
+      phone_number: '081234567895',
+      role: 'GURU',
+      position: 'Guru Kimia',
+      avatar_url: null,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+    };
+    useAuthStore.setState({ user: overrideTeacher, token: 'MOCK_GURU_TOKEN' });
+
+    const preAutoBoth = await mockProvider.autoAttendTeacher({
+      user_id: overrideTeacher.id,
+      date: todayStr,
+      teacher_name: overrideTeacher.full_name,
+      mode: 'BOTH',
+    });
+
+    const windowOverrideRes = validateAttendanceTimeWindow({
+      checkInTime: preAutoBoth.check_in_time,
+      checkOutTime: preAutoBoth.check_out_time,
+      timestamp: `${todayStr}T07:15:00+07:00`,
+      isFriday: false,
+      isAutoCheckIn: true,
+      isAutoCheckOut: true,
+    });
+
+    const manualScanRes = await mockProvider.scanAttendance({
+      token: 'MOCK_GURU_TOKEN',
+      user_id: overrideTeacher.id,
+      qr_seed: 'SMART_ABSENSI_OFFICIAL_QR_2026',
+      user_lat: -6.613144,
+      user_lng: 106.684975,
+      device_uuid: 'dev_override_in',
+      timestamp: `${todayStr}T07:15:00+07:00`,
+    });
+
+    const replacedRec = await mockProvider.getTodayAttendance(overrideTeacher.id, 'MOCK_GURU_TOKEN');
+    const overridePoints = await mockProvider.getTeacherPointHistory(overrideTeacher.id);
+    const hasNonZeroCheckInPt = overridePoints.some(
+      (p) =>
+        p.date === todayStr &&
+        (p.activity_type === 'CHECK_IN_ON_TIME' || p.activity_type === 'CHECK_IN_LATE') &&
+        Number(p.points) > 0
+    );
+
+    assert(
+      'AutoAttendance 11: Guru with SYSTEM_AUTO BOTH can still scan physical CHECK_IN, clearing stale auto checkout and replacing 0-point placeholder',
+      windowOverrideRes.isValid === true &&
+        windowOverrideRes.action === 'CHECK_IN' &&
+        windowOverrideRes.isOverrideAutoCheckIn === true &&
+        manualScanRes.attendance_action === 'CHECK_IN' &&
+        replacedRec?.verification_method === 'QR_GPS' &&
+        replacedRec?.check_out_time === null &&
+        replacedRec?.is_auto_attendance === false &&
+        hasNonZeroCheckInPt,
+      `Action=${manualScanRes.attendance_action}, Method=${replacedRec?.verification_method}, Out=${replacedRec?.check_out_time}, HasPts=${hasNonZeroCheckInPt}`
+    );
+
+    // ── Test 12: Guru with Auto Pulang can override checkout with physical scan during checkout window
+    await mockProvider.autoAttendTeacher({
+      user_id: overrideTeacher.id,
+      date: todayStr,
+      teacher_name: overrideTeacher.full_name,
+      mode: 'CHECK_OUT',
+    });
+    const physicalCheckoutOverride = await mockProvider.scanAttendance({
+      token: 'MOCK_GURU_TOKEN',
+      user_id: overrideTeacher.id,
+      qr_seed: 'SMART_ABSENSI_OFFICIAL_QR_2026',
+      user_lat: -6.613144,
+      user_lng: 106.684975,
+      device_uuid: 'dev_override_in',
+      timestamp: `${todayStr}T14:25:00+07:00`,
+      attempt_action: 'CHECK_OUT',
+    });
+    const finalPhysicalRec = await mockProvider.getTodayAttendance(overrideTeacher.id, 'MOCK_GURU_TOKEN');
+    assert(
+      'AutoAttendance 12: Guru with Auto Pulang can replace checkout timestamp via physical scan in checkout window',
+      physicalCheckoutOverride.attendance_action === 'CHECK_OUT' &&
+        Boolean(finalPhysicalRec?.check_out_time) &&
+        !String(finalPhysicalRec?.notes || '').includes('Auto Pulang'),
+      `Action=${physicalCheckoutOverride.attendance_action}, Notes=${finalPhysicalRec?.notes}`
+    );
+
+    // ── Test 13: Guru with SYSTEM_AUTO BOTH submits SAKIT leave -> Kepsek approves -> voids stale auto points & clears SYSTEM_AUTO
+    const leaveOverrideUser: UserProfile = {
+      id: 'usr_auto_leave_override',
+      nip: '199406062024062006',
+      npp: 'NPP-940606',
+      full_name: 'Dewi Anggraini, S.Pd',
+      phone_number: '081234567896',
+      role: 'GURU',
+      position: 'Guru Biologi',
+      avatar_url: null,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+    };
+    useAuthStore.setState({ user: leaveOverrideUser, token: 'MOCK_GURU_TOKEN' });
+
+    await mockProvider.autoAttendTeacher({
+      user_id: leaveOverrideUser.id,
+      date: todayStr,
+      teacher_name: leaveOverrideUser.full_name,
+      mode: 'BOTH',
+    });
+
+    const submittedLeave = await mockProvider.submitLeave({
+      token: 'MOCK_GURU_TOKEN',
+      leave_type: 'SAKIT',
+      start_date: todayStr,
+      end_date: todayStr,
+      reason: 'Demam tinggi mendadak setelah jadwal pagi sehingga harus beristirahat di klinik.',
+      duty_teacher_notes: 'Tugas latihan LKS halaman 24 diserahkan ke kelas.',
+    });
+
+    useAuthStore.setState({
+      user: { ...leaveOverrideUser, id: 'usr_kepsek_test', role: 'KEPSEK', full_name: 'Kepala Sekolah' },
+      token: 'MOCK_KEPSEK_TOKEN',
+    });
+    await mockProvider.approveLeave(submittedLeave.id, 'APPROVED', 'Disetujui, lekas sembuh.', 'MOCK_KEPSEK_TOKEN');
+
+    const postLeaveRec = await mockProvider.getTodayAttendance(leaveOverrideUser.id, 'MOCK_KEPSEK_TOKEN');
+    const postLeavePoints = await mockProvider.getTeacherPointHistory(leaveOverrideUser.id);
+    const activeAutoPoints = postLeavePoints.filter(
+      (p) =>
+        p.date === todayStr &&
+        p.status !== 'VOIDED' &&
+        (p.title?.includes('Otomatis Sistem') || p.description?.includes('otomatis') || p.description?.includes('Auto Pulang'))
+    );
+
+    assert(
+      'AutoAttendance 13: Approved SAKIT/IZIN leave cleanly overrides existing SYSTEM_AUTO attendance and voids stale auto points',
+      postLeaveRec?.status === 'SAKIT' &&
+        postLeaveRec?.verification_method === 'MANUAL_OPERATOR' &&
+        postLeaveRec?.attendance_source === 'MANUAL' &&
+        postLeaveRec?.is_auto_attendance === false &&
+        postLeaveRec?.check_in_time === null &&
+        postLeaveRec?.check_out_time === null &&
+        activeAutoPoints.length === 0,
+      `Status=${postLeaveRec?.status}, Method=${postLeaveRec?.verification_method}, ActiveAutoPts=${activeAutoPoints.length}`
+    );
+
+    // ── Test 14: Server-Side Auto Check-Out Only (Hanya Pulang) & Auth Guard
+    const prevCronSecret = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = 'test_cron_secret_wave_auto_checkout';
+
+    const fakeAttendanceRows: any[] = [
+      {
+        id: 'att_u_checkedin_only_2026-11-26',
+        user_id: 'u_checkedin_only',
+        date: '2026-11-26',
+        status: 'HADIR',
+        check_in_time: '07:05:00',
+        check_out_time: null,
+        verification_method: 'QR_GPS',
+        attendance_source: 'QR',
+        notes: null,
+      },
+      {
+        id: 'att_u_qr_late_2026-11-26',
+        user_id: 'u_qr_late',
+        date: '2026-11-26',
+        status: 'TERLAMBAT',
+        check_in_time: '07:42:00',
+        check_out_time: null,
+        verification_method: 'BIOMETRIC_GPS',
+        attendance_source: 'BIOMETRIC',
+        notes: null,
+      },
+      {
+        id: 'att_u_already_out_2026-11-26',
+        user_id: 'u_already_out',
+        date: '2026-11-26',
+        status: 'HADIR',
+        check_in_time: '06:55:00',
+        check_out_time: '13:15:00',
+        verification_method: 'QR_GPS',
+        attendance_source: 'QR',
+        notes: null,
+      },
+      {
+        id: 'att_u_on_leave_2026-11-26',
+        user_id: 'u_on_leave',
+        date: '2026-11-26',
+        status: 'HADIR',
+        check_in_time: '07:10:00',
+        check_out_time: null,
+        verification_method: 'QR_GPS',
+        attendance_source: 'QR',
+        notes: null,
+      },
+    ];
+    const fakePointRows: any[] = [];
+    const fakeHolidays: any[] = [
+      { id: 'h_test_off', date: '2026-11-27', name: 'Libur Uji', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true },
+    ];
+    const fakeLeaves: any[] = [
+      { id: 'lv_sakit_1', user_id: 'u_on_leave', type: 'SAKIT', status: 'APPROVED', start_date: '2026-11-26', end_date: '2026-11-26', reason: 'Sakit' },
+    ];
+    const fakeUsers: any[] = [
+      { id: 'u_checkedin_only', full_name: 'Guru Hadir Belum Pulang', role: 'GURU', account_status: 'ACTIVE' },
+      { id: 'u_qr_late', full_name: 'Guru Telat Sidik Jari', role: 'GURU', account_status: 'ACTIVE' },
+      { id: 'u_already_out', full_name: 'Guru Sudah Pulang', role: 'GURU', account_status: 'ACTIVE' },
+      { id: 'u_never_checkedin', full_name: 'Guru Belum Absen Masuk', role: 'GURU', account_status: 'ACTIVE' },
+      { id: 'u_on_leave', full_name: 'Guru Izin Sakit', role: 'GURU', account_status: 'ACTIVE' },
+    ];
+
+    const fakeCronSupabase = {
+      from: (table: string) => {
+        const filters: Record<string, any> = {};
+        let lteDate: string | null = null;
+        let gteDate: string | null = null;
+        let updatePayload: any = null;
+
+        const execSelect = () => {
+          if (table === 'system_settings') {
+            return {
+              data: [
+                { key: 'saturday_is_holiday', value: 'true' },
+                { key: 'sunday_is_holiday', value: 'true' },
+                { key: 'work_checkout_start', value: '12:00' },
+                { key: 'friday_checkout_start', value: '10:00' },
+              ],
+              error: null,
+            };
+          }
+          if (table === 'holidays') {
+            return { data: fakeHolidays.filter((h) => !filters.date || h.date === filters.date), error: null };
+          }
+          if (table === 'users') {
+            return { data: fakeUsers, error: null };
+          }
+          if (table === 'leaves') {
+            return {
+              data: fakeLeaves.filter((l) => (!lteDate || l.start_date <= lteDate) && (!gteDate || l.end_date >= gteDate)),
+              error: null,
+            };
+          }
+          if (table === 'attendance') {
+            return {
+              data: fakeAttendanceRows.filter((a) => !filters.date || a.date === filters.date),
+              error: null,
+            };
+          }
+          if (table === 'teacher_point_history') {
+            const matched = fakePointRows.filter(
+              (p) =>
+                (!filters.user_id || p.user_id === filters.user_id) &&
+                (!filters.date || p.date === filters.date) &&
+                (!filters.activity_type || p.activity_type === filters.activity_type)
+            );
+            return { data: matched, error: null };
+          }
+          return { data: [], error: null };
+        };
+
+        const chain: any = {
+          select: () => chain,
+          eq: (col: string, val: any) => {
+            filters[col] = val;
+            if (updatePayload && table === 'attendance' && col === 'id') {
+              const idx = fakeAttendanceRows.findIndex((r) => r.id === val);
+              if (idx >= 0) {
+                fakeAttendanceRows[idx] = { ...fakeAttendanceRows[idx], ...updatePayload };
+              }
+              return Promise.resolve({ error: null });
+            }
+            return chain;
+          },
+          lte: (_col: string, val: any) => {
+            lteDate = val;
+            return chain;
+          },
+          gte: (_col: string, val: any) => {
+            gteDate = val;
+            return chain;
+          },
+          update: (payload: any) => {
+            updatePayload = payload;
+            return chain;
+          },
+          insert: (payload: any) => {
+            if (table === 'teacher_point_history') {
+              fakePointRows.push(payload);
+            }
+            return Promise.resolve({ data: payload, error: null });
+          },
+          maybeSingle: async () => {
+            const res = execSelect();
+            return { data: res.data?.[0] || null, error: null };
+          },
+          then: (resolve: any, reject?: any) => Promise.resolve(execSelect()).then(resolve, reject),
+        };
+        return chain;
+      },
+    };
+
+    try {
+      setServerSupabaseClient(fakeCronSupabase);
+
+      // 14a: Unauthenticated request rejected 401
+      const unauthHeaders: Record<string, string> = {};
+      let unauthStatus = 200;
+      const unauthRes = {
+        setHeader: (k: string, v: string) => { unauthHeaders[k.toLowerCase()] = v; },
+        status: (code: number) => { unauthStatus = code; return unauthRes; },
+        json: (_b: any) => unauthRes,
+        end: () => unauthRes,
+      };
+      await cronHandler({ method: 'GET', query: { type: 'auto-checkout' }, headers: {} }, unauthRes);
+
+      // 14b: Run server auto-checkout for active workday 2026-11-26
+      const cronRes = await runAutoCheckout(fakeCronSupabase, { targetDateStr: '2026-11-26' });
+      const u1Row = fakeAttendanceRows.find((r) => r.user_id === 'u_checkedin_only');
+      const u2Row = fakeAttendanceRows.find((r) => r.user_id === 'u_qr_late');
+      const u3Row = fakeAttendanceRows.find((r) => r.user_id === 'u_already_out');
+      const u4Row = fakeAttendanceRows.find((r) => r.user_id === 'u_never_checkedin');
+      const u5Row = fakeAttendanceRows.find((r) => r.user_id === 'u_on_leave');
+
+      // 14c: Authorized Cron Endpoint HTTP 200 test + Holiday skip test
+      let cronHttpStatus = 0;
+      let cronHttpBody: any = null;
+      const authRes = {
+        setHeader: () => {},
+        status: (code: number) => { cronHttpStatus = code; return authRes; },
+        json: (body: any) => { cronHttpBody = body; return authRes; },
+        end: () => authRes,
+      };
+      await cronHandler(
+        {
+          method: 'POST',
+          query: { type: 'auto-checkout' },
+          headers: { authorization: 'Bearer test_cron_secret_wave_auto_checkout' },
+        },
+        authRes
+      );
+
+      const holidayRes = await runAutoCheckout(fakeCronSupabase, { targetDateStr: '2026-11-27' });
+
+      assert(
+        'AutoAttendance 14: Server auto-checkout ONLY checks out checked-in teachers, skips unabsented/leave/holiday, preserves QR/Biometric identity, and enforces auth',
+        unauthStatus === 401 &&
+          cronHttpStatus === 200 &&
+          cronHttpBody?.ok === true &&
+          cronRes.processedCount === 2 &&
+          cronRes.updatedUserIds.includes('u_checkedin_only') &&
+          cronRes.updatedUserIds.includes('u_qr_late') &&
+          !u4Row && // Unabsented teacher MUST NOT get auto checked-in!
+          u1Row?.check_out_time === '12:00:00' &&
+          u1Row?.verification_method === 'QR_GPS' &&
+          u2Row?.check_out_time === '12:00:00' &&
+          u2Row?.verification_method === 'BIOMETRIC_GPS' &&
+          u2Row?.attendance_source === 'BIOMETRIC' &&
+          u3Row?.check_out_time === '13:15:00' &&
+          u5Row?.check_out_time === null &&
+          fakePointRows.length === 2 &&
+          holidayRes.skippedReason === 'HOLIDAY' &&
+          holidayRes.processedCount === 0,
+        `unauth=${unauthStatus}, processed=${cronRes.processedCount}, holiday=${holidayRes.skippedReason}, u4=${Boolean(u4Row)}, pts=${fakePointRows.length}`
+      );
+    } finally {
+      resetServerSupabaseClient();
+      if (prevCronSecret === undefined) delete process.env.CRON_SECRET;
+      else process.env.CRON_SECRET = prevCronSecret;
+    }
+  } finally {
+    useAuthStore.setState(prevAuthState);
+  }
 
   return { passed, failed, results };
 };
