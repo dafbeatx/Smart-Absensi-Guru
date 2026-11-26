@@ -15,6 +15,7 @@ import {
   handleSaveExamSchedule,
   handleDeleteExamSchedule,
   handleSaveExamPeriod,
+  handleSaveOralExamAssignments,
 } from '../_shared/exam-admin-settings.js';
 import {
   issueOfficialDocumentToken,
@@ -117,6 +118,11 @@ export default async function handler(req: any, res: any) {
 
   if (action === 'save_exam_period' && ['POST', 'PUT'].includes(req.method)) {
     const result = await handleSaveExamPeriod(req.body || {}, auth);
+    return res.status(result.status).json(result.body);
+  }
+
+  if (action === 'save_oral_exam_assignments' && ['POST', 'PUT'].includes(req.method)) {
+    const result = await handleSaveOralExamAssignments(req.body || {}, auth);
     return res.status(result.status).json(result.body);
   }
 

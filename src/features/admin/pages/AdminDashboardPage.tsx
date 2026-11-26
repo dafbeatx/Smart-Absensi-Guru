@@ -1224,6 +1224,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           <OralExamAssessmentModal
             isOpen={isOralExamModalOpen}
             onClose={() => setIsOralExamModalOpen(false)}
+            roleMode="ADMIN"
           />
         </React.Suspense>
       )}

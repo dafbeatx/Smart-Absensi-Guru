@@ -33,6 +33,7 @@ import {
   Gamepad2,
   Award,
   HeartHandshake,
+  Languages,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
@@ -150,6 +151,14 @@ export const ALL_QUICK_ICONS: QuickIconItem[] = [
     description: 'Cetak kartu peserta ujian & barcode NISN siswa otomatis (A4)',
     icon: QrCode,
     colorClass: 'from-amber-600 to-yellow-800',
+  },
+  {
+    id: 'oral_exam',
+    title: 'Ujian Lisan',
+    category: 'Akademik & Nilai',
+    description: 'Penilaian Ujian Lisan Bahasa & BTQ sesuai penempatan penguji dari Admin',
+    icon: Languages,
+    colorClass: 'from-emerald-700 to-teal-900',
   },
   {
     id: 'jadwal_ujian_ngawas',
@@ -270,9 +279,9 @@ export const DEFAULT_8_QUICK_ICONS = [
   'izin_cuti',
   'jadwal',
   'rekap',
+  'oral_exam',
   'exam_card',
   'koreksi_soal',
-  'direktori_siswa',
   'kalender',
 ];
 

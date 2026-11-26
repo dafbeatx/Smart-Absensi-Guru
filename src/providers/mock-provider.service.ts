@@ -89,6 +89,7 @@ import type {
   ExamScheduleData,
   ExamPeriodSettings,
 } from '../types/exam-schedule.types';
+import type { OralExamAssignment } from '../types/oral-exam.types';
 import type { MeetingMinute } from '../types/meeting-minutes.types';
 import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
@@ -4535,6 +4536,40 @@ export class MockProvider implements IDataProvider {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(`smart_absensi_exam_period_${cleanYear}`, JSON.stringify(settings));
         localStorage.setItem('smart_absensi_exam_period_settings', JSON.stringify(settings));
+      }
+    } catch {}
+    return true;
+  }
+
+  // ── Oral Exam Examiner Assignments API (Mock) ─────────────────────────────
+  private mockOralExamAssignments = new Map<string, OralExamAssignment[]>();
+
+  public async getOralExamAssignments(academicYear?: string, _token?: string): Promise<OralExamAssignment[] | null> {
+    const targetYear = academicYear || '2026/2027';
+    const cleanYear = targetYear.replace(/[^\w]/g, '_');
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(`smart_absensi_oral_exam_assignments_${cleanYear}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      }
+    } catch {}
+    return this.mockOralExamAssignments.get(cleanYear) || null;
+  }
+
+  public async saveOralExamAssignments(
+    assignments: OralExamAssignment[],
+    academicYear?: string,
+    _token?: string
+  ): Promise<boolean> {
+    const targetYear = academicYear || '2026/2027';
+    const cleanYear = targetYear.replace(/[^\w]/g, '_');
+    this.mockOralExamAssignments.set(cleanYear, assignments);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(`smart_absensi_oral_exam_assignments_${cleanYear}`, JSON.stringify(assignments));
       }
     } catch {}
     return true;

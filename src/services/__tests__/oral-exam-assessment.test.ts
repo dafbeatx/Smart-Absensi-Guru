@@ -11,15 +11,23 @@ import {
   isStudentOralExamCompleted,
 } from '../../utils/oral-exam-scoring.utils';
 import { OralExamRepository } from '../../repositories/OralExamRepository';
+import { OralExamAssignmentRepository } from '../../repositories/OralExamAssignmentRepository';
 import { OralExamExportService } from '../../lib/oral-exam-export.lib';
 import {
   ORAL_EXAM_OFFICIAL_GROUPS,
   findMatchingOfficialOralGroup,
+  getDefaultOralExamAssignments,
+  findAssignmentsForTeacher,
 } from '../../data/oral-exam-groups';
+import { ProviderFactory } from '../../providers/provider-factory';
+import { MockProvider } from '../../providers/mock-provider.service';
+import { setServerSupabaseClient, resetServerSupabaseClient } from '../../../api/_shared/session-auth';
+import { handleSaveOralExamAssignments } from '../../../api/_shared/exam-admin-settings';
 import {
   getEffectiveSubjectScope,
   getOralExamSessionTrack,
   type OralExamSession,
+  type OralExamAssignment,
 } from '../../types/oral-exam.types';
 import type { TestResultItem } from '../test-runner.service';
 
@@ -377,6 +385,211 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
       !btqOnlyHtml.includes('HAFALAN'),
     `HasEng=${engOnlyHtml.includes('BAHASA INGGRIS')}, NoArab=${!engOnlyHtml.includes('BAHASA ARAB')}, HasSma=${engOnlyHtml.includes('SMA TERPADU AS SALAAM')}, NoHaf=${!btqOnlyHtml.includes('HAFALAN')}`
   );
+
+  // =========================================================================
+  // Test 9–11: Admin Placement Setup, Security Auth, & Guru Ready-to-Use Sync
+  // =========================================================================
+  const prevProvider = ProviderFactory.getProvider();
+  const mockProv = new MockProvider();
+  ProviderFactory.setProvider(mockProv);
+
+  try {
+    // 9a: Default 12 assignments from official groups
+    const defaultAssignments = getDefaultOralExamAssignments('2026/2027');
+
+    // 9b: Server endpoint RBAC check + DB upsert verification
+    const upsertedKv: Array<{ key: string; value: string }> = [];
+    const fakeServerDb = {
+      from: (table: string) => {
+        const chain: any = {
+          select: () => chain,
+          eq: () => chain,
+          in: () => chain,
+          limit: () => Promise.resolve({ data: [], error: null }),
+          upsert: (row: { key: string; value: string }) => {
+            if (table === 'system_settings') upsertedKv.push(row);
+            return Promise.resolve({ error: null });
+          },
+          then: (resolve: any, reject?: any) => Promise.resolve({ data: [], error: null }).then(resolve, reject),
+        };
+        return chain;
+      },
+    };
+
+    let forbiddenStatus = 0;
+    let adminSaveStatus = 0;
+    try {
+      setServerSupabaseClient(fakeServerDb);
+      const guruAttempt = await handleSaveOralExamAssignments(
+        { academicYear: '2026/2027', assignments: defaultAssignments },
+        {
+          ok: true,
+          userId: 'usr_guru_only',
+          role: 'GURU',
+          sessionId: 'sess_test_guru',
+          user: {
+            id: 'usr_guru_only',
+            nip: null,
+            full_name: 'Guru Penguji',
+            role: 'GURU',
+            position: 'Guru',
+            avatar_url: null,
+            phone_number: null,
+          },
+        }
+      );
+      forbiddenStatus = guruAttempt.status;
+
+      const adminAttempt = await handleSaveOralExamAssignments(
+        { academicYear: '2026/2027', assignments: defaultAssignments },
+        {
+          ok: true,
+          userId: 'usr_admin_1',
+          role: 'ADMIN',
+          sessionId: 'sess_test_admin',
+          user: {
+            id: 'usr_admin_1',
+            nip: null,
+            full_name: 'Administrator',
+            role: 'ADMIN',
+            position: 'Admin',
+            avatar_url: null,
+            phone_number: null,
+          },
+        }
+      );
+      adminSaveStatus = adminAttempt.status;
+    } finally {
+      resetServerSupabaseClient();
+    }
+
+    // 9c: Repository round-trip via MockProvider
+    const customAssignment: OralExamAssignment = {
+      id: 'assign_custom_uji',
+      examinerUserId: 'usr_guru_khusus_99',
+      examinerName: 'Ust. Ahmad Fauzi, M.Pd',
+      examinerNpp: '19880101',
+      roomNumber: 'Ruang 07',
+      className: '8B',
+      examTracks: ['BAHASA'],
+      bahasaScope: 'ENGLISH_ONLY',
+      btqScope: 'BOTH',
+      students: [
+        { studentId: 'st_a1', studentName: 'Abila Yazid Rizaki', className: '8B' },
+        { studentId: 'st_a2', studentName: 'Adrian Putra Nugraha', className: '8B' },
+      ],
+      academicYear: '2026/2027',
+      isActive: true,
+      updatedAt: new Date().toISOString(),
+    };
+    const inactiveAssignment: OralExamAssignment = {
+      ...customAssignment,
+      id: 'assign_inactive_uji',
+      examinerUserId: 'usr_guru_nonaktif',
+      examinerName: 'Guru Nonaktif',
+      isActive: false,
+    };
+
+    await OralExamAssignmentRepository.saveAssignments(
+      [...defaultAssignments, customAssignment, inactiveAssignment],
+      '2026/2027',
+      'MOCK_TOKEN'
+    );
+    const reloadedAssignments = await OralExamAssignmentRepository.getAssignments('2026/2027');
+
+    assert(
+      'Admin Placement & Cloud Auth: Endpoint server menolak role GURU (403), menyimpan untuk ADMIN (200), dan Repository sinkron lewat Provider',
+      forbiddenStatus === 403 &&
+        adminSaveStatus === 200 &&
+        upsertedKv.some((k) => k.key === 'exam_oral_assignments_2026_2027') &&
+        reloadedAssignments.length === 14 &&
+        reloadedAssignments.some((a) => a.id === 'assign_custom_uji' && a.roomNumber === 'Ruang 07'),
+      `forbidden=${forbiddenStatus}, admin=${adminSaveStatus}, kvCount=${upsertedKv.length}, total=${reloadedAssignments.length}`
+    );
+
+    // Test 10: Pencocokan penugasan guru (ID exact, fallback nama, nonaktif/kosong terisolasi)
+    const matchedById = findAssignmentsForTeacher(reloadedAssignments, {
+      id: 'usr_guru_khusus_99',
+      full_name: 'Nama Lain Sama Sekali',
+    });
+    const matchedByName = findAssignmentsForTeacher(reloadedAssignments, {
+      id: 'usr_adi_login',
+      full_name: 'Adi Prastyo, S.Pd',
+    });
+    const matchedUnassigned = findAssignmentsForTeacher(reloadedAssignments, {
+      id: 'usr_random_teacher',
+      full_name: 'Guru Tidak Bertugas',
+    });
+    const matchedInactive = findAssignmentsForTeacher(reloadedAssignments, {
+      id: 'usr_guru_nonaktif',
+      full_name: 'Guru Nonaktif',
+    });
+
+    assert(
+      'Teacher Placement Matching: Akun guru dicocokkan via User ID atau nama resmi, dan guru nonaktif / tidak ditugaskan tidak bocor',
+      matchedById.length === 1 &&
+        matchedById[0].id === 'assign_custom_uji' &&
+        matchedByName.length === 1 &&
+        matchedByName[0].roomNumber === 'Ruang 01' &&
+        matchedUnassigned.length === 0 &&
+        matchedInactive.length === 0,
+      `byId=${matchedById.length}, byName=${matchedByName.length}, unreg=${matchedUnassigned.length}, inactive=${matchedInactive.length}`
+    );
+
+    // Test 11: Siap Pakai Guru (openOrSyncAssignedSession) membuat sesi instan & menjaga nilai lama saat Admin tambah siswa
+    const firstReady = OralExamRepository.openOrSyncAssignedSession({
+      assignment: customAssignment,
+      track: 'BAHASA',
+      academicYear: '2026/2027',
+      semester: 'GANJIL',
+      examinerNpp: '19880101',
+      date: '2026-11-27',
+    });
+
+    // Simulasi guru menilai siswa pertama sebelum Admin mengedit penempatan
+    firstReady.students[0].englishChecklist = new Array(15).fill(true);
+    firstReady.students[0].englishCorrectCount = 15;
+    firstReady.students[0].englishScore = 100;
+    firstReady.students[0].englishPredicate = 'A';
+    firstReady.students[0].englishAssessed = true;
+    OralExamRepository.saveSession(firstReady);
+
+    const updatedByAdmin: OralExamAssignment = {
+      ...customAssignment,
+      roomNumber: 'Ruang 09',
+      bahasaScope: 'BOTH',
+      students: [
+        ...customAssignment.students,
+        { studentId: 'st_a3', studentName: 'Siswa Tambahan Admin', className: '8B' },
+      ],
+    };
+    const resyncedSession = OralExamRepository.openOrSyncAssignedSession({
+      assignment: updatedByAdmin,
+      track: 'BAHASA',
+      academicYear: '2026/2027',
+      semester: 'GANJIL',
+      examinerNpp: '19880101',
+      date: '2026-11-27',
+    });
+
+    OralExamRepository.deleteSession(resyncedSession.id);
+
+    assert(
+      'Guru Siap Pakai Sync: openOrSyncAssignedSession langsung siap menilai & menjaga nilai lama saat Admin update ruang/scope/siswa',
+      firstReady.students.length === 2 &&
+        resyncedSession.id === firstReady.id &&
+        resyncedSession.roomNumber === 'Ruang 09' &&
+        resyncedSession.subjectScope === 'BOTH' &&
+        resyncedSession.students.length === 3 &&
+        resyncedSession.students[0].englishScore === 100 &&
+        resyncedSession.students[2].studentName === 'Siswa Tambahan Admin',
+      `room=${resyncedSession.roomNumber}, scope=${resyncedSession.subjectScope}, count=${resyncedSession.students.length}, preserved=${resyncedSession.students[0].englishScore}`
+    );
+
+    await OralExamAssignmentRepository.resetToOfficialDefaults('2026/2027', 'MOCK_TOKEN');
+  } finally {
+    ProviderFactory.setProvider(prevProvider);
+  }
 
   return { passed, failed, results };
 };

@@ -107,6 +107,7 @@ import type {
   ExamScheduleData,
   ExamPeriodSettings,
 } from '../types/exam-schedule.types';
+import type { OralExamAssignment } from '../types/oral-exam.types';
 import type { MeetingMinute } from '../types/meeting-minutes.types';
 import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters, getEffectiveAllowedRadius, sanitizeCoordinate, sanitizeSchoolCoordinates } from '../utils/geofence.utils';
@@ -236,6 +237,7 @@ export class SupabaseProvider implements IDataProvider {
     this.cachedTeachingSchedules.clear();
     this.cachedExamCommittees.clear();
     this.cachedExamSchedules.clear();
+    this.cachedOralExamAssignments.clear();
     this.inFlightRequests.clear();
   }
 
@@ -8445,6 +8447,120 @@ export class SupabaseProvider implements IDataProvider {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('smart_absensi_exam_period_changed', { detail: settings })
+      );
+    }
+
+    return true;
+  }
+
+  // ── Oral Exam Examiner Assignments API (Supabase Cloud Sync) ────────────
+  private cachedOralExamAssignments: Map<string, { data: OralExamAssignment[]; timestamp: number }> = new Map();
+
+  public async getOralExamAssignments(academicYear?: string, _token?: string): Promise<OralExamAssignment[] | null> {
+    const targetYear = academicYear || '2026/2027';
+    const cleanYear = targetYear.replace(/[^\w]/g, '_');
+    const storageKey = `exam_oral_assignments_${cleanYear}`;
+
+    const cached = this.cachedOralExamAssignments.get(cleanYear);
+    if (cached && Date.now() - cached.timestamp < 300000) {
+      return cached.data;
+    }
+
+    return this.dedupeRequest(`getOralExamAssignments_${cleanYear}`, async () => {
+      try {
+        const { data, error } = await this.client
+          .from('system_settings')
+          .select('value')
+          .eq('key', storageKey)
+          .maybeSingle();
+
+        if (!error && data?.value) {
+          const parsed: OralExamAssignment[] = JSON.parse(data.value);
+          if (Array.isArray(parsed)) {
+            this.cachedOralExamAssignments.set(cleanYear, { data: parsed, timestamp: Date.now() });
+            try {
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(`smart_absensi_oral_exam_assignments_${cleanYear}`, JSON.stringify(parsed));
+              }
+            } catch {}
+            return parsed;
+          }
+        }
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'Failed to fetch oral exam assignments from system_settings:', err);
+      }
+
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const raw = localStorage.getItem(`smart_absensi_oral_exam_assignments_${cleanYear}`);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) return parsed;
+          }
+        }
+      } catch {}
+
+      return null;
+    });
+  }
+
+  public async saveOralExamAssignments(
+    assignments: OralExamAssignment[],
+    academicYear?: string,
+    _token?: string
+  ): Promise<boolean> {
+    const targetYear = academicYear || '2026/2027';
+    const cleanYear = targetYear.replace(/[^\w]/g, '_');
+    const localKey = `smart_absensi_oral_exam_assignments_${cleanYear}`;
+
+    let prevRaw: string | null = null;
+    this.cachedOralExamAssignments.delete(cleanYear);
+
+    try {
+      if (typeof localStorage !== 'undefined') {
+        prevRaw = localStorage.getItem(localKey);
+        localStorage.setItem(localKey, JSON.stringify(assignments));
+      }
+    } catch {}
+
+    try {
+      const token = resolveClientAuthToken(_token);
+      if (!token) {
+        throw new Error('AUTH_SESSION_MISSING: Sesi login diperlukan untuk menyimpan penugasan penguji.');
+      }
+
+      const resp = await fetch(
+        '/api/admin/teaching-schedules?action=save_oral_exam_assignments',
+        buildAuthenticatedFetchOptions(
+          'POST',
+          {
+            action: 'save_oral_exam_assignments',
+            academicYear: targetYear,
+            assignments,
+          },
+          token
+        )
+      );
+      const resJson = await resp.json().catch(() => null);
+      if (!resp.ok || !resJson?.success) {
+        throw new Error(resJson?.errorMessage || `HTTP ${resp.status}: Gagal menyimpan penugasan penguji ujian lisan.`);
+      }
+      this.cachedOralExamAssignments.set(cleanYear, { data: assignments, timestamp: Date.now() });
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'Failed to save oral exam assignments via serverless endpoint:', err);
+      this.cachedOralExamAssignments.delete(cleanYear);
+      try {
+        if (typeof localStorage !== 'undefined') {
+          if (prevRaw !== null) localStorage.setItem(localKey, prevRaw);
+          else localStorage.removeItem(localKey);
+        }
+      } catch {}
+      return false;
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('smart_absensi_oral_exam_assignments_changed', { detail: assignments })
       );
     }
 

@@ -1,3 +1,6 @@
+import type { UserProfile } from '../types/database.types';
+import type { OralExamAssignment } from '../types/oral-exam.types';
+
 /**
  * SMART ABSENSI GURU - KELOMPOK PENGUJI & PESERTA UJIAN LISAN RESMI
  * Sumber pembagian resmi sekolah (12 Kelompok Penguji, 144 Peserta across Ruang 01–05 & SMA).
@@ -272,6 +275,21 @@ const normalizeExaminerPersonName = (name: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const isPersonNameMatch = (nameA: string, nameB: string): boolean => {
+  const normA = normalizeExaminerPersonName(nameA);
+  const normB = normalizeExaminerPersonName(nameB);
+  if (!normA || !normB) return false;
+  if (normA === normB || normA.includes(normB) || normB.includes(normA)) {
+    return true;
+  }
+  const tokensA = normA.split(' ').filter((t) => t.length >= 3);
+  const tokensB = normB.split(' ').filter((t) => t.length >= 3);
+  const matched = tokensA.filter((ta) =>
+    tokensB.some((tb) => tb === ta || (ta.length >= 5 && tb.length >= 5 && ta.slice(0, 5) === tb.slice(0, 5)))
+  );
+  return matched.length >= 2;
+};
+
 /**
  * Mencocokkan nama guru yang sedang login dengan salah satu dari 12 kelompok penguji resmi.
  */
@@ -279,22 +297,62 @@ export function findMatchingOfficialOralGroup(
   userName?: string | null
 ): OfficialOralExamGroup | null {
   if (!userName || !userName.trim()) return null;
-  const userNorm = normalizeExaminerPersonName(userName);
-  if (!userNorm) return null;
-
-  const userTokens = userNorm.split(' ').filter((t) => t.length >= 3);
   for (const grp of ORAL_EXAM_OFFICIAL_GROUPS) {
-    const grpNorm = normalizeExaminerPersonName(grp.examinerName);
-    if (grpNorm === userNorm || grpNorm.includes(userNorm) || userNorm.includes(grpNorm)) {
-      return grp;
-    }
-    const grpTokens = grpNorm.split(' ').filter((t) => t.length >= 3);
-    const matchedTokens = userTokens.filter((ut) =>
-      grpTokens.some((gt) => gt === ut || (gt.length >= 5 && ut.length >= 5 && gt.slice(0, 5) === ut.slice(0, 5)))
-    );
-    if (matchedTokens.length >= 2) {
+    if (isPersonNameMatch(grp.examinerName, userName)) {
       return grp;
     }
   }
   return null;
+}
+
+/**
+ * Menghasilkan daftar penugasan penguji bawaan dari 12 kelompok resmi sekolah.
+ */
+export function getDefaultOralExamAssignments(academicYear: string = '2026/2027'): OralExamAssignment[] {
+  const nowIso = new Date().toISOString();
+  return ORAL_EXAM_OFFICIAL_GROUPS.map((grp) => ({
+    id: grp.id,
+    examinerUserId: null,
+    examinerName: grp.examinerName,
+    examinerNpp: null,
+    roomNumber: grp.roomNumber,
+    className: grp.className,
+    examTracks: ['BAHASA', 'BTQ'],
+    bahasaScope: 'ENGLISH_ONLY',
+    btqScope: 'BOTH',
+    students: grp.students.map((st) => ({
+      studentId: st.studentId,
+      studentName: st.studentName,
+      className: grp.className,
+    })),
+    academicYear,
+    isActive: true,
+    updatedAt: nowIso,
+  }));
+}
+
+/**
+ * Mencari seluruh penugasan penguji ujian lisan milik guru yang sedang login.
+ * Memprioritaskan kecocokan ID user (jika Admin menautkan akun), lalu kecocokan nama penguji.
+ */
+export function findAssignmentsForTeacher(
+  assignments: OralExamAssignment[],
+  user?: Pick<UserProfile, 'id' | 'full_name'> | null
+): OralExamAssignment[] {
+  if (!user) return [];
+  const active = assignments.filter((a) => a && a.isActive !== false);
+  return active.filter((a) => {
+    if (a.examinerUserId && user.id && a.examinerUserId === user.id) {
+      return true;
+    }
+    if (!a.examinerUserId && user.full_name) {
+      return isPersonNameMatch(a.examinerName, user.full_name);
+    }
+    // Jika examinerUserId ditautkan ke akun lain yang berbeda ID, pastikan tidak bocor;
+    // namun bila nama persis sama & id belum diisi, tetap cocokkan
+    if (a.examinerUserId && user.id && a.examinerUserId !== user.id) {
+      return false;
+    }
+    return false;
+  });
 }

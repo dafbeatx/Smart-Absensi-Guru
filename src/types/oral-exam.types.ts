@@ -16,6 +16,32 @@ export type OralExamSubjectScope =
   | 'BTQ_ONLY'
   | 'HAFALAN_ONLY';
 
+export type OralExamBahasaScope = 'ENGLISH_ONLY' | 'ARABIC_ONLY' | 'BOTH';
+export type OralExamBtqScope = 'BTQ_ONLY' | 'HAFALAN_ONLY' | 'BOTH';
+
+export interface OralExamAssignmentStudent {
+  studentId: string;
+  studentName: string;
+  nisn?: string;
+  className?: string;
+}
+
+export interface OralExamAssignment {
+  id: string;
+  examinerUserId?: string | null;
+  examinerName: string;
+  examinerNpp?: string | null;
+  roomNumber: string;
+  className: string;
+  examTracks: OralExamTrack[];
+  bahasaScope: OralExamBahasaScope;
+  btqScope: OralExamBtqScope;
+  students: OralExamAssignmentStudent[];
+  academicYear?: string;
+  isActive: boolean;
+  updatedAt: string;
+}
+
 export type OralExamGrade = 'A' | 'B' | 'C' | 'D';
 
 export interface OralExamGradeKriteria {

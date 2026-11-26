@@ -106,7 +106,14 @@ import {
   Gamepad2,
   ExternalLink,
   HeartHandshake,
+  Languages,
 } from 'lucide-react';
+import {
+  OralExamAssignmentRepository,
+  ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT,
+} from '../../../repositories/OralExamAssignmentRepository';
+import { findAssignmentsForTeacher } from '../../../data/oral-exam-groups';
+import type { OralExamAssignment } from '../../../types/oral-exam.types';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
 import { BiometricService } from '../../../services/biometric.service';
@@ -561,6 +568,27 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [isAdministrationModalOpen, setIsAdministrationModalOpen] = useState(false);
   const [isOralExamModalOpen, setIsOralExamModalOpen] = useState(false);
+  const [guruOralAssignments, setGuruOralAssignments] = useState<OralExamAssignment[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const syncOralAssignments = async () => {
+      try {
+        const list = await OralExamAssignmentRepository.getAssignments();
+        if (mounted) {
+          setGuruOralAssignments(findAssignmentsForTeacher(list, effectiveUser));
+        }
+      } catch {
+        // fallback handled by repository
+      }
+    };
+    syncOralAssignments();
+    window.addEventListener(ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT, syncOralAssignments);
+    return () => {
+      mounted = false;
+      window.removeEventListener(ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT, syncOralAssignments);
+    };
+  }, [effectiveUser?.id, effectiveUser?.full_name]);
   const [isExamScheduleModalOpen, setIsExamScheduleModalOpen] = useState(false);
   const [isExamScheduleReadOnly, setIsExamScheduleReadOnly] = useState(false);
   const [examScheduleInitialTab, setExamScheduleInitialTab] = useState<'proctors' | 'subjects' | 'my_schedule' | 'ai_prompt' | 'form'>('proctors');
@@ -977,6 +1005,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         break;
       case 'exam_card':
         setIsExamCardModalOpen(true);
+        break;
+      case 'oral_exam':
+        setIsOralExamModalOpen(true);
         break;
       case 'jadwal_ujian_ngawas':
         setIsExamScheduleReadOnly(true);
@@ -4594,6 +4625,40 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </div>
               </div>
 
+              {/* Akses Cepat Ujian Lisan di Menu Utama (Siap Pakai sesuai Penugasan Admin) */}
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsOralExamModalOpen(true)}
+                  className={`w-full py-2.5 px-3.5 rounded-2xl active:scale-[0.98] border text-xs font-bold flex items-center justify-between transition-all cursor-pointer group ${
+                    guruOralAssignments.length > 0
+                      ? 'bg-emerald-50/90 hover:bg-emerald-100/80 border-emerald-200 text-emerald-950'
+                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200/80 text-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-white ${
+                      guruOralAssignments.length > 0 ? 'bg-emerald-600' : 'bg-[#023246]'
+                    }`}>
+                      <Languages className="w-4 h-4" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <span className="block truncate font-extrabold text-xs">
+                        Penilaian Ujian Lisan (Bahasa &amp; BTQ)
+                      </span>
+                      <span className={`block truncate text-[10.5px] font-medium ${
+                        guruOralAssignments.length > 0 ? 'text-emerald-700' : 'text-slate-500'
+                      }`}>
+                        {guruOralAssignments.length > 0
+                          ? `Siap pakai: ${guruOralAssignments[0].roomNumber} (${guruOralAssignments[0].className === 'SMA' ? 'SMA' : `Kls ${guruOralAssignments[0].className}`}) • ${guruOralAssignments[0].students.length} siswa`
+                          : 'Buka penilaian Bahasa & BTQ (penempatan diatur Admin)'}
+                      </span>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 shrink-0 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              </div>
+
               {/* Tulisan & Tombol More: Pindah Layer ke Semua Fitur */}
               <div className="pt-2 border-t border-slate-100">
                 <button
@@ -5297,6 +5362,26 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </div>
                     <span className="text-[11px] font-bold text-slate-700 group-hover:text-amber-800 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
                       Kartu Ujian
+                    </span>
+                  </button>
+
+                  {/* Penilaian Ujian Lisan (Bahasa & BTQ - Siap Pakai) */}
+                  <button
+                    type="button"
+                    onClick={() => setIsOralExamModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    title="Penilaian Ujian Lisan Bahasa & BTQ (Penempatan diatur Admin)"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-emerald-700 to-teal-900 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
+                      <Languages className="w-6 h-6 stroke-[1.8]" />
+                      {guruOralAssignments.length > 0 && (
+                        <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-emerald-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
+                          Tugas
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-emerald-800 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Ujian Lisan
                     </span>
                   </button>
 
@@ -7182,6 +7267,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           <OralExamAssessmentModal
             isOpen={isOralExamModalOpen}
             onClose={() => setIsOralExamModalOpen(false)}
+            roleMode="GURU"
           />
         </React.Suspense>
       )}

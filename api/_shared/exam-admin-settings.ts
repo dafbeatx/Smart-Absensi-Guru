@@ -355,3 +355,93 @@ export async function handleSaveExamPeriod(body: any, auth: AuthSuccessContext) 
 
   return { status: 200, body: { success: true, key: storageKey } };
 }
+
+export async function handleSaveOralExamAssignments(body: any, auth: AuthSuccessContext) {
+  const academicYear = String(body?.academicYear || '2026/2027').trim() || '2026/2027';
+  const rawAssignments = Array.isArray(body?.assignments) ? body.assignments : null;
+
+  if (!rawAssignments) {
+    return {
+      status: 400,
+      body: {
+        success: false,
+        errorCode: 'VALIDATION_ERROR',
+        errorMessage: 'Daftar penugasan penguji ujian lisan (assignments) wajib berupa array.',
+      },
+    };
+  }
+
+  const authorized = await isAuthorizedAdminOrCommittee(auth, academicYear);
+  if (!authorized) {
+    return {
+      status: 403,
+      body: {
+        success: false,
+        errorCode: 'AUTH_FORBIDDEN',
+        errorMessage: 'Akses Ditolak: Hanya Admin, Operator, Kepala Sekolah, atau Panitia Ujian aktif yang berwenang mengatur penempatan penguji ujian lisan.',
+      },
+    };
+  }
+
+  const nowIso = new Date().toISOString();
+  const sanitized = rawAssignments
+    .filter((a: any) => a && typeof a.examinerName === 'string' && a.examinerName.trim())
+    .map((a: any, idx: number) => {
+      const tracks = Array.isArray(a.examTracks)
+        ? a.examTracks.filter((t: string) => t === 'BAHASA' || t === 'BTQ')
+        : [];
+      const bahasaScope = ['ENGLISH_ONLY', 'ARABIC_ONLY', 'BOTH'].includes(a.bahasaScope)
+        ? a.bahasaScope
+        : 'ENGLISH_ONLY';
+      const btqScope = ['BTQ_ONLY', 'HAFALAN_ONLY', 'BOTH'].includes(a.btqScope)
+        ? a.btqScope
+        : 'BOTH';
+      const students = Array.isArray(a.students)
+        ? a.students
+            .filter((s: any) => s && typeof s.studentName === 'string' && s.studentName.trim())
+            .map((s: any, sIdx: number) => ({
+              studentId: typeof s.studentId === 'string' && s.studentId.trim()
+                ? s.studentId.trim()
+                : `oral_std_${idx + 1}_${sIdx + 1}`,
+              studentName: String(s.studentName).trim(),
+              ...(s.nisn ? { nisn: String(s.nisn).trim() } : {}),
+              ...(s.className ? { className: String(s.className).trim() } : {}),
+            }))
+        : [];
+
+      return {
+        id: typeof a.id === 'string' && a.id.trim() ? a.id.trim() : `oral_grp_${Date.now()}_${idx + 1}`,
+        examinerUserId: typeof a.examinerUserId === 'string' && a.examinerUserId.trim() ? a.examinerUserId.trim() : null,
+        examinerName: String(a.examinerName).trim(),
+        examinerNpp: typeof a.examinerNpp === 'string' && a.examinerNpp.trim() ? a.examinerNpp.trim() : null,
+        roomNumber: String(a.roomNumber || 'Ruang 01').trim(),
+        className: String(a.className || '7').trim(),
+        examTracks: tracks.length > 0 ? tracks : ['BAHASA', 'BTQ'],
+        bahasaScope,
+        btqScope,
+        students,
+        academicYear,
+        isActive: a.isActive !== false,
+        updatedAt: nowIso,
+      };
+    });
+
+  const cleanYear = sanitizeKeySegment(academicYear);
+  const storageKey = `exam_oral_assignments_${cleanYear}`;
+
+  const { error } = await serverSupabase
+    .from('system_settings')
+    .upsert(
+      { key: storageKey, value: JSON.stringify(sanitized), updated_at: nowIso },
+      { onConflict: 'key' }
+    );
+
+  if (error) {
+    return {
+      status: 500,
+      body: { success: false, errorCode: 'DB_WRITE_FAILED', errorMessage: error.message },
+    };
+  }
+
+  return { status: 200, body: { success: true, key: storageKey, count: sanitized.length } };
+}

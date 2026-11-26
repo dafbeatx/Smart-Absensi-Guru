@@ -7,7 +7,9 @@ import {
   ExternalLink,
   SlidersHorizontal,
   Clock,
+  Users,
 } from 'lucide-react';
+import { OralExamAdminSetupModal } from './OralExamAdminSetupModal';
 import type {
   AdministrationModuleItem,
   AdministrationCategory,
@@ -60,6 +62,7 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
   // Exam Period Active & Expiration Status State
   const [examPeriodStatus, setExamPeriodStatus] = useState<ExamPeriodStatus | null>(null);
   const [isExamPeriodModalOpen, setIsExamPeriodModalOpen] = useState(false);
+  const [isOralExamSetupOpen, setIsOralExamSetupOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -248,15 +251,26 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
               </button>
 
               {['ADMIN', 'OPERATOR'].includes((userRole || '').toUpperCase()) ? (
-                <button
-                  type="button"
-                  onClick={() => setIsExamPeriodModalOpen(true)}
-                  className="w-full py-1.5 px-3 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-white/20 shadow-2xs"
-                  title="Atur status aktif/nonaktif dan waktu berakhir masa ujian"
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-300" />
-                  <span>Masa Ujian: {examPeriodStatus?.isActive ? 'Aktif' : 'Usai / Nonaktif'}</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsExamPeriodModalOpen(true)}
+                    className="w-full py-1.5 px-3 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-white/20 shadow-2xs"
+                    title="Atur status aktif/nonaktif dan waktu berakhir masa ujian"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-300" />
+                    <span>Masa Ujian: {examPeriodStatus?.isActive ? 'Aktif' : 'Usai / Nonaktif'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsOralExamSetupOpen(true)}
+                    className="w-full py-1.5 px-3 rounded-xl bg-emerald-500/90 hover:bg-emerald-400 active:scale-95 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-emerald-300/40 shadow-2xs"
+                    title="Atur siapa yang menjadi penguji, ruangan, dan daftar siswa Ujian Lisan"
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Atur Penguji Ujian Lisan</span>
+                  </button>
+                </>
               ) : (
                 <div className="w-full py-1.5 px-3 rounded-xl bg-white/10 text-white/90 text-xs font-bold flex items-center justify-center gap-1.5 border border-white/15">
                   <span>Masa Ujian: {examPeriodStatus?.isActive ? 'Aktif' : 'Usai / Nonaktif'}</span>
@@ -429,15 +443,22 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
 
       {/* Modal Pengaturan Periode Ujian & Kepanitiaan (Toggle & Waktu Berakhir) */}
       {['ADMIN', 'OPERATOR'].includes((userRole || '').toUpperCase()) && (
-        <ExamPeriodSettingsModal
-          isOpen={isExamPeriodModalOpen}
-          onClose={() => setIsExamPeriodModalOpen(false)}
-          academicYear={academicYear}
-          userRole={userRole}
-          onSettingsSaved={(_newSettings, newStatus) => {
-            setExamPeriodStatus(newStatus);
-          }}
-        />
+        <>
+          <ExamPeriodSettingsModal
+            isOpen={isExamPeriodModalOpen}
+            onClose={() => setIsExamPeriodModalOpen(false)}
+            academicYear={academicYear}
+            userRole={userRole}
+            onSettingsSaved={(_newSettings, newStatus) => {
+              setExamPeriodStatus(newStatus);
+            }}
+          />
+          <OralExamAdminSetupModal
+            isOpen={isOralExamSetupOpen}
+            onClose={() => setIsOralExamSetupOpen(false)}
+            academicYear={academicYear}
+          />
+        </>
       )}
     </div>
   );

@@ -3,11 +3,14 @@
  * Menyimpan dan mengelola data sesi penilaian ujian lisan dengan persistensi lokal aman.
  */
 
-import type {
-  OralExamSession,
-  OralExamTemplateType,
-  OralExamStudentRecord,
-  OralExamSubjectScope,
+import {
+  getOralExamSessionTrack,
+  type OralExamAssignment,
+  type OralExamSession,
+  type OralExamTemplateType,
+  type OralExamStudentRecord,
+  type OralExamSubjectScope,
+  type OralExamTrack,
 } from '../types/oral-exam.types';
 
 export const ORAL_EXAM_STORAGE_KEY = 'smart_absensi_oral_exam_sessions_v1';
@@ -190,5 +193,123 @@ export class OralExamRepository {
     };
 
     return this.saveSession(newSession);
+  }
+
+  /**
+   * Mencari sesi ujian lisan yang sesuai penugasan Admin untuk penguji & track (BAHASA / BTQ),
+   * atau langsung membuatnya secara otomatis tanpa langkah manual dari guru.
+   * Jika Admin memperbarui penugasan siswa/ruang/scope, nilai siswa yang sudah ada tetap dipertahankan.
+   */
+  public static openOrSyncAssignedSession(params: {
+    assignment: OralExamAssignment;
+    track: OralExamTrack;
+    academicYear: string;
+    semester: 'GANJIL' | 'GENAP';
+    examinerNpp?: string | null;
+    date: string;
+  }): OralExamSession {
+    const { assignment, track, academicYear, semester, examinerNpp, date } = params;
+    const templateType: OralExamTemplateType =
+      track === 'BAHASA' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN';
+    const subjectScope: OralExamSubjectScope =
+      track === 'BAHASA' ? assignment.bahasaScope : assignment.btqScope;
+
+    const existing = this.getAllSessions(academicYear).find(
+      (s) => s.groupId === assignment.id && getOralExamSessionTrack(s) === track
+    );
+
+    const scopeLabel =
+      track === 'BAHASA'
+        ? (subjectScope === 'ENGLISH_ONLY'
+            ? 'Bahasa Inggris'
+            : subjectScope === 'ARABIC_ONLY'
+              ? 'Bahasa Arab'
+              : 'Bahasa Inggris & Arab')
+        : (subjectScope === 'BTQ_ONLY'
+            ? 'BTQ'
+            : subjectScope === 'HAFALAN_ONLY'
+              ? 'Hafalan'
+              : 'BTQ & Hafalan');
+    const classLabel = assignment.className === 'SMA' ? 'SMA' : `Kelas ${assignment.className}`;
+    const defaultTitle = `Ujian Lisan ${scopeLabel} - ${classLabel}`;
+
+    if (!existing) {
+      return this.createNewSession({
+        templateType,
+        subjectScope,
+        groupId: assignment.id,
+        title: defaultTitle,
+        academicYear,
+        semester,
+        examinerName: assignment.examinerName,
+        examinerNpp: examinerNpp ?? assignment.examinerNpp ?? null,
+        roomNumber: assignment.roomNumber,
+        className: assignment.className,
+        date,
+        students: assignment.students,
+      });
+    }
+
+    const existingById = new Map(existing.students.map((st) => [st.studentId, st]));
+    const existingByName = new Map(
+      existing.students.map((st) => [st.studentName.trim().toLowerCase(), st])
+    );
+
+    const syncedStudents: OralExamStudentRecord[] = assignment.students.map((as) => {
+      const matched =
+        existingById.get(as.studentId) ||
+        existingByName.get(as.studentName.trim().toLowerCase());
+
+      if (matched) {
+        return {
+          ...matched,
+          studentId: as.studentId,
+          studentName: as.studentName,
+          nisn: as.nisn ?? matched.nisn,
+          className: as.className || assignment.className,
+        };
+      }
+
+      if (templateType === 'BAHASA_INGGRIS_ARAB') {
+        return {
+          studentId: as.studentId,
+          studentName: as.studentName,
+          nisn: as.nisn,
+          className: as.className || assignment.className,
+          englishChecklist: new Array(15).fill(false),
+          englishCorrectCount: null,
+          englishScore: null,
+          englishPredicate: null,
+          englishAssessed: false,
+          arabicChecklist: new Array(15).fill(false),
+          arabicCorrectCount: null,
+          arabicScore: null,
+          arabicPredicate: null,
+          arabicAssessed: false,
+        };
+      }
+
+      return {
+        studentId: as.studentId,
+        studentName: as.studentName,
+        nisn: as.nisn,
+        className: as.className || assignment.className,
+        btqScore: null,
+        btqPredicate: null,
+        hafalanScore: null,
+        hafalanPredicate: null,
+      };
+    });
+
+    const syncedSession: OralExamSession = {
+      ...existing,
+      subjectScope,
+      examinerName: assignment.examinerName,
+      roomNumber: assignment.roomNumber,
+      className: assignment.className,
+      students: syncedStudents,
+    };
+
+    return this.saveSession(syncedSession);
   }
 }

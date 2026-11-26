@@ -4,8 +4,9 @@
  * 1. Ujian Bahasa (Checklist 15 Soal Bahasa Inggris / Bahasa Arab)
  * 2. Ujian BTQ & Hafalan (Skala Angka 0–100 + Tombol Nilai Cepat)
  *
- * Arsitektur Infinix Note 8 Full-Screen 3-Zone (100dvh), zero horizontal overflow,
- * dilengkapi Preset 12 Kelompok Penguji Resmi dan mode Nilai Satu per Satu.
+ * Pemisahan Wewenang:
+ * - Mode ADMIN (`roleMode === 'ADMIN'`): Mengatur siapa penguji, ruang, mata uji, dan daftar siswa via OralExamAdminSetupModal + monitoring sesi.
+ * - Mode GURU (`roleMode === 'GURU'`): Tinggal siap pakai langsung menilai siswa yang telah ditempatkan oleh Admin tanpa setup manual.
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -25,6 +26,7 @@ import {
   RotateCcw,
   Save,
   Search,
+  SlidersHorizontal,
   Trash2,
   UserCheck,
   Users,
@@ -36,12 +38,17 @@ import { AdministrationRepository } from '../../../repositories/AdministrationRe
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { OralExamRepository } from '../../../repositories/OralExamRepository';
 import {
-  ORAL_EXAM_OFFICIAL_GROUPS,
+  OralExamAssignmentRepository,
+  ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT,
+} from '../../../repositories/OralExamAssignmentRepository';
+import {
+  findAssignmentsForTeacher,
   findMatchingOfficialOralGroup,
 } from '../../../data/oral-exam-groups';
 import {
   getEffectiveSubjectScope,
   getOralExamSessionTrack,
+  type OralExamAssignment,
   type OralExamSession,
   type OralExamStudentRecord,
   type OralExamSubjectScope,
@@ -59,11 +66,13 @@ import {
 import { areClassCodesEqual, normalizeClassCode } from '../../../utils/class.utils';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import type { StudentItem } from '../../../types/database.types';
+import { OralExamAdminSetupModal } from './OralExamAdminSetupModal';
 
 export interface OralExamAssessmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   academicYear?: string;
+  roleMode?: 'GURU' | 'ADMIN';
 }
 
 type ModalScreen = 'LIST' | 'CREATE' | 'ASSESS';
@@ -88,10 +97,12 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   isOpen,
   onClose,
   academicYear: propAcademicYear,
+  roleMode = 'GURU',
 }) => {
   const { user } = useAuthStore();
   const { showToast } = useToastStore();
 
+  const isAdminControl = roleMode === 'ADMIN';
   const activeAcademicYear = useMemo(
     () => propAcademicYear || AdministrationRepository.getActiveAcademicYear(),
     [propAcademicYear]
@@ -103,15 +114,21 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   const [screen, setScreen] = useState<ModalScreen>('LIST');
   const [assessViewMode, setAssessViewMode] = useState<AssessViewMode>('FOCUS');
 
+  // Admin-configured Examiner Assignments (Cloud Synced)
+  const [allAssignments, setAllAssignments] = useState<OralExamAssignment[]>([]);
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState<boolean>(false);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>('');
+  const [isAdminSetupOpen, setIsAdminSetupOpen] = useState<boolean>(false);
+
   // Sessions & editing state
   const [sessions, setSessions] = useState<OralExamSession[]>([]);
   const [currentSession, setCurrentSession] = useState<OralExamSession | null>(null);
   const [isDirty, setIsDirty] = useState(false);
 
-  // Create session wizard state
+  // Create session wizard state (Admin Only)
   const [subjectScopeDraft, setSubjectScopeDraft] = useState<OralExamSubjectScope>('ENGLISH_ONLY');
   const [rosterSourceMode, setRosterSourceMode] = useState<RosterSourceMode>('OFFICIAL_GROUP');
-  const [selectedGroupId, setSelectedGroupId] = useState<string>(ORAL_EXAM_OFFICIAL_GROUPS[0].id);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [selectedClass, setSelectedClass] = useState<string>('7');
   const [examinerName, setExaminerName] = useState<string>('');
   const [roomNumber, setRoomNumber] = useState<string>('Ruang 01');
@@ -157,24 +174,74 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     return list;
   }, [activeAcademicYear]);
 
-  // Reset modal entry state cleanly when opened
+  const loadAssignments = useCallback(async () => {
+    setIsLoadingAssignments(true);
+    try {
+      const list = await OralExamAssignmentRepository.getAssignments(activeAcademicYear);
+      setAllAssignments(list);
+      return list;
+    } finally {
+      setIsLoadingAssignments(false);
+    }
+  }, [activeAcademicYear]);
+
+  // Reset modal entry state cleanly when opened + listen for Admin assignment updates
   useEffect(() => {
     if (!isOpen) return;
     loadSessions();
+    loadAssignments();
     setScreen('LIST');
     setIsDirty(false);
     setScoreDrafts({});
-    const matchedGroup = findMatchingOfficialOralGroup(user?.full_name);
-    if (matchedGroup) {
-      setRosterSourceMode('OFFICIAL_GROUP');
-      setSelectedGroupId(matchedGroup.id);
-      setExaminerName(matchedGroup.examinerName);
-      setRoomNumber(matchedGroup.roomNumber);
-      setSelectedClass(matchedGroup.className);
-    } else {
-      setExaminerName(user?.full_name || 'Guru Penguji');
+    setIsAdminSetupOpen(false);
+
+    const handleAssignmentsChanged = () => {
+      loadAssignments();
+    };
+    window.addEventListener(ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT, handleAssignmentsChanged);
+    return () => {
+      window.removeEventListener(ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT, handleAssignmentsChanged);
+    };
+  }, [isOpen, loadSessions, loadAssignments]);
+
+  const guruAssignments = useMemo(
+    () => findAssignmentsForTeacher(allAssignments, user),
+    [allAssignments, user]
+  );
+
+  // Determine active teacher assignment in GURU mode
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!isAdminControl && guruAssignments.length > 0) {
+      const stillValid = guruAssignments.some((a) => a.id === selectedAssignmentId);
+      const chosen = stillValid
+        ? guruAssignments.find((a) => a.id === selectedAssignmentId)!
+        : guruAssignments[0];
+      if (chosen.id !== selectedAssignmentId) {
+        setSelectedAssignmentId(chosen.id);
+      }
+      if (!chosen.examTracks.includes(activeTrack) && chosen.examTracks.length > 0) {
+        setActiveTrack(chosen.examTracks[0]);
+      }
     }
-  }, [isOpen, loadSessions, user?.full_name]);
+  }, [isOpen, isAdminControl, guruAssignments, selectedAssignmentId, activeTrack]);
+
+  const activeGuruAssignment = useMemo(
+    () => guruAssignments.find((a) => a.id === selectedAssignmentId) || guruAssignments[0] || null,
+    [guruAssignments, selectedAssignmentId]
+  );
+
+  // Sync admin create wizard defaults when assignments finish loading
+  useEffect(() => {
+    if (allAssignments.length === 0) return;
+    if (!selectedGroupId || !allAssignments.some((a) => a.id === selectedGroupId)) {
+      const matchedGroup = findMatchingOfficialOralGroup(user?.full_name);
+      const firstId = matchedGroup?.id && allAssignments.some((a) => a.id === matchedGroup.id)
+        ? matchedGroup.id
+        : allAssignments[0].id;
+      setSelectedGroupId(firstId);
+    }
+  }, [allAssignments, selectedGroupId, user?.full_name]);
 
   // Sessions filtered STRICTLY by active track (Bahasa vs BTQ separated)
   const trackSessions = useMemo(
@@ -191,23 +258,33 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     [sessions]
   );
 
-  const selectedOfficialGroup = useMemo(
-    () => ORAL_EXAM_OFFICIAL_GROUPS.find((g) => g.id === selectedGroupId) || ORAL_EXAM_OFFICIAL_GROUPS[0],
-    [selectedGroupId]
+  const selectedAdminAssignment = useMemo(
+    () => allAssignments.find((g) => g.id === selectedGroupId) || allAssignments[0] || null,
+    [allAssignments, selectedGroupId]
   );
 
+  const existingSessionForActiveGuruTrack = useMemo(() => {
+    if (!activeGuruAssignment) return null;
+    return (
+      sessions.find(
+        (s) => s.groupId === activeGuruAssignment.id && getOralExamSessionTrack(s) === activeTrack
+      ) || null
+    );
+  }, [sessions, activeGuruAssignment, activeTrack]);
+
   const openCreateScreen = (track: OralExamTrack = activeTrack) => {
+    if (!isAdminControl) return;
     setActiveTrack(track);
     setSubjectScopeDraft(track === 'BAHASA' ? 'ENGLISH_ONLY' : 'BOTH');
     setSessionTitle('');
     setSessionDate(getTodayDateInJakarta());
-    const matchedGroup = findMatchingOfficialOralGroup(user?.full_name);
-    if (matchedGroup) {
+    const targetGrp = selectedAdminAssignment;
+    if (targetGrp) {
       setRosterSourceMode('OFFICIAL_GROUP');
-      setSelectedGroupId(matchedGroup.id);
-      setExaminerName(matchedGroup.examinerName);
-      setRoomNumber(matchedGroup.roomNumber);
-      setSelectedClass(matchedGroup.className);
+      setSelectedGroupId(targetGrp.id);
+      setExaminerName(targetGrp.examinerName);
+      setRoomNumber(targetGrp.roomNumber);
+      setSelectedClass(targetGrp.className);
     } else {
       setExaminerName(user?.full_name || 'Guru Penguji');
     }
@@ -216,7 +293,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
   const handleGroupChange = (groupId: string) => {
     setSelectedGroupId(groupId);
-    const grp = ORAL_EXAM_OFFICIAL_GROUPS.find((g) => g.id === groupId);
+    const grp = allAssignments.find((g) => g.id === groupId);
     if (grp) {
       setExaminerName(grp.examinerName);
       setRoomNumber(grp.roomNumber);
@@ -239,6 +316,22 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     setScreen('ASSESS');
   };
 
+  const handleLaunchReadyAssignmentSession = (
+    assignment: OralExamAssignment,
+    track: OralExamTrack = activeTrack
+  ) => {
+    const session = OralExamRepository.openOrSyncAssignedSession({
+      assignment,
+      track,
+      academicYear: activeAcademicYear,
+      semester: activeSemester,
+      examinerNpp: user?.nip ?? assignment.examinerNpp ?? null,
+      date: getTodayDateInJakarta(),
+    });
+    loadSessions();
+    handleOpenSession(session);
+  };
+
   const handleCreateSessionSubmit = async () => {
     setIsCreatingLoading(true);
     try {
@@ -251,15 +344,16 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       let groupId: string | null = null;
       let classStudents: Array<{ studentId: string; studentName: string; nisn?: string; className?: string }> = [];
 
-      if (rosterSourceMode === 'OFFICIAL_GROUP' && selectedOfficialGroup) {
-        targetClassName = selectedOfficialGroup.className;
-        targetRoomNumber = roomNumber.trim() || selectedOfficialGroup.roomNumber;
-        targetExaminerName = examinerName.trim() || selectedOfficialGroup.examinerName;
-        groupId = selectedOfficialGroup.id;
-        classStudents = selectedOfficialGroup.students.map((s) => ({
+      if (rosterSourceMode === 'OFFICIAL_GROUP' && selectedAdminAssignment) {
+        targetClassName = selectedAdminAssignment.className;
+        targetRoomNumber = roomNumber.trim() || selectedAdminAssignment.roomNumber;
+        targetExaminerName = examinerName.trim() || selectedAdminAssignment.examinerName;
+        groupId = selectedAdminAssignment.id;
+        classStudents = selectedAdminAssignment.students.map((s) => ({
           studentId: s.studentId,
           studentName: s.studentName,
-          className: selectedOfficialGroup.className,
+          nisn: s.nisn,
+          className: s.className || selectedAdminAssignment.className,
         }));
       } else {
         try {
@@ -293,7 +387,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
           showToast(
             'info',
             'Data Kelas Belum Tersedia di Master',
-            'Sesi dibuat dengan baris contoh. Anda dapat menambah nama siswa dengan tombol "+ Tambah Siswa".'
+            'Sesi dibuat dengan baris contoh. Anda dapat menambah nama siswa dengan tombol "+ Siswa".'
           );
         }
       }
@@ -674,7 +768,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape' && isOpen && !isAdminSetupOpen) {
         if (confirmDialog) {
           setConfirmDialog(null);
         } else if (addStudentDialogOpen) {
@@ -686,7 +780,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, confirmDialog, addStudentDialogOpen, handleRequestCloseModal]);
+  }, [isOpen, isAdminSetupOpen, confirmDialog, addStudentDialogOpen, handleRequestCloseModal]);
 
   const effectiveScope = useMemo(
     () => (currentSession ? getEffectiveSubjectScope(currentSession) : 'BOTH'),
@@ -931,7 +1025,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
     return (
       <div className="space-y-3.5">
-        {showBtq && renderDirectScoreInputBlock(student, studentIdx, 'btqScore', 'Nilai BTQ (Baca Tulis Qur\'an)')}
+        {showBtq && renderDirectScoreInputBlock(student, studentIdx, 'btqScore', "Nilai BTQ (Baca Tulis Qur'an)")}
         {showHafalan && renderDirectScoreInputBlock(student, studentIdx, 'hafalanScore', 'Nilai Hafalan (Tahfidz)')}
         <div className="space-y-1">
           <label className="text-xs font-bold text-slate-700 block">
@@ -945,6 +1039,79 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
             className="w-full h-11 px-3.5 bg-white border border-slate-200 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
           />
         </div>
+      </div>
+    );
+  };
+
+  const renderTrackSwitcher = (allowedTracks?: OralExamTrack[]) => {
+    const canBahasa = !allowedTracks || allowedTracks.includes('BAHASA');
+    const canBtq = !allowedTracks || allowedTracks.includes('BTQ');
+
+    return (
+      <div className="grid grid-cols-2 gap-2.5">
+        <button
+          type="button"
+          disabled={!canBahasa}
+          onClick={() => setActiveTrack('BAHASA')}
+          className={`p-3.5 rounded-xl border text-left transition-colors min-h-14 ${
+            !canBahasa
+              ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+              : activeTrack === 'BAHASA'
+                ? 'bg-[#023246] border-[#023246] text-white shadow-sm cursor-pointer'
+                : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50 cursor-pointer'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="text-xs sm:text-sm font-extrabold flex items-center gap-1.5">
+              <Languages className="w-4 h-4 shrink-0" />
+              <span>Ujian Bahasa</span>
+            </span>
+            {isAdminControl && (
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                activeTrack === 'BAHASA' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {bahasaCount}
+              </span>
+            )}
+          </div>
+          <p className={`text-[11px] mt-1 ${
+            !canBahasa ? 'text-slate-400' : activeTrack === 'BAHASA' ? 'text-slate-200' : 'text-slate-500'
+          }`}>
+            {canBahasa ? 'Inggris / Arab • 15 Soal' : 'Tidak ditugaskan'}
+          </p>
+        </button>
+
+        <button
+          type="button"
+          disabled={!canBtq}
+          onClick={() => setActiveTrack('BTQ')}
+          className={`p-3.5 rounded-xl border text-left transition-colors min-h-14 ${
+            !canBtq
+              ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+              : activeTrack === 'BTQ'
+                ? 'bg-[#0D7A5F] border-[#0D7A5F] text-white shadow-sm cursor-pointer'
+                : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50 cursor-pointer'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="text-xs sm:text-sm font-extrabold flex items-center gap-1.5">
+              <BookOpen className="w-4 h-4 shrink-0" />
+              <span>Ujian BTQ</span>
+            </span>
+            {isAdminControl && (
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                activeTrack === 'BTQ' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {btqCount}
+              </span>
+            )}
+          </div>
+          <p className={`text-[11px] mt-1 ${
+            !canBtq ? 'text-slate-400' : activeTrack === 'BTQ' ? 'text-emerald-100' : 'text-slate-500'
+          }`}>
+            {canBtq ? 'BTQ & Hafalan • 0–100' : 'Tidak ditugaskan'}
+          </p>
+        </button>
       </div>
     );
   };
@@ -963,7 +1130,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
             <button
               type="button"
               onClick={handleBackNavigation}
-              aria-label={screen === 'LIST' ? 'Tutup' : 'Kembali ke daftar sesi'}
+              aria-label={screen === 'LIST' ? 'Tutup' : 'Kembali'}
               className="w-11 h-11 -ml-1.5 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -975,8 +1142,8 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                 {screen === 'ASSESS' && (currentSession?.title || 'Input Nilai Ujian Lisan')}
               </h2>
               <p className="text-[11px] text-slate-500 truncate">
-                {screen === 'LIST' && 'Ujian Bahasa dan Ujian BTQ dipisah agar mudah dinilai di HP'}
-                {screen === 'CREATE' && 'Pilih mata uji dan kelompok siswa dalam 3 langkah mudah'}
+                {screen === 'LIST' && (isAdminControl ? 'Kelola penugasan penguji & pantau penilaian' : 'Siap pakai menilai siswa sesuai penempatan Admin')}
+                {screen === 'CREATE' && 'Mode Admin: Buat sesi penilaian tambahan'}
                 {screen === 'ASSESS' && currentSession && (
                   `${currentSession.examinerName} • ${currentSession.className === 'SMA' ? 'SMA' : `Kelas ${currentSession.className}`} • ${currentSession.roomNumber || 'Ruang 01'}`
                 )}
@@ -984,97 +1151,240 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleRequestCloseModal}
-            aria-label="Tutup Penilaian Ujian Lisan"
-            className="w-11 h-11 rounded-xl hidden md:flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer shrink-0"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isAdminControl && screen === 'LIST' && (
+              <button
+                type="button"
+                onClick={() => setIsAdminSetupOpen(true)}
+                className="h-10 px-3 rounded-xl bg-[#023246] hover:bg-[#034560] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Atur Penguji</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleRequestCloseModal}
+              aria-label="Tutup Penilaian Ujian Lisan"
+              className="w-11 h-11 rounded-xl hidden md:flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer shrink-0"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </header>
 
         {/* 2. SCROLLABLE WORKSPACE */}
         <main className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
           <div className="w-full max-w-lg mx-auto space-y-4">
-            {/* ==================== SCREEN 1: LIST ==================== */}
-            {screen === 'LIST' && (
+            {/* ==================== SCREEN 1: GURU READY-TO-USE HOME ==================== */}
+            {screen === 'LIST' && !isAdminControl && (
               <>
-                {/* Tab Pemisah Ujian Bahasa vs BTQ */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTrack('BAHASA')}
-                    className={`p-3.5 rounded-xl border text-left transition-colors cursor-pointer min-h-14 ${
-                      activeTrack === 'BAHASA'
-                        ? 'bg-[#023246] border-[#023246] text-white shadow-sm'
-                        : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="text-xs sm:text-sm font-extrabold flex items-center gap-1.5">
-                        <Languages className="w-4 h-4 shrink-0" />
-                        <span>Ujian Bahasa</span>
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                        activeTrack === 'BAHASA' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {bahasaCount}
-                      </span>
-                    </div>
-                    <p className={`text-[11px] mt-1 ${activeTrack === 'BAHASA' ? 'text-slate-200' : 'text-slate-500'}`}>
-                      Inggris / Arab • 15 Soal
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveTrack('BTQ')}
-                    className={`p-3.5 rounded-xl border text-left transition-colors cursor-pointer min-h-14 ${
-                      activeTrack === 'BTQ'
-                        ? 'bg-[#0D7A5F] border-[#0D7A5F] text-white shadow-sm'
-                        : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="text-xs sm:text-sm font-extrabold flex items-center gap-1.5">
-                        <BookOpen className="w-4 h-4 shrink-0" />
-                        <span>Ujian BTQ</span>
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                        activeTrack === 'BTQ' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {btqCount}
-                      </span>
-                    </div>
-                    <p className={`text-[11px] mt-1 ${activeTrack === 'BTQ' ? 'text-emerald-100' : 'text-slate-500'}`}>
-                      BTQ &amp; Hafalan • 0–100
-                    </p>
-                  </button>
-                </div>
-
-                {/* Daftar Sesi pada Tab Aktif */}
-                {trackSessions.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center space-y-3">
-                    <div className="w-12 h-12 rounded-2xl bg-slate-100 text-[#023246] flex items-center justify-center mx-auto">
-                      {activeTrack === 'BAHASA' ? <Languages className="w-6 h-6" /> : <BookOpen className="w-6 h-6" />}
+                {isLoadingAssignments ? (
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center text-xs font-semibold text-slate-500">
+                    Memuat penugasan penguji dari Admin...
+                  </div>
+                ) : !activeGuruAssignment ? (
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center mx-auto">
+                      <UserCheck className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
                       <h3 className="text-sm font-extrabold text-slate-900">
-                        {activeTrack === 'BAHASA'
-                          ? 'Belum Ada Sesi Ujian Lisan Bahasa'
-                          : 'Belum Ada Sesi Ujian BTQ & Hafalan'}
+                        Belum Ada Penempatan Penguji
                       </h3>
-                      <p className="text-xs text-slate-500 leading-relaxed">
-                        Ketuk tombol di bawah untuk membuat lembar nilai. Kelompok siswa Anda dapat dipilih langsung tanpa perlu ketik manual.
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Pengaturan siapa yang menjadi penguji, ruangan, dan daftar siswa ditetapkan oleh Admin.
+                        Silakan hubungi Admin/Panitia Ujian jika akun Anda (<strong>{user?.full_name}</strong>) bertugas menguji Ujian Lisan.
                       </p>
                     </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Assignment Selector if Guru has >1 group */}
+                    {guruAssignments.length > 1 && (
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                          Pilih Kelompok Penugasan Anda ({guruAssignments.length})
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {guruAssignments.map((grp) => (
+                            <button
+                              key={grp.id}
+                              type="button"
+                              onClick={() => setSelectedAssignmentId(grp.id)}
+                              className={`h-10 px-3 rounded-xl border text-xs font-bold cursor-pointer ${
+                                grp.id === activeGuruAssignment.id
+                                  ? 'bg-[#023246] border-[#023246] text-white'
+                                  : 'bg-white border-slate-200 text-slate-700'
+                              }`}
+                            >
+                              {grp.roomNumber} • {grp.className === 'SMA' ? 'SMA' : `Kls ${grp.className}`} ({grp.students.length})
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Teacher Ready-to-Use Placement Card */}
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                          Penempatan Resmi dari Admin
+                        </span>
+                        <span className="text-xs font-bold text-slate-600">TA {activeAcademicYear}</span>
+                      </div>
+                      <div>
+                        <h3 className="text-base font-extrabold text-slate-900">
+                          {activeGuruAssignment.roomNumber} •{' '}
+                          {activeGuruAssignment.className === 'SMA'
+                            ? 'Jenjang SMA'
+                            : `Kelas ${activeGuruAssignment.className}`}
+                        </h3>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          Penguji: <strong>{activeGuruAssignment.examinerName}</strong> •{' '}
+                          <strong>{activeGuruAssignment.students.length} Siswa</strong> siap dinilai
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Separated Bahasa vs BTQ Tabs */}
+                    {renderTrackSwitcher(activeGuruAssignment.examTracks)}
+
+                    {/* Ready-to-Start Card for Selected Track */}
+                    {(() => {
+                      const trackAllowed = activeGuruAssignment.examTracks.includes(activeTrack);
+                      if (!trackAllowed) {
+                        return (
+                          <div className="p-5 rounded-xl bg-white border border-slate-200 text-center text-xs text-slate-600">
+                            Anda tidak ditugaskan menguji kategori ini oleh Admin. Silakan pilih kategori lain di atas.
+                          </div>
+                        );
+                      }
+
+                      const scope =
+                        activeTrack === 'BAHASA'
+                          ? activeGuruAssignment.bahasaScope
+                          : activeGuruAssignment.btqScope;
+                      const template: OralExamTemplateType =
+                        activeTrack === 'BAHASA' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN';
+                      const stats = existingSessionForActiveGuruTrack
+                        ? calculateOralExamSummaryStats(
+                            existingSessionForActiveGuruTrack.students,
+                            activeTrack === 'BAHASA',
+                            scope
+                          )
+                        : null;
+                      const totalCount = activeGuruAssignment.students.length;
+                      const doneCount = stats?.completedStudents ?? 0;
+                      const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+
+                      return (
+                        <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-slate-900">
+                              {getScopeLabel(template, scope)}
+                            </span>
+                            <span className="text-xs font-bold text-emerald-700">
+                              {doneCount} / {totalCount} siswa ({pct}%)
+                            </span>
+                          </div>
+
+                          <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-600 transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleLaunchReadyAssignmentSession(activeGuruAssignment, activeTrack)}
+                            className="w-full h-12 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold cursor-pointer transition-colors"
+                          >
+                            {doneCount > 0
+                              ? `Lanjutkan Menilai (${doneCount}/${totalCount})`
+                              : `Mulai Menilai Sekarang (${totalCount} Siswa)`}
+                          </button>
+
+                          {existingSessionForActiveGuruTrack && (
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const { OralExamExportService } = await import('../../../lib/oral-exam-export.lib');
+                                  await OralExamExportService.exportToPdf(existingSessionForActiveGuruTrack);
+                                }}
+                                className="h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <Printer className="w-4 h-4 text-[#023246]" />
+                                <span>Unduh PDF</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const { OralExamExportService } = await import('../../../lib/oral-exam-export.lib');
+                                  OralExamExportService.exportToExcel(existingSessionForActiveGuruTrack);
+                                }}
+                                className="h-11 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                                <span>Unduh Excel</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
+              </>
+            )}
+
+            {/* ==================== SCREEN 1: ADMIN OVERVIEW ==================== */}
+            {screen === 'LIST' && isAdminControl && (
+              <>
+                {/* Card Pengaturan Penguji (Admin Only) */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 flex items-center justify-between gap-3">
+                  <div className="space-y-0.5 min-w-0">
+                    <h3 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                      Pengaturan Penguji &amp; Penempatan
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      {allAssignments.filter((a) => a.isActive).length} penguji aktif • Sinkron otomatis ke HP guru
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAdminSetupOpen(true)}
+                    className="h-11 px-3.5 rounded-xl bg-[#023246] hover:bg-[#034560] text-white text-xs font-bold shrink-0 cursor-pointer"
+                  >
+                    Kelola Penguji
+                  </button>
+                </div>
+
+                {/* Tab Pemisah Ujian Bahasa vs BTQ */}
+                {renderTrackSwitcher()}
+
+                {/* Daftar Sesi pada Tab Aktif */}
+                {trackSessions.length === 0 ? (
+                  <div className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center space-y-2.5">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 text-[#023246] flex items-center justify-center mx-auto">
+                      {activeTrack === 'BAHASA' ? <Languages className="w-6 h-6" /> : <BookOpen className="w-6 h-6" />}
+                    </div>
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      {activeTrack === 'BAHASA'
+                        ? 'Belum Ada Sesi Ujian Bahasa di Perangkat Ini'
+                        : 'Belum Ada Sesi Ujian BTQ di Perangkat Ini'}
+                    </h3>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Klik tombol di bawah untuk membuka/membuat sesi penilaian kelompok penguji atau kelas.
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                        {activeTrack === 'BAHASA' ? 'Sesi Ujian Bahasa Tersimpan' : 'Sesi Ujian BTQ Tersimpan'}
+                        {activeTrack === 'BAHASA' ? 'Sesi Ujian Bahasa' : 'Sesi Ujian BTQ'}
                       </h3>
                       <span className="text-xs font-semibold text-slate-500">TA {activeAcademicYear}</span>
                     </div>
@@ -1096,29 +1406,26 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                           key={sess.id}
                           className="p-4 rounded-xl bg-white border border-slate-200 space-y-3"
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="space-y-1 min-w-0">
-                              <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">
-                                {getScopeLabel(sess.templateType, scope)}
-                              </span>
-                              <h4 className="text-sm font-extrabold text-slate-900 leading-snug">
-                                {sess.title}
-                              </h4>
-                              <p className="text-xs text-slate-500">
-                                Penguji: <strong className="text-slate-700">{sess.examinerName}</strong>
-                              </p>
-                              <p className="text-xs text-slate-500">
-                                {sess.className === 'SMA' ? 'SMA' : `Kelas ${sess.className}`} • {sess.roomNumber || 'Ruang 01'} • {sess.date}
-                              </p>
-                            </div>
+                          <div className="space-y-1 min-w-0">
+                            <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">
+                              {getScopeLabel(sess.templateType, scope)}
+                            </span>
+                            <h4 className="text-sm font-extrabold text-slate-900 leading-snug">
+                              {sess.title}
+                            </h4>
+                            <p className="text-xs text-slate-500">
+                              Penguji: <strong className="text-slate-700">{sess.examinerName}</strong>
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {sess.className === 'SMA' ? 'SMA' : `Kelas ${sess.className}`} • {sess.roomNumber || 'Ruang 01'} • {sess.date}
+                            </p>
                           </div>
 
-                          {/* Progress bar */}
                           <div className="space-y-1">
                             <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
-                              <span>Progress Penilaian</span>
+                              <span>Progress</span>
                               <span className="text-slate-900 font-bold">
-                                {stats.completedStudents} dari {stats.totalStudents} siswa ({pct}%)
+                                {stats.completedStudents}/{stats.totalStudents} siswa ({pct}%)
                               </span>
                             </div>
                             <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
@@ -1135,7 +1442,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                               onClick={() => handleOpenSession(sess)}
                               className="flex-1 h-11 px-4 rounded-xl bg-[#023246] hover:bg-[#034560] text-white text-xs sm:text-sm font-bold cursor-pointer transition-colors"
                             >
-                              Buka &amp; Nilai Siswa
+                              Buka &amp; Nilai
                             </button>
                             <button
                               type="button"
@@ -1151,15 +1458,11 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                     })}
                   </div>
                 )}
-
-                <p className="text-[11px] text-slate-500 text-center pt-1 leading-relaxed">
-                  Tip: Setelah menilai siswa di HP, gunakan tombol <strong>Unduh PDF</strong> atau <strong>Excel</strong> untuk arsip panitia ujian.
-                </p>
               </>
             )}
 
-            {/* ==================== SCREEN 2: CREATE ==================== */}
-            {screen === 'CREATE' && (
+            {/* ==================== SCREEN 2: CREATE (ADMIN ONLY) ==================== */}
+            {screen === 'CREATE' && isAdminControl && (
               <div className="space-y-4">
                 {/* Langkah 1: Pilih Mata Uji */}
                 <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
@@ -1204,7 +1507,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                   ) : (
                     <div className="space-y-2">
                       {[
-                        { scope: 'BTQ_ONLY' as const, title: 'BTQ Saja (Nilai 0–100)', desc: 'Lebih ringkas bila hanya menguji Baca Tulis Qur\'an.' },
+                        { scope: 'BTQ_ONLY' as const, title: 'BTQ Saja (Nilai 0–100)', desc: "Lebih ringkas bila hanya menguji Baca Tulis Qur'an." },
                         { scope: 'BOTH' as const, title: 'BTQ & Hafalan (Keduanya)', desc: 'Menguji nilai BTQ sekaligus nilai Hafalan / Tahfidz.' },
                         { scope: 'HAFALAN_ONLY' as const, title: 'Hafalan Saja (Nilai 0–100)', desc: 'Khusus menilai setoran hafalan / tahfidz siswa.' },
                       ].map((opt) => (
@@ -1278,22 +1581,22 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                   {rosterSourceMode === 'OFFICIAL_GROUP' ? (
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-700 block">
-                        Pilih Nama Penguji / Ruangan (Otomatis isi daftar siswa):
+                        Pilih Penguji &amp; Penempatan:
                       </label>
                       <select
                         value={selectedGroupId}
                         onChange={(e) => handleGroupChange(e.target.value)}
                         className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
                       >
-                        {ORAL_EXAM_OFFICIAL_GROUPS.map((grp) => (
+                        {allAssignments.map((grp) => (
                           <option key={grp.id} value={grp.id}>
                             {grp.examinerName} — {grp.roomNumber} ({grp.className === 'SMA' ? 'SMA' : `Kls ${grp.className}`}, {grp.students.length} siswa)
                           </option>
                         ))}
                       </select>
-                      {selectedOfficialGroup && (
+                      {selectedAdminAssignment && (
                         <p className="text-[11px] text-emerald-700 font-semibold">
-                          Terpilih {selectedOfficialGroup.students.length} siswa resmi di {selectedOfficialGroup.roomNumber} ({selectedOfficialGroup.className === 'SMA' ? 'SMA' : `Kelas ${selectedOfficialGroup.className}`}).
+                          Terpilih {selectedAdminAssignment.students.length} siswa di {selectedAdminAssignment.roomNumber} ({selectedAdminAssignment.className === 'SMA' ? 'SMA' : `Kelas ${selectedAdminAssignment.className}`}).
                         </p>
                       )}
                     </div>
@@ -1456,17 +1759,19 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                     {currentSession.students.length === 0 ? (
                       <div className="p-6 rounded-xl bg-white border border-slate-200 text-center space-y-3">
                         <p className="text-sm font-bold text-slate-800">Daftar siswa kosong</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNewStudentNameDraft('');
-                            setAddStudentDialogOpen(true);
-                          }}
-                          className="h-11 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>Tambah Siswa Pertama</span>
-                        </button>
+                        {isAdminControl && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewStudentNameDraft('');
+                              setAddStudentDialogOpen(true);
+                            }}
+                            className="h-11 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Tambah Siswa Pertama</span>
+                          </button>
+                        )}
                       </div>
                     ) : activeFocusStudent ? (
                       <div className="space-y-3">
@@ -1487,18 +1792,20 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                               );
                             })}
                           </select>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setNewStudentNameDraft('');
-                              setAddStudentDialogOpen(true);
-                            }}
-                            aria-label="Tambah Siswa Baru"
-                            title="Tambah Siswa Baru"
-                            className="w-11 h-11 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 flex items-center justify-center cursor-pointer shrink-0"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
+                          {isAdminControl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewStudentNameDraft('');
+                                setAddStudentDialogOpen(true);
+                              }}
+                              aria-label="Tambah Siswa Baru"
+                              title="Tambah Siswa Baru"
+                              className="w-11 h-11 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 flex items-center justify-center cursor-pointer shrink-0"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
 
                         {/* Active Student Assessment Card */}
@@ -1533,14 +1840,16 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                                   ? 'Sudah Dinilai'
                                   : 'Belum Dinilai'}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveStudent(activeStudentIndex)}
-                                aria-label="Hapus siswa ini"
-                                className="w-9 h-9 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center cursor-pointer"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              {isAdminControl && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveStudent(activeStudentIndex)}
+                                  aria-label="Hapus siswa ini"
+                                  className="w-9 h-9 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center cursor-pointer"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -1549,7 +1858,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                             : renderBtqAssessmentBody(activeFocusStudent, activeStudentIndex)}
                         </div>
 
-                        {/* Secondary Export Buttons (Cleanly accessible without crowding bottom thumb bar) */}
+                        {/* Secondary Export Buttons */}
                         <div className="grid grid-cols-2 gap-2.5">
                           <button
                             type="button"
@@ -1574,7 +1883,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                   </>
                 )}
 
-                {/* Mode 2: Daftar Semua Siswa (Mobile Cards — Zero Horizontal Scroll) */}
+                {/* Mode 2: Daftar Semua Siswa (Mobile Cards) */}
                 {assessViewMode === 'ALL' && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
@@ -1588,17 +1897,19 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                           className="w-full h-11 pl-9 pr-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#023246]"
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewStudentNameDraft('');
-                          setAddStudentDialogOpen(true);
-                        }}
-                        className="h-11 px-3 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 text-xs font-bold inline-flex items-center gap-1 cursor-pointer shrink-0"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Siswa</span>
-                      </button>
+                      {isAdminControl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewStudentNameDraft('');
+                            setAddStudentDialogOpen(true);
+                          }}
+                          className="h-11 px-3 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 text-xs font-bold inline-flex items-center gap-1 cursor-pointer shrink-0"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Siswa</span>
+                        </button>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-3 gap-2">
@@ -1711,7 +2022,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
         {/* 3. STICKY BOTTOM ACTION BAR (THUMB ZONE) */}
         <footer className="sticky bottom-0 z-20 bg-white border-t border-slate-200 p-3 pb-[max(12px,env(safe-area-inset-bottom))] shrink-0">
           <div className="w-full max-w-lg mx-auto">
-            {screen === 'LIST' && (
+            {screen === 'LIST' && isAdminControl && (
               <button
                 type="button"
                 onClick={() => openCreateScreen(activeTrack)}
@@ -1724,7 +2035,17 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
               </button>
             )}
 
-            {screen === 'CREATE' && (
+            {screen === 'LIST' && !isAdminControl && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold cursor-pointer"
+              >
+                Tutup
+              </button>
+            )}
+
+            {screen === 'CREATE' && isAdminControl && (
               <div className="flex items-center gap-2.5">
                 <button
                   type="button"
@@ -1827,8 +2148,20 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
         </footer>
       </div>
 
-      {/* Bottom-sheet Mobile / Clean Modal Desktop: Tambah Siswa Baru */}
-      {addStudentDialogOpen && (
+      {/* Modal Pengaturan Penguji Admin */}
+      {isAdminControl && isAdminSetupOpen && (
+        <OralExamAdminSetupModal
+          isOpen={isAdminSetupOpen}
+          onClose={() => {
+            setIsAdminSetupOpen(false);
+            loadAssignments();
+          }}
+          academicYear={activeAcademicYear}
+        />
+      )}
+
+      {/* Bottom-sheet Mobile / Clean Modal Desktop: Tambah Siswa Baru (Admin Only) */}
+      {isAdminControl && addStudentDialogOpen && (
         <div className="fixed inset-0 z-120 flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-900/60 backdrop-blur-xs">
           <form
             onSubmit={handleConfirmAddStudent}
