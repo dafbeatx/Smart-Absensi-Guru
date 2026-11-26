@@ -94,11 +94,13 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-      const targetDateParam = gate.via.startsWith('admin_session:')
+      const isAdminTriggered = gate.via.startsWith('admin_session:');
+      const targetDateParam = isAdminTriggered
         ? (req.query?.date || req.body?.date || undefined)
         : undefined;
       const result = await runAutoCheckout(serverSupabase, {
         targetDateStr: typeof targetDateParam === 'string' ? targetDateParam : undefined,
+        forceRun: isAdminTriggered,
       });
       return res.status(200).json({
         ...result,

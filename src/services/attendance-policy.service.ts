@@ -362,19 +362,34 @@ export class AttendancePolicyService {
     holidays?: HolidayRecord[] | null,
     token?: string
   ): Promise<AttendanceRecord[]> {
-    const offCheck = isDateOffDay(dateStr, systemSettings, holidays);
-    if (offCheck.isOff) return [];
+    if (systemSettings?.auto_attendance_enabled === false) {
+      return [];
+    }
+    if (mode !== 'CHECK_OUT' && systemSettings?.auto_checkin_mode === 'DISABLED') {
+      return [];
+    }
+
+    const shouldSkipHolidays = systemSettings?.auto_attendance_skip_holidays !== false;
+    if (shouldSkipHolidays) {
+      const offCheck = isDateOffDay(dateStr, systemSettings, holidays);
+      if (offCheck.isOff) return [];
+    }
+
+    const shouldSkipLeaves = systemSettings?.auto_attendance_skip_leaves !== false;
+    const effectiveLeaves = shouldSkipLeaves ? leaveRequests : [];
 
     let targetTeachers: UserProfile[] = [];
     if (mode === 'CHECK_OUT') {
       targetTeachers = allTeachers.filter((t) => {
-        const hasLeave = leaveRequests.some(
-          (l) =>
-            l.start_date <= dateStr &&
-            dateStr <= l.end_date &&
-            (l.approval_status === 'APPROVED' || (l as any).status === 'APPROVED')
-        );
-        if (hasLeave) return false;
+        if (shouldSkipLeaves) {
+          const hasLeave = effectiveLeaves.some(
+            (l) =>
+              l.start_date <= dateStr &&
+              dateStr <= l.end_date &&
+              (l.approval_status === 'APPROVED' || (l as any).status === 'APPROVED')
+          );
+          if (hasLeave) return false;
+        }
         const rec = attendanceHistory.find((r) => r.date === dateStr && r.user_id === t.id);
         return !rec || !rec.check_out_time;
       });
@@ -383,9 +398,9 @@ export class AttendancePolicyService {
         dateStr,
         allTeachers,
         attendanceHistory,
-        leaveRequests,
-        systemSettings,
-        holidays
+        effectiveLeaves,
+        shouldSkipHolidays ? systemSettings : { ...systemSettings, saturday_is_holiday: false, sunday_is_holiday: false } as SystemSettings,
+        shouldSkipHolidays ? holidays : []
       );
     }
 

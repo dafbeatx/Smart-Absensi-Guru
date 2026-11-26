@@ -15,7 +15,7 @@ import { Button } from '../../../components/ui/Button';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
-import { evaluateAttendanceStatus, isDateOffDay } from '../../../utils/time.utils';
+import { evaluateAttendanceStatus, isDateOffDay, resolveAutoCheckoutTimeHhMm } from '../../../utils/time.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { AttendancePolicyService } from '../../../services/attendance-policy.service';
@@ -129,11 +129,15 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     return new Date(y, (m || 1) - 1, d || 1).getDay() === 5;
   }, [selectedDate]);
 
+  const isAutoAttendanceEnabled = systemSettings?.auto_attendance_enabled !== false;
+  const isAutoCheckInAllowed = systemSettings?.auto_checkin_mode !== 'DISABLED';
+  const autoCheckInMinDisplay = systemSettings?.auto_checkin_time_min?.slice(0, 5) || CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN;
+  const autoCheckInMaxDisplay = systemSettings?.auto_checkin_time_max?.slice(0, 5) || CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX;
+  const autoCheckInPtsDisplay = systemSettings?.auto_checkin_points ?? CONSTANTS.DEFAULTS.AUTO_CHECKIN_POINTS;
+  const autoCheckOutPtsDisplay = systemSettings?.auto_checkout_points ?? CONSTANTS.DEFAULTS.AUTO_CHECKOUT_POINTS;
+
   const officialCheckoutDisplay = useMemo(() => {
-    if (isFriday) {
-      return systemSettings?.friday_checkout_start?.slice(0, 5) || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START;
-    }
-    return systemSettings?.work_checkout_start?.slice(0, 5) || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START;
+    return resolveAutoCheckoutTimeHhMm(isFriday, systemSettings);
   }, [isFriday, systemSettings]);
 
   const handleExecuteAutoAttend = async () => {
@@ -752,7 +756,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
 
           {/* Date Selector & Auto Absen Action */}
           <div className="flex items-center gap-2 flex-wrap">
-            {summary.totalUnabsented > 0 && !isOffDayCheck.isOff && (
+            {isAutoAttendanceEnabled && summary.totalUnabsented > 0 && !isOffDayCheck.isOff && isAutoCheckInAllowed && (
               <button
                 type="button"
                 onClick={() => {
@@ -1115,7 +1119,10 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                       )}
 
                       {/* Auto Absen Shortcut for Personnel who hasn't fully completed attendance */}
-                      {(!item?.record?.check_in_time || !item?.record?.check_out_time || status === 'BELUM_ABSEN') && !isOffDayCheck.isOff && (
+                      {isAutoAttendanceEnabled &&
+                        (!item?.record?.check_in_time || !item?.record?.check_out_time || status === 'BELUM_ABSEN') &&
+                        !isOffDayCheck.isOff &&
+                        (isAutoCheckInAllowed || Boolean(item?.record?.check_in_time && !item?.record?.check_out_time)) && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1125,7 +1132,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                             } else if (!item?.record?.check_in_time && item?.record?.check_out_time) {
                               setSelectedAutoMode('CHECK_IN');
                             } else {
-                              setSelectedAutoMode('BOTH');
+                              setSelectedAutoMode(isAutoCheckInAllowed ? 'BOTH' : 'CHECK_OUT');
                             }
                             setIsAutoAttendModalOpen(true);
                           }}
@@ -1472,11 +1479,14 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
             {/* Opsi 1: Auto Absen Masuk Saja */}
             <button
               type="button"
+              disabled={!isAutoCheckInAllowed}
               onClick={() => setSelectedAutoMode('CHECK_IN')}
-              className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-3.5 ${
-                selectedAutoMode === 'CHECK_IN'
-                  ? 'border-amber-500 bg-amber-50/70 shadow-xs ring-2 ring-amber-400/30'
-                  : 'border-slate-200 hover:border-slate-300 bg-white'
+              className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all flex items-start gap-3.5 ${
+                !isAutoCheckInAllowed
+                  ? 'border-slate-200 bg-slate-50 opacity-55 cursor-not-allowed'
+                  : selectedAutoMode === 'CHECK_IN'
+                  ? 'border-amber-500 bg-amber-50/70 shadow-xs ring-2 ring-amber-400/30 cursor-pointer'
+                  : 'border-slate-200 hover:border-slate-300 bg-white cursor-pointer'
               }`}
             >
               <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-xl shrink-0">
@@ -1485,17 +1495,19 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
                   <h4 className="font-extrabold text-sm text-slate-900">1. Auto Absen Masuk Saja</h4>
-                  {selectedAutoMode === 'CHECK_IN' && (
+                  {!isAutoCheckInAllowed ? (
+                    <span className="text-slate-500 font-bold text-[10px]">Dinonaktifkan di Pengaturan</span>
+                  ) : selectedAutoMode === 'CHECK_IN' && (
                     <span className="text-amber-600 font-extrabold text-xs">● Dipilih</span>
                   )}
                 </div>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Mencatat presensi masuk manual Admin berstatus <strong>Terlambat</strong> dengan <strong>0 Poin</strong> (guru tetap dapat mengganti dengan scan QR/Sidik Jari atau mengajukan izin).
+                  Mencatat presensi masuk manual Admin berstatus <strong>Terlambat</strong> dengan <strong>{autoCheckInPtsDisplay} Poin</strong> (guru tetap dapat mengganti dengan scan QR/Sidik Jari atau mengajukan izin).
                 </p>
                 <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-amber-900 bg-amber-100/60 px-2 py-0.5 rounded-lg w-fit">
-                  <span>Jam Masuk: Acak 07:31 - 08:00 WIB</span>
+                  <span>Jam Masuk: Acak {autoCheckInMinDisplay} - {autoCheckInMaxDisplay} WIB</span>
                   <span>•</span>
-                  <span>Poin: 0 PTS</span>
+                  <span>Poin: {autoCheckInPtsDisplay} PTS</span>
                 </div>
               </div>
             </button>
@@ -1521,10 +1533,12 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                   )}
                 </div>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Mencatat presensi kepulangan dinas sekolah secara tuntas (otomatis setiap hari kerja pukul 16:30 WIB oleh sistem server bagi guru yang sudah masuk, atau eksekusi manual di sini).
+                  Mencatat presensi kepulangan dinas sekolah secara tuntas (otomatis di server sesuai Pengaturan Sistem, atau eksekusi manual di sini).
                 </p>
                 <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-blue-900 bg-blue-100/60 px-2 py-0.5 rounded-lg w-fit">
                   <span>Jam Pulang: {officialCheckoutDisplay} WIB</span>
+                  <span>•</span>
+                  <span>Poin: +{autoCheckOutPtsDisplay} PTS</span>
                 </div>
               </div>
             </button>
@@ -1532,11 +1546,14 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
             {/* Opsi 3: Keduanya (Masuk & Pulang Sekaligus) */}
             <button
               type="button"
+              disabled={!isAutoCheckInAllowed}
               onClick={() => setSelectedAutoMode('BOTH')}
-              className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-3.5 ${
-                selectedAutoMode === 'BOTH'
-                  ? 'border-emerald-600 bg-emerald-50/70 shadow-xs ring-2 ring-emerald-500/30'
-                  : 'border-slate-200 hover:border-slate-300 bg-white'
+              className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all flex items-start gap-3.5 ${
+                !isAutoCheckInAllowed
+                  ? 'border-slate-200 bg-slate-50 opacity-55 cursor-not-allowed'
+                  : selectedAutoMode === 'BOTH'
+                  ? 'border-emerald-600 bg-emerald-50/70 shadow-xs ring-2 ring-emerald-500/30 cursor-pointer'
+                  : 'border-slate-200 hover:border-slate-300 bg-white cursor-pointer'
               }`}
             >
               <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center text-xl shrink-0">
@@ -1545,17 +1562,19 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
                   <h4 className="font-extrabold text-sm text-slate-900">3. Keduanya (Masuk &amp; Pulang)</h4>
-                  {selectedAutoMode === 'BOTH' && (
+                  {!isAutoCheckInAllowed ? (
+                    <span className="text-slate-500 font-bold text-[10px]">Dinonaktifkan di Pengaturan</span>
+                  ) : selectedAutoMode === 'BOTH' && (
                     <span className="text-emerald-700 font-extrabold text-xs">● Dipilih</span>
                   )}
                 </div>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Mencatat lengkap presensi masuk (Terlambat - 0 Poin) dan kepulangan dinas sekolah tuntas sekaligus.
+                  Mencatat lengkap presensi masuk (Terlambat - {autoCheckInPtsDisplay} Poin) dan kepulangan dinas sekolah ({autoCheckOutPtsDisplay} Poin) sekaligus.
                 </p>
                 <div className="mt-2 flex items-center gap-2 text-[11px] font-mono text-emerald-900 bg-emerald-100/60 px-2 py-0.5 rounded-lg w-fit">
-                  <span>Masuk: Acak 07:31 - 08:00 WIB (0 PTS)</span>
+                  <span>Masuk: Acak {autoCheckInMinDisplay} - {autoCheckInMaxDisplay} WIB ({autoCheckInPtsDisplay} PTS)</span>
                   <span>•</span>
-                  <span>Pulang: {officialCheckoutDisplay} WIB</span>
+                  <span>Pulang: {officialCheckoutDisplay} WIB (+{autoCheckOutPtsDisplay} PTS)</span>
                 </div>
               </div>
             </button>

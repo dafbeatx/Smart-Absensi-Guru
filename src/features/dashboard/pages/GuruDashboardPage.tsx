@@ -3460,7 +3460,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 return null;
               })();
 
-              const isAutoCheckInToday = isAutoCheckInRecord(todayAttendance);
+              const allowOverrideScan = settings.auto_attendance_allow_override_scan !== false;
+              const isAutoCheckInToday = allowOverrideScan && isAutoCheckInRecord(todayAttendance);
               const isAutoCheckOutToday = isAutoCheckOutRecord(todayAttendance);
 
               let statusLabel = 'Belum Absen';

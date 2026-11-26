@@ -7,12 +7,13 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
-import type { SystemSettings } from '../../../types/database.types';
-import { formatTimeForInput } from '../../../utils/time.utils';
+import type { SystemSettings, AutoCheckInMode, AutoCheckoutTimeMode } from '../../../types/database.types';
+import type { ServerAutoCheckoutSummary } from '../../../providers/data-provider.interface';
+import { formatTimeForInput, timeToMinutes } from '../../../utils/time.utils';
 import { GPSService } from '../../../services/gps.service';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { handleAppError } from '../../../utils/error.utils';
-import { SlidersHorizontal, Clock } from 'lucide-react';
+import { SlidersHorizontal, Clock, Play, RotateCcw, ShieldCheck } from 'lucide-react';
 import { ExamPeriodRepository, EXAM_PERIOD_CHANGED_EVENT } from '../../../repositories/ExamPeriodRepository';
 import { ExamPeriodSettingsModal } from '../../administration/components/ExamPeriodSettingsModal';
 import type { ExamPeriodStatus } from '../../../types/exam-schedule.types';
@@ -66,6 +67,27 @@ export const SystemSettingsForm: React.FC = () => {
   const [adminResetPassword, setAdminResetPassword] = useState('');
   const [confirmResetPassword, setConfirmResetPassword] = useState('');
   const [showResetPassword, setShowResetPassword] = useState(false);
+
+  // Pengaturan Lengkap Auto Absen
+  const [autoAttendanceEnabled, setAutoAttendanceEnabled] = useState<boolean>(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ENABLED);
+  const [autoCheckoutEnabled, setAutoCheckoutEnabled] = useState<boolean>(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_ENABLED);
+  const [autoCheckinMode, setAutoCheckinMode] = useState<AutoCheckInMode>(CONSTANTS.DEFAULTS.AUTO_CHECKIN_MODE);
+  const [autoCheckoutTimeMode, setAutoCheckoutTimeMode] = useState<AutoCheckoutTimeMode>(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TIME_MODE);
+  const [autoCheckoutCustomTime, setAutoCheckoutCustomTime] = useState<string>(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME);
+  const [autoCheckoutCustomFridayTime, setAutoCheckoutCustomFridayTime] = useState<string>(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME);
+  const [autoCheckoutTriggerTime, setAutoCheckoutTriggerTime] = useState<string>(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME);
+  const [autoCheckinTimeMin, setAutoCheckinTimeMin] = useState<string>(CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN);
+  const [autoCheckinTimeMax, setAutoCheckinTimeMax] = useState<string>(CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX);
+  const [autoCheckinPoints, setAutoCheckinPoints] = useState<number>(CONSTANTS.DEFAULTS.AUTO_CHECKIN_POINTS);
+  const [autoCheckoutPoints, setAutoCheckoutPoints] = useState<number>(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_POINTS);
+  const [autoSkipHolidays, setAutoSkipHolidays] = useState<boolean>(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_SKIP_HOLIDAYS);
+  const [autoSkipLeaves, setAutoSkipLeaves] = useState<boolean>(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_SKIP_LEAVES);
+  const [allowOverrideScan, setAllowOverrideScan] = useState<boolean>(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_SCAN);
+  const [allowOverrideLeave, setAllowOverrideLeave] = useState<boolean>(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_LEAVE);
+  const [preserveCheckInSource, setPreserveCheckInSource] = useState<boolean>(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_PRESERVE_CHECKIN_SOURCE);
+  const [isRunningAutoCheckout, setIsRunningAutoCheckout] = useState<boolean>(false);
+  const [lastAutoCheckoutResult, setLastAutoCheckoutResult] = useState<ServerAutoCheckoutSummary | null>(null);
+  const [autoCheckoutExecError, setAutoCheckoutExecError] = useState<string | null>(null);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isGettingGps, setIsGettingGps] = useState(false);
@@ -120,6 +142,22 @@ export const SystemSettingsForm: React.FC = () => {
             setAdminResetPassword(parsed.admin_reset_password);
             setConfirmResetPassword(parsed.admin_reset_password);
           }
+          if (parsed.auto_attendance_enabled !== undefined) setAutoAttendanceEnabled(parsed.auto_attendance_enabled !== false);
+          if (parsed.auto_checkout_enabled !== undefined) setAutoCheckoutEnabled(parsed.auto_checkout_enabled !== false);
+          if (parsed.auto_checkin_mode === 'DISABLED' || parsed.auto_checkin_mode === 'MANUAL_ONLY') setAutoCheckinMode(parsed.auto_checkin_mode);
+          if (parsed.auto_checkout_time_mode === 'CUSTOM' || parsed.auto_checkout_time_mode === 'FOLLOW_SCHEDULE') setAutoCheckoutTimeMode(parsed.auto_checkout_time_mode);
+          if (parsed.auto_checkout_custom_time) setAutoCheckoutCustomTime(formatTimeForInput(parsed.auto_checkout_custom_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME));
+          if (parsed.auto_checkout_custom_friday_time) setAutoCheckoutCustomFridayTime(formatTimeForInput(parsed.auto_checkout_custom_friday_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME));
+          if (parsed.auto_checkout_trigger_time) setAutoCheckoutTriggerTime(formatTimeForInput(parsed.auto_checkout_trigger_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME));
+          if (parsed.auto_checkin_time_min) setAutoCheckinTimeMin(formatTimeForInput(parsed.auto_checkin_time_min, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN));
+          if (parsed.auto_checkin_time_max) setAutoCheckinTimeMax(formatTimeForInput(parsed.auto_checkin_time_max, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX));
+          if (parsed.auto_checkin_points !== undefined) setAutoCheckinPoints(Math.max(0, Math.min(15, Number(parsed.auto_checkin_points) || 0)));
+          if (parsed.auto_checkout_points !== undefined) setAutoCheckoutPoints(Math.max(0, Math.min(20, Number(parsed.auto_checkout_points) || 0)));
+          if (parsed.auto_attendance_skip_holidays !== undefined) setAutoSkipHolidays(parsed.auto_attendance_skip_holidays !== false);
+          if (parsed.auto_attendance_skip_leaves !== undefined) setAutoSkipLeaves(parsed.auto_attendance_skip_leaves !== false);
+          if (parsed.auto_attendance_allow_override_scan !== undefined) setAllowOverrideScan(parsed.auto_attendance_allow_override_scan !== false);
+          if (parsed.auto_attendance_allow_override_leave !== undefined) setAllowOverrideLeave(parsed.auto_attendance_allow_override_leave !== false);
+          if (parsed.auto_checkout_preserve_checkin_source !== undefined) setPreserveCheckInSource(parsed.auto_checkout_preserve_checkin_source !== false);
         } catch (e) {
           console.error('Failed to parse local settings:', e);
         }
@@ -151,6 +189,22 @@ export const SystemSettingsForm: React.FC = () => {
             setAdminResetPassword(fetched.admin_reset_password);
             setConfirmResetPassword(fetched.admin_reset_password);
           }
+          if (fetched.auto_attendance_enabled !== undefined) setAutoAttendanceEnabled(fetched.auto_attendance_enabled !== false);
+          if (fetched.auto_checkout_enabled !== undefined) setAutoCheckoutEnabled(fetched.auto_checkout_enabled !== false);
+          if (fetched.auto_checkin_mode === 'DISABLED' || fetched.auto_checkin_mode === 'MANUAL_ONLY') setAutoCheckinMode(fetched.auto_checkin_mode);
+          if (fetched.auto_checkout_time_mode === 'CUSTOM' || fetched.auto_checkout_time_mode === 'FOLLOW_SCHEDULE') setAutoCheckoutTimeMode(fetched.auto_checkout_time_mode);
+          if (fetched.auto_checkout_custom_time) setAutoCheckoutCustomTime(formatTimeForInput(fetched.auto_checkout_custom_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME));
+          if (fetched.auto_checkout_custom_friday_time) setAutoCheckoutCustomFridayTime(formatTimeForInput(fetched.auto_checkout_custom_friday_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME));
+          if (fetched.auto_checkout_trigger_time) setAutoCheckoutTriggerTime(formatTimeForInput(fetched.auto_checkout_trigger_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME));
+          if (fetched.auto_checkin_time_min) setAutoCheckinTimeMin(formatTimeForInput(fetched.auto_checkin_time_min, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN));
+          if (fetched.auto_checkin_time_max) setAutoCheckinTimeMax(formatTimeForInput(fetched.auto_checkin_time_max, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX));
+          if (fetched.auto_checkin_points !== undefined) setAutoCheckinPoints(Math.max(0, Math.min(15, Number(fetched.auto_checkin_points) || 0)));
+          if (fetched.auto_checkout_points !== undefined) setAutoCheckoutPoints(Math.max(0, Math.min(20, Number(fetched.auto_checkout_points) || 0)));
+          if (fetched.auto_attendance_skip_holidays !== undefined) setAutoSkipHolidays(fetched.auto_attendance_skip_holidays !== false);
+          if (fetched.auto_attendance_skip_leaves !== undefined) setAutoSkipLeaves(fetched.auto_attendance_skip_leaves !== false);
+          if (fetched.auto_attendance_allow_override_scan !== undefined) setAllowOverrideScan(fetched.auto_attendance_allow_override_scan !== false);
+          if (fetched.auto_attendance_allow_override_leave !== undefined) setAllowOverrideLeave(fetched.auto_attendance_allow_override_leave !== false);
+          if (fetched.auto_checkout_preserve_checkin_source !== undefined) setPreserveCheckInSource(fetched.auto_checkout_preserve_checkin_source !== false);
 
           localStorage.setItem('smart_absensi_system_settings', JSON.stringify({
             ...fetched,
@@ -166,6 +220,11 @@ export const SystemSettingsForm: React.FC = () => {
             reminder_friday_checkout_time: formatTimeForInput(fetched.reminder_friday_checkout_time, CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME),
             reminder_checkout_enabled: fetched.reminder_checkout_enabled !== false,
             reminder_early_checkout_enabled: fetched.reminder_early_checkout_enabled !== false,
+            auto_checkout_custom_time: formatTimeForInput(fetched.auto_checkout_custom_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME),
+            auto_checkout_custom_friday_time: formatTimeForInput(fetched.auto_checkout_custom_friday_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME),
+            auto_checkout_trigger_time: formatTimeForInput(fetched.auto_checkout_trigger_time, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME),
+            auto_checkin_time_min: formatTimeForInput(fetched.auto_checkin_time_min, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN),
+            auto_checkin_time_max: formatTimeForInput(fetched.auto_checkin_time_max, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX),
           }));
         }
       } catch (err) {
@@ -191,11 +250,70 @@ export const SystemSettingsForm: React.FC = () => {
     }
   };
 
+  const handleResetAutoDefaults = () => {
+    setAutoAttendanceEnabled(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ENABLED);
+    setAutoCheckoutEnabled(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_ENABLED);
+    setAutoCheckinMode(CONSTANTS.DEFAULTS.AUTO_CHECKIN_MODE);
+    setAutoCheckoutTimeMode(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TIME_MODE);
+    setAutoCheckoutCustomTime(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME);
+    setAutoCheckoutCustomFridayTime(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME);
+    setAutoCheckoutTriggerTime(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME);
+    setAutoCheckinTimeMin(CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN);
+    setAutoCheckinTimeMax(CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX);
+    setAutoCheckinPoints(CONSTANTS.DEFAULTS.AUTO_CHECKIN_POINTS);
+    setAutoCheckoutPoints(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_POINTS);
+    setAutoSkipHolidays(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_SKIP_HOLIDAYS);
+    setAutoSkipLeaves(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_SKIP_LEAVES);
+    setAllowOverrideScan(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_SCAN);
+    setAllowOverrideLeave(CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_LEAVE);
+    setPreserveCheckInSource(CONSTANTS.DEFAULTS.AUTO_CHECKOUT_PRESERVE_CHECKIN_SOURCE);
+    showToast('info', 'Setelan Auto Absen Direset', 'Nilai dikembalikan ke standar bawaan. Klik "Simpan Perubahan Pengaturan Permanen" untuk menerapkan ke server.');
+  };
+
+  const handleTriggerServerAutoCheckout = async () => {
+    setIsRunningAutoCheckout(true);
+    setAutoCheckoutExecError(null);
+    try {
+      const provider = ProviderFactory.getProvider();
+      if (!provider.runServerAutoCheckout) {
+        throw new Error('Provider aktif belum mendukung eksekusi Auto Pulang server.');
+      }
+      const token = useAuthStore.getState().token || '';
+      const res = await provider.runServerAutoCheckout(undefined, token);
+      setLastAutoCheckoutResult(res);
+
+      if (res.skippedReason) {
+        showToast(
+          'info',
+          'Auto Pulang Dilewati',
+          `Status hari ini (${res.date}): ${res.skippedReason}${res.holidayName ? ` (${res.holidayName})` : ''}.`
+        );
+      } else {
+        showToast(
+          'success',
+          'Auto Pulang Server Selesai',
+          `${res.processedCount} guru dicatat pulang otomatis pada tanggal ${res.date}.`
+        );
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal menjalankan Auto Pulang server.';
+      setAutoCheckoutExecError(msg);
+      showToast('error', 'Eksekusi Auto Pulang Gagal', msg);
+    } finally {
+      setIsRunningAutoCheckout(false);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (adminResetPassword && adminResetPassword !== confirmResetPassword) {
       showToast('error', 'Password Reset Tidak Cocok', 'Konfirmasi password reset absensi tidak cocok dengan password yang Anda masukkan.');
+      return;
+    }
+
+    if (autoCheckinMode === 'MANUAL_ONLY' && timeToMinutes(autoCheckinTimeMin) > timeToMinutes(autoCheckinTimeMax)) {
+      showToast('error', 'Rentang Jam Auto Masuk Tidak Valid', 'Jam awal acak Auto Masuk tidak boleh lebih lambat dari jam batas akhirnya.');
       return;
     }
 
@@ -242,6 +360,22 @@ export const SystemSettingsForm: React.FC = () => {
       reminder_friday_checkout_time: reminderFridayCheckoutTime,
       reminder_checkout_enabled: reminderCheckoutEnabled,
       reminder_early_checkout_enabled: reminderEarlyCheckoutEnabled,
+      auto_attendance_enabled: autoAttendanceEnabled,
+      auto_checkout_enabled: autoCheckoutEnabled,
+      auto_checkin_mode: autoCheckinMode,
+      auto_checkout_time_mode: autoCheckoutTimeMode,
+      auto_checkout_custom_time: formatTimeForInput(autoCheckoutCustomTime, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME),
+      auto_checkout_custom_friday_time: formatTimeForInput(autoCheckoutCustomFridayTime, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME),
+      auto_checkout_trigger_time: formatTimeForInput(autoCheckoutTriggerTime, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME),
+      auto_checkin_time_min: formatTimeForInput(autoCheckinTimeMin, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN),
+      auto_checkin_time_max: formatTimeForInput(autoCheckinTimeMax, CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX),
+      auto_checkin_points: Math.max(0, Math.min(15, Math.round(Number(autoCheckinPoints) || 0))),
+      auto_checkout_points: Math.max(0, Math.min(20, Math.round(Number(autoCheckoutPoints) || 0))),
+      auto_attendance_skip_holidays: autoSkipHolidays,
+      auto_attendance_skip_leaves: autoSkipLeaves,
+      auto_attendance_allow_override_scan: allowOverrideScan,
+      auto_attendance_allow_override_leave: allowOverrideLeave,
+      auto_checkout_preserve_checkin_source: preserveCheckInSource,
     };
 
     try {
@@ -502,7 +636,323 @@ export const SystemSettingsForm: React.FC = () => {
         </div>
       </div>
 
-      {/* Section 4: GPS Geofence & Auto Location */}
+      {/* Section 4: Pengaturan Lengkap Auto Absen & Fleksibilitas Guru */}
+      <div className="space-y-4 pt-4 border-t border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-[#023246]" />
+                <span>Pengaturan Auto Absen &amp; Kebijakan Penggantian</span>
+              </h4>
+              <span
+                className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border ${
+                  autoAttendanceEnabled
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                }`}
+              >
+                {autoAttendanceEnabled
+                  ? `${autoCheckoutEnabled ? 'Auto Pulang Aktif' : 'Auto Pulang Nonaktif'} • Masuk: ${autoCheckinMode === 'DISABLED' ? 'Nonaktif' : 'Manual Admin'}`
+                  : 'Semua Auto Absen Nonaktif'}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Atur kapan sistem otomatis mencatat pulang, kebijakan masuk manual Admin, rentang jam, poin, serta izin guru untuk menimpa catatan auto.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleResetAutoDefaults}
+            className="h-9 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 self-start sm:self-auto cursor-pointer transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset Bawaan</span>
+          </button>
+        </div>
+
+        {/* Master Switch & Kebijakan Masuk vs Pulang */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="flex items-start justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer">
+            <div className="space-y-0.5">
+              <span className="text-xs font-bold text-slate-900 block">Aktifkan Mesin Auto Absen</span>
+              <span className="text-[11px] text-slate-500 block leading-relaxed">
+                Saklar utama seluruh fitur Auto Absen (server cron maupun tombol Admin).
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              checked={autoAttendanceEnabled}
+              onChange={(e) => setAutoAttendanceEnabled(e.target.checked)}
+              className="w-5 h-5 mt-0.5 accent-[#023246] rounded cursor-pointer shrink-0"
+            />
+          </label>
+
+          <label className={`flex items-start justify-between gap-3 p-3.5 rounded-2xl border cursor-pointer ${
+            autoAttendanceEnabled ? 'bg-slate-50 border-slate-200' : 'bg-slate-50/50 border-slate-200/60 opacity-60'
+          }`}>
+            <div className="space-y-0.5">
+              <span className="text-xs font-bold text-slate-900 block">Auto Pulang Otomatis Server (Hanya Pulang)</span>
+              <span className="text-[11px] text-slate-500 block leading-relaxed">
+                Sistem otomatis mencatat pulang guru yang sudah masuk namun lupa scan pulang (tidak menyentuh guru yang belum masuk).
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              checked={autoCheckoutEnabled}
+              disabled={!autoAttendanceEnabled}
+              onChange={(e) => setAutoCheckoutEnabled(e.target.checked)}
+              className="w-5 h-5 mt-0.5 accent-[#023246] rounded cursor-pointer shrink-0"
+            />
+          </label>
+        </div>
+
+        {/* Mode Auto Masuk & Penentuan Jam Pulang */}
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${!autoAttendanceEnabled ? 'opacity-55 pointer-events-none' : ''}`}>
+          {/* Kebijakan Auto Masuk */}
+          <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3">
+            <h5 className="font-bold text-xs text-slate-900">Kebijakan Auto Absen Masuk</h5>
+            <div className="space-y-2">
+              <label className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${
+                autoCheckinMode === 'MANUAL_ONLY' ? 'border-[#023246] bg-sky-50/50' : 'border-slate-200 hover:bg-slate-50'
+              }`}>
+                <input
+                  type="radio"
+                  name="autoCheckinMode"
+                  checked={autoCheckinMode === 'MANUAL_ONLY'}
+                  onChange={() => setAutoCheckinMode('MANUAL_ONLY')}
+                  className="mt-0.5 accent-[#023246]"
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-slate-900 block">Manual Admin Saja (Direkomendasikan)</span>
+                  <span className="text-[11px] text-slate-500 block">
+                    Sistem tidak pernah auto-masuk sendiri; hanya Admin lewat menu Auto Absen.
+                  </span>
+                </div>
+              </label>
+
+              <label className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${
+                autoCheckinMode === 'DISABLED' ? 'border-[#023246] bg-sky-50/50' : 'border-slate-200 hover:bg-slate-50'
+              }`}>
+                <input
+                  type="radio"
+                  name="autoCheckinMode"
+                  checked={autoCheckinMode === 'DISABLED'}
+                  onChange={() => setAutoCheckinMode('DISABLED')}
+                  className="mt-0.5 accent-[#023246]"
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-slate-900 block">Nonaktifkan Auto Masuk Sepenuhnya</span>
+                  <span className="text-[11px] text-slate-500 block">
+                    Opsi Auto Masuk &amp; Keduanya dikunci di Dashboard Admin (hanya Auto Pulang diizinkan).
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <Input
+                label="Jam Acak Masuk Mulai"
+                type="time"
+                value={autoCheckinTimeMin}
+                onChange={(e) => setAutoCheckinTimeMin(e.target.value)}
+                disabled={autoCheckinMode === 'DISABLED'}
+              />
+              <Input
+                label="Jam Acak Masuk Maks"
+                type="time"
+                value={autoCheckinTimeMax}
+                onChange={(e) => setAutoCheckinTimeMax(e.target.value)}
+                disabled={autoCheckinMode === 'DISABLED'}
+              />
+            </div>
+          </div>
+
+          {/* Jam Pulang Auto & Eksekusi */}
+          <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3">
+            <h5 className="font-bold text-xs text-slate-900">Jam Pulang &amp; Jadwal Eksekusi Server</h5>
+            <div className="space-y-2">
+              <label className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${
+                autoCheckoutTimeMode === 'FOLLOW_SCHEDULE' ? 'border-[#023246] bg-sky-50/50' : 'border-slate-200 hover:bg-slate-50'
+              }`}>
+                <input
+                  type="radio"
+                  name="autoCheckoutTimeMode"
+                  checked={autoCheckoutTimeMode === 'FOLLOW_SCHEDULE'}
+                  onChange={() => setAutoCheckoutTimeMode('FOLLOW_SCHEDULE')}
+                  className="mt-0.5 accent-[#023246]"
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-slate-900 block">Ikuti Jam Buka Pulang Sekolah</span>
+                  <span className="text-[11px] text-slate-500 block">
+                    Sen–Kam: {checkOutStart} WIB • Jumat: {fridayCheckoutStart} WIB.
+                  </span>
+                </div>
+              </label>
+
+              <label className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${
+                autoCheckoutTimeMode === 'CUSTOM' ? 'border-[#023246] bg-sky-50/50' : 'border-slate-200 hover:bg-slate-50'
+              }`}>
+                <input
+                  type="radio"
+                  name="autoCheckoutTimeMode"
+                  checked={autoCheckoutTimeMode === 'CUSTOM'}
+                  onChange={() => setAutoCheckoutTimeMode('CUSTOM')}
+                  className="mt-0.5 accent-[#023246]"
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-slate-900 block">Atur Jam Pulang Khusus Auto</span>
+                  <span className="text-[11px] text-slate-500 block">
+                    Catat jam pulang spesifik tersendiri untuk seluruh Auto Pulang.
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            {autoCheckoutTimeMode === 'CUSTOM' && (
+              <div className="grid grid-cols-2 gap-2.5">
+                <Input
+                  label="Pulang Auto Sen–Kam"
+                  type="time"
+                  value={autoCheckoutCustomTime}
+                  onChange={(e) => setAutoCheckoutCustomTime(e.target.value)}
+                />
+                <Input
+                  label="Pulang Auto Jumat"
+                  type="time"
+                  value={autoCheckoutCustomFridayTime}
+                  onChange={(e) => setAutoCheckoutCustomFridayTime(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="pt-1">
+              <Input
+                label="Batas Jam Eksekusi Server Auto Pulang (WIB)"
+                type="time"
+                value={autoCheckoutTriggerTime}
+                onChange={(e) => setAutoCheckoutTriggerTime(e.target.value)}
+                disabled={!autoCheckoutEnabled}
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                Cron server terjadwal berjalan pukul 16:30 WIB setiap Senin–Jumat dan hanya memproses jika waktu server sudah mencapai batas di atas.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Poin & Kebijakan Pengecualian + Override */}
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${!autoAttendanceEnabled ? 'opacity-55 pointer-events-none' : ''}`}>
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+            <h5 className="font-bold text-xs text-slate-900">Poin Kedisiplinan Auto Absen</h5>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Poin Auto Masuk (0–15)"
+                type="number"
+                min={0}
+                max={15}
+                value={String(autoCheckinPoints)}
+                onChange={(e) => setAutoCheckinPoints(Math.max(0, Math.min(15, parseInt(e.target.value || '0', 10) || 0)))}
+                disabled={autoCheckinMode === 'DISABLED'}
+              />
+              <Input
+                label="Poin Auto Pulang (0–20)"
+                type="number"
+                min={0}
+                max={20}
+                value={String(autoCheckoutPoints)}
+                onChange={(e) => setAutoCheckoutPoints(Math.max(0, Math.min(20, parseInt(e.target.value || '0', 10) || 0)))}
+                disabled={!autoCheckoutEnabled}
+              />
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Standar bawaan: Auto Masuk mendapat <strong>0 poin</strong> dan Auto Pulang mendapat <strong>+10 poin</strong> (bisa diubah ke 0 jika lupa pulang tidak diberi poin).
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+            <h5 className="font-bold text-xs text-slate-900">Pengecualian &amp; Hak Penggantian oleh Guru</h5>
+            <label className="flex items-center justify-between gap-2 text-xs text-slate-700 cursor-pointer py-1">
+              <span>Lewati otomatis hari libur &amp; akhir pekan</span>
+              <input
+                type="checkbox"
+                checked={autoSkipHolidays}
+                onChange={(e) => setAutoSkipHolidays(e.target.checked)}
+                className="w-4 h-4 accent-[#023246] rounded cursor-pointer shrink-0"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2 text-xs text-slate-700 cursor-pointer py-1">
+              <span>Lewati guru yang sedang Izin / Sakit / Cuti</span>
+              <input
+                type="checkbox"
+                checked={autoSkipLeaves}
+                onChange={(e) => setAutoSkipLeaves(e.target.checked)}
+                className="w-4 h-4 accent-[#023246] rounded cursor-pointer shrink-0"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2 text-xs text-slate-700 cursor-pointer py-1">
+              <span>Pertahankan sumber Check-In QR/Sidik Jari saat Auto Pulang</span>
+              <input
+                type="checkbox"
+                checked={preserveCheckInSource}
+                onChange={(e) => setPreserveCheckInSource(e.target.checked)}
+                className="w-4 h-4 accent-[#023246] rounded cursor-pointer shrink-0"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2 text-xs text-slate-700 cursor-pointer py-1 border-t border-slate-200 pt-2">
+              <span className="font-semibold text-slate-900">Izinkan guru tiba-tiba scan QR / Sidik Jari menimpa catatan Auto</span>
+              <input
+                type="checkbox"
+                checked={allowOverrideScan}
+                onChange={(e) => setAllowOverrideScan(e.target.checked)}
+                className="w-4 h-4 accent-emerald-600 rounded cursor-pointer shrink-0"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2 text-xs text-slate-700 cursor-pointer py-1">
+              <span className="font-semibold text-slate-900">Izinkan Izin / Sakit / Cuti / Koreksi membatalkan poin Auto</span>
+              <input
+                type="checkbox"
+                checked={allowOverrideLeave}
+                onChange={(e) => setAllowOverrideLeave(e.target.checked)}
+                className="w-4 h-4 accent-emerald-600 rounded cursor-pointer shrink-0"
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Aksi Eksekusi Langsung Server Auto Pulang */}
+        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1 min-w-0">
+            <p className="text-xs font-bold text-slate-900">Uji &amp; Jalankan Auto Pulang Hari Ini (Server)</p>
+            <p className="text-[11px] text-slate-500">
+              Menjalankan Auto Pulang sekarang sesuai pengaturan yang sudah tersimpan di server untuk guru yang sudah masuk hari ini.
+            </p>
+            {lastAutoCheckoutResult && (
+              <p className="text-[11px] font-semibold text-emerald-700">
+                Hasil ({lastAutoCheckoutResult.date}): {lastAutoCheckoutResult.skippedReason
+                  ? `Dilewati (${lastAutoCheckoutResult.skippedReason})`
+                  : `${lastAutoCheckoutResult.processedCount} guru diproses pulang, ${lastAutoCheckoutResult.skippedNoCheckInCount} belum masuk dilewati.`}
+              </p>
+            )}
+            {autoCheckoutExecError && (
+              <p className="text-[11px] font-semibold text-rose-700">{autoCheckoutExecError}</p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            disabled={!autoAttendanceEnabled || !autoCheckoutEnabled || isRunningAutoCheckout}
+            onClick={handleTriggerServerAutoCheckout}
+            className="h-11 px-4 rounded-xl bg-[#023246] hover:bg-[#034560] disabled:opacity-50 text-white text-xs font-bold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
+          >
+            <Play className="w-3.5 h-3.5" />
+            <span>{isRunningAutoCheckout ? 'Menjalankan...' : 'Jalankan Auto Pulang Sekarang'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Section 5: GPS Geofence & Auto Location */}
       <div className="space-y-3 pt-3 border-t border-slate-100">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">📍 Koordinat GPS Sekolah & Radius Geofence</h4>

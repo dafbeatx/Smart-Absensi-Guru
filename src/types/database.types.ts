@@ -202,6 +202,9 @@ export interface AuditLog {
   created_at: string;
 }
 
+export type AutoCheckInMode = 'MANUAL_ONLY' | 'DISABLED';
+export type AutoCheckoutTimeMode = 'FOLLOW_SCHEDULE' | 'CUSTOM';
+
 export interface SystemSettings {
   app_name: string;
   institution_name: string;
@@ -221,6 +224,23 @@ export interface SystemSettings {
   reminder_friday_checkout_time?: string; // Jam pengingat presensi pulang Jumat (default '11:00')
   reminder_checkout_enabled?: boolean; // Status pengingat presensi pulang (default true)
   reminder_early_checkout_enabled?: boolean; // Status pengingat H-1 jam sebelum pulang (default true)
+  // ── Pengaturan Lengkap Auto Absen ───────────────────────────────────────
+  auto_attendance_enabled?: boolean; // Saklar utama fitur Auto Absen
+  auto_checkout_enabled?: boolean; // Auto Pulang otomatis oleh server cron
+  auto_checkin_mode?: AutoCheckInMode; // 'MANUAL_ONLY' (Admin saja) | 'DISABLED'
+  auto_checkout_time_mode?: AutoCheckoutTimeMode; // 'FOLLOW_SCHEDULE' | 'CUSTOM'
+  auto_checkout_custom_time?: string; // Jam pulang auto Senin-Kamis jika CUSTOM
+  auto_checkout_custom_friday_time?: string; // Jam pulang auto Jumat jika CUSTOM
+  auto_checkout_trigger_time?: string; // Batas jam mulai eksekusi server cron (default '16:30')
+  auto_checkin_time_min?: string; // Batas awal rentang acak Auto Masuk Admin (default '07:31')
+  auto_checkin_time_max?: string; // Batas akhir rentang acak Auto Masuk Admin (default '08:00')
+  auto_checkin_points?: number; // Poin saat Auto Masuk (default 0)
+  auto_checkout_points?: number; // Poin saat Auto Pulang (default 10)
+  auto_attendance_skip_holidays?: boolean; // Lewati hari libur & akhir pekan (default true)
+  auto_attendance_skip_leaves?: boolean; // Lewati guru izin/sakit/cuti/dinas (default true)
+  auto_attendance_allow_override_scan?: boolean; // Izinkan scan QR/Sidik Jari menimpa catatan auto (default true)
+  auto_attendance_allow_override_leave?: boolean; // Izinkan izin/cuti/koreksi membatalkan catatan auto (default true)
+  auto_checkout_preserve_checkin_source?: boolean; // Pertahankan sumber check-in asli saat Auto Pulang (default true)
 }
 
 export type CalendarCategoryType = 'HOLIDAY' | 'SCHEDULE';

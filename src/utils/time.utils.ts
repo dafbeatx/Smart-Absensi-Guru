@@ -1,5 +1,5 @@
 import { CONSTANTS } from '../config/constants';
-import type { HolidayRecord } from '../types/database.types';
+import type { HolidayRecord, SystemSettings } from '../types/database.types';
 
 /**
  * Helper utility for formatting and sanitizing time values for HTML5 <input type="time">
@@ -59,7 +59,11 @@ export function evaluateAttendanceStatus(
  * @param seed Optional string seed (misal `${userId}_${date}`) untuk konsistensi/idempotency jika dihitung ulang
  * @returns string waktu "HH:mm:ss" di rentang > 07:30:00 dan <= 08:00:00 (contoh: "07:34:18", "07:49:22", "07:58:05")
  */
-export function generateRandomLateCheckInTime(seed?: string): string {
+export function generateRandomLateCheckInTime(
+  seed?: string,
+  minHhMm: string = '07:31',
+  maxHhMm: string = '08:00'
+): string {
   let rand = Math.random();
   if (seed) {
     let hash = 0;
@@ -71,9 +75,21 @@ export function generateRandomLateCheckInTime(seed?: string): string {
     rand = x - Math.floor(x);
   }
 
-  // Rentang detik: 07:31:00 (27060s) s/d 08:00:00 (28800s)
-  const minSec = 7 * 3600 + 31 * 60; // 27060s (07:31:00)
-  const maxSec = 8 * 3600;           // 28800s (08:00:00)
+  const parseToSec = (hhmm: string, fallbackSec: number): number => {
+    const clean = String(hhmm || '').trim().slice(0, 5);
+    const parts = clean.split(':');
+    if (parts.length < 2) return fallbackSec;
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return fallbackSec;
+    return Math.max(0, Math.min(23 * 3600 + 59 * 60, h * 3600 + m * 60));
+  };
+
+  // Default rentang detik: 07:31:00 (27060s) s/d 08:00:00 (28800s)
+  const rawMinSec = parseToSec(minHhMm, 7 * 3600 + 31 * 60);
+  const rawMaxSec = parseToSec(maxHhMm, 8 * 3600);
+  const minSec = Math.min(rawMinSec, rawMaxSec);
+  const maxSec = Math.max(rawMinSec, rawMaxSec);
   const chosenSec = Math.floor(minSec + rand * (maxSec - minSec + 1));
   const clampedSec = Math.min(Math.max(chosenSec, minSec), maxSec);
 
@@ -83,6 +99,26 @@ export function generateRandomLateCheckInTime(seed?: string): string {
 
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+/**
+ * Menentukan jam pulang yang dicatat untuk Auto Absen Pulang berdasarkan hari (Jumat vs Senin-Kamis)
+ * dan kebijakan pengaturan admin (FOLLOW_SCHEDULE vs CUSTOM).
+ */
+export function resolveAutoCheckoutTimeHhMm(
+  isFriday: boolean,
+  settings?: Partial<SystemSettings> | null
+): string {
+  if (settings?.auto_checkout_time_mode === 'CUSTOM') {
+    const customTarget = isFriday
+      ? settings.auto_checkout_custom_friday_time
+      : settings.auto_checkout_custom_time;
+    const formatted = formatTimeForInput(customTarget, '');
+    if (formatted) return formatted;
+  }
+  const fallback = isFriday ? CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START : CONSTANTS.DEFAULTS.WORK_CHECKOUT_START;
+  const scheduled = isFriday ? settings?.friday_checkout_start : settings?.work_checkout_start;
+  return formatTimeForInput(scheduled, fallback);
 }
 
 /**

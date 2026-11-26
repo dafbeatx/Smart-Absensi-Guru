@@ -22,6 +22,22 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   reminder_friday_checkout_time: CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME,
   reminder_checkout_enabled: CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_ENABLED,
   reminder_early_checkout_enabled: CONSTANTS.DEFAULTS.REMINDER_EARLY_CHECKOUT_ENABLED,
+  auto_attendance_enabled: CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ENABLED,
+  auto_checkout_enabled: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_ENABLED,
+  auto_checkin_mode: CONSTANTS.DEFAULTS.AUTO_CHECKIN_MODE,
+  auto_checkout_time_mode: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TIME_MODE,
+  auto_checkout_custom_time: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME,
+  auto_checkout_custom_friday_time: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME,
+  auto_checkout_trigger_time: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME,
+  auto_checkin_time_min: CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN,
+  auto_checkin_time_max: CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX,
+  auto_checkin_points: CONSTANTS.DEFAULTS.AUTO_CHECKIN_POINTS,
+  auto_checkout_points: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_POINTS,
+  auto_attendance_skip_holidays: CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_SKIP_HOLIDAYS,
+  auto_attendance_skip_leaves: CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_SKIP_LEAVES,
+  auto_attendance_allow_override_scan: CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_SCAN,
+  auto_attendance_allow_override_leave: CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_LEAVE,
+  auto_checkout_preserve_checkin_source: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_PRESERVE_CHECKIN_SOURCE,
 };
 
 export interface SettingsState {

@@ -9,7 +9,13 @@ import { ProviderFactory } from '../../providers/provider-factory';
 import { AttendancePolicyService } from '../attendance-policy.service';
 import { TeacherPointReconciliationService } from '../teacher-point-reconciliation.service';
 import { calculateTeacherAppreciationScore } from '../../utils/teacher-appreciation.utils';
-import { validateAttendanceTimeWindow, getTodayDateInJakarta } from '../../utils/time.utils';
+import {
+  validateAttendanceTimeWindow,
+  getTodayDateInJakarta,
+  generateRandomLateCheckInTime,
+  resolveAutoCheckoutTimeHhMm,
+} from '../../utils/time.utils';
+import { DEFAULT_SYSTEM_SETTINGS } from '../../store/useSettingsStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { setServerSupabaseClient, resetServerSupabaseClient } from '../../../api/_shared/session-auth';
 import { runAutoCheckout } from '../../../api/_shared/auto-checkout';
@@ -719,6 +725,421 @@ export const runAutoAttendanceRuleTestSuite = async (): Promise<{
       resetServerSupabaseClient();
       if (prevCronSecret === undefined) delete process.env.CRON_SECRET;
       else process.env.CRON_SECRET = prevCronSecret;
+    }
+
+    // ── Test 15–19: Complete Admin Auto Absen Configuration Suite ─────────────
+    try {
+      const customAutoSettings = {
+        ...DEFAULT_SYSTEM_SETTINGS,
+        auto_attendance_enabled: true,
+        auto_checkout_enabled: false,
+        auto_checkin_mode: 'MANUAL_ONLY' as const,
+        auto_checkout_time_mode: 'CUSTOM' as const,
+        auto_checkout_custom_time: '15:15',
+        auto_checkout_custom_friday_time: '11:45',
+        auto_checkout_trigger_time: '17:00',
+        auto_checkin_time_min: '08:05',
+        auto_checkin_time_max: '08:15',
+        auto_checkin_points: 2,
+        auto_checkout_points: 6,
+        auto_attendance_skip_holidays: false,
+        auto_attendance_skip_leaves: false,
+        auto_attendance_allow_override_scan: false,
+        auto_attendance_allow_override_leave: false,
+        auto_checkout_preserve_checkin_source: false,
+      };
+      await mockProvider.updateSettings(customAutoSettings, 'MOCK_ADMIN_TOKEN');
+      const reloadedAutoSettings = await mockProvider.getSettings();
+
+      const customTimeVal = generateRandomLateCheckInTime('cfg_seed_1', '08:05', '08:15');
+      const resolvedThuCustom = resolveAutoCheckoutTimeHhMm(false, reloadedAutoSettings);
+      const resolvedFriCustom = resolveAutoCheckoutTimeHhMm(true, reloadedAutoSettings);
+      const resolvedThuSchedule = resolveAutoCheckoutTimeHhMm(false, DEFAULT_SYSTEM_SETTINGS);
+
+      assert(
+        'AutoAttendance 15: All 16 auto_attendance settings persist via getSettings/updateSettings and helpers resolve custom ranges & times',
+        reloadedAutoSettings.auto_attendance_enabled === true &&
+          reloadedAutoSettings.auto_checkout_enabled === false &&
+          reloadedAutoSettings.auto_checkin_mode === 'MANUAL_ONLY' &&
+          reloadedAutoSettings.auto_checkout_time_mode === 'CUSTOM' &&
+          reloadedAutoSettings.auto_checkout_custom_time === '15:15' &&
+          reloadedAutoSettings.auto_checkout_custom_friday_time === '11:45' &&
+          reloadedAutoSettings.auto_checkout_trigger_time === '17:00' &&
+          reloadedAutoSettings.auto_checkin_time_min === '08:05' &&
+          reloadedAutoSettings.auto_checkin_time_max === '08:15' &&
+          reloadedAutoSettings.auto_checkin_points === 2 &&
+          reloadedAutoSettings.auto_checkout_points === 6 &&
+          reloadedAutoSettings.auto_attendance_skip_holidays === false &&
+          reloadedAutoSettings.auto_attendance_skip_leaves === false &&
+          reloadedAutoSettings.auto_attendance_allow_override_scan === false &&
+          reloadedAutoSettings.auto_attendance_allow_override_leave === false &&
+          reloadedAutoSettings.auto_checkout_preserve_checkin_source === false &&
+          customTimeVal >= '08:05:00' &&
+          customTimeVal <= '08:15:00' &&
+          resolvedThuCustom === '15:15' &&
+          resolvedFriCustom === '11:45' &&
+          resolvedThuSchedule === DEFAULT_SYSTEM_SETTINGS.work_checkout_start,
+        `in=${customTimeVal}, thu=${resolvedThuCustom}, fri=${resolvedFriCustom}, sched=${resolvedThuSchedule}`
+      );
+
+      // ── Test 16: autoAttendTeacher & autoAttendUnabsentedTeachers enforce master off, check-in disabled, & custom time/points
+      await mockProvider.updateSettings({
+        ...DEFAULT_SYSTEM_SETTINGS,
+        auto_attendance_enabled: false,
+      }, 'MOCK_ADMIN_TOKEN');
+
+      let disabledThrew = false;
+      try {
+        await mockProvider.autoAttendTeacher({
+          user_id: 'usr_cfg_disabled',
+          date: '2026-11-25',
+          teacher_name: 'Guru Nonaktif',
+          mode: 'CHECK_OUT',
+        });
+      } catch {
+        disabledThrew = true;
+      }
+      const batchDisabled = await AttendancePolicyService.autoAttendUnabsentedTeachers(
+        '2026-11-25',
+        [testTeacher1],
+        [],
+        [],
+        'CHECK_OUT',
+        { ...DEFAULT_SYSTEM_SETTINGS, auto_attendance_enabled: false }
+      );
+
+      await mockProvider.updateSettings({
+        ...DEFAULT_SYSTEM_SETTINGS,
+        auto_attendance_enabled: true,
+        auto_checkin_mode: 'DISABLED',
+        auto_checkout_time_mode: 'CUSTOM',
+        auto_checkout_custom_time: '14:40',
+        auto_checkin_points: 2,
+        auto_checkout_points: 6,
+      }, 'MOCK_ADMIN_TOKEN');
+
+      let checkInDisabledThrew = false;
+      try {
+        await mockProvider.autoAttendTeacher({
+          user_id: 'usr_cfg_no_in',
+          date: '2026-11-25',
+          teacher_name: 'Guru No Auto Masuk',
+          mode: 'CHECK_IN',
+        });
+      } catch {
+        checkInDisabledThrew = true;
+      }
+
+      const checkOutStillAllowed = await mockProvider.autoAttendTeacher({
+        user_id: 'usr_cfg_only_out',
+        date: '2026-11-25',
+        teacher_name: 'Guru Hanya Auto Pulang',
+        mode: 'CHECK_OUT',
+      });
+
+      await mockProvider.updateSettings({
+        ...DEFAULT_SYSTEM_SETTINGS,
+        auto_attendance_enabled: true,
+        auto_checkin_mode: 'MANUAL_ONLY',
+        auto_checkin_time_min: '08:05',
+        auto_checkin_time_max: '08:15',
+        auto_checkin_points: 2,
+        auto_checkout_points: 6,
+      }, 'MOCK_ADMIN_TOKEN');
+
+      const customCheckInRec = await mockProvider.autoAttendTeacher({
+        user_id: 'usr_cfg_custom_in',
+        date: '2026-11-25',
+        teacher_name: 'Guru Poin Kustom',
+        mode: 'CHECK_IN',
+      });
+
+      assert(
+        'AutoAttendance 16: Master toggle, auto_checkin_mode=DISABLED, custom check-in range, and custom points are enforced',
+        disabledThrew &&
+          batchDisabled.length === 0 &&
+          checkInDisabledThrew &&
+          checkOutStillAllowed.check_out_time === '14:40:00' &&
+          checkOutStillAllowed.points_awarded === 6 &&
+          Boolean(customCheckInRec.check_in_time) &&
+          customCheckInRec.check_in_time! >= '08:05:00' &&
+          customCheckInRec.check_in_time! <= '08:15:00' &&
+          customCheckInRec.points_awarded === 2,
+        `disabledThrew=${disabledThrew}, inDisThrew=${checkInDisabledThrew}, outTime=${checkOutStillAllowed.check_out_time}, outPts=${checkOutStillAllowed.points_awarded}, inTime=${customCheckInRec.check_in_time}, inPts=${customCheckInRec.points_awarded}`
+      );
+
+      // ── Test 17: Exception toggles skip_holidays & skip_leaves
+      await mockProvider.updateSettings({
+        ...DEFAULT_SYSTEM_SETTINGS,
+        auto_attendance_enabled: true,
+        auto_attendance_skip_holidays: false,
+        auto_attendance_skip_leaves: false,
+      }, 'MOCK_ADMIN_TOKEN');
+
+      const cfgHolTeacher: UserProfile = { ...testTeacher1, id: 'usr_cfg_hol_skip' };
+      const cfgLeaveTeacher: UserProfile = { ...testTeacherLeave, id: 'usr_cfg_leave_skip' };
+      const cfgHolidays: HolidayRecord[] = [
+        {
+          id: 'hol_cfg_test',
+          date: '2026-11-26',
+          name: 'Hari Libur Uji Pengaturan',
+          type: 'NATIONAL_HOLIDAY',
+          category_type: 'HOLIDAY',
+          is_holiday: true,
+          created_at: '2026-11-01T00:00:00Z',
+        },
+      ];
+      const cfgLeaves: LeaveRequest[] = [
+        {
+          id: 'leave_cfg_test',
+          user_id: cfgLeaveTeacher.id,
+          leave_type: 'IZIN',
+          start_date: '2026-11-25',
+          end_date: '2026-11-25',
+          reason: 'Keperluan keluarga',
+          attachment_url: null,
+          approval_status: 'APPROVED',
+          approval_deadline: '2026-11-25T12:00:00Z',
+          created_at: '2026-11-25T06:00:00Z',
+        },
+      ];
+
+      const skippedHolRes = await AttendancePolicyService.autoAttendUnabsentedTeachers(
+        '2026-11-26',
+        [cfgHolTeacher],
+        [],
+        [],
+        'CHECK_IN',
+        { ...DEFAULT_SYSTEM_SETTINGS, auto_attendance_enabled: true, auto_attendance_skip_holidays: true },
+        cfgHolidays
+      );
+      const allowedHolRes = await AttendancePolicyService.autoAttendUnabsentedTeachers(
+        '2026-11-26',
+        [cfgHolTeacher],
+        [],
+        [],
+        'CHECK_IN',
+        { ...DEFAULT_SYSTEM_SETTINGS, auto_attendance_enabled: true, auto_attendance_skip_holidays: false },
+        cfgHolidays
+      );
+      const skippedLeaveRes = await AttendancePolicyService.autoAttendUnabsentedTeachers(
+        '2026-11-25',
+        [cfgLeaveTeacher],
+        [],
+        cfgLeaves,
+        'CHECK_IN',
+        { ...DEFAULT_SYSTEM_SETTINGS, auto_attendance_enabled: true, auto_attendance_skip_leaves: true },
+        []
+      );
+      const allowedLeaveRes = await AttendancePolicyService.autoAttendUnabsentedTeachers(
+        '2026-11-25',
+        [cfgLeaveTeacher],
+        [],
+        cfgLeaves,
+        'CHECK_IN',
+        { ...DEFAULT_SYSTEM_SETTINGS, auto_attendance_enabled: true, auto_attendance_skip_leaves: false },
+        []
+      );
+
+      assert(
+        'AutoAttendance 17: skip_holidays=false and skip_leaves=false allow Auto Absen while true strictly skips both',
+        skippedHolRes.length === 0 &&
+          allowedHolRes.length === 1 &&
+          skippedLeaveRes.length === 0 &&
+          allowedLeaveRes.length === 1,
+        `hol=(${skippedHolRes.length}->${allowedHolRes.length}), leave=(${skippedLeaveRes.length}->${allowedLeaveRes.length})`
+      );
+
+      // ── Test 18: Override toggle auto_attendance_allow_override_scan
+      const overrideCfgUser: UserProfile = {
+        ...testTeacher1,
+        id: 'usr_cfg_override_scan',
+        full_name: 'Guru Override Pengaturan',
+      };
+      useAuthStore.setState({ user: overrideCfgUser, token: 'MOCK_GURU_TOKEN' });
+
+      await mockProvider.updateSettings({
+        ...DEFAULT_SYSTEM_SETTINGS,
+        auto_attendance_enabled: true,
+        auto_attendance_allow_override_scan: false,
+      }, 'MOCK_ADMIN_TOKEN');
+
+      await mockProvider.autoAttendTeacher({
+        user_id: overrideCfgUser.id,
+        date: todayStr,
+        teacher_name: overrideCfgUser.full_name,
+        mode: 'BOTH',
+      });
+
+      const blockedOverrideScan = await mockProvider.scanAttendance({
+        token: 'MOCK_GURU_TOKEN',
+        user_id: overrideCfgUser.id,
+        qr_seed: 'SMART_ABSENSI_OFFICIAL_QR_2026',
+        user_lat: -6.613144,
+        user_lng: 106.684975,
+        device_uuid: 'dev_cfg_override',
+        timestamp: `${todayStr}T07:10:00+07:00`,
+      });
+
+      await mockProvider.updateSettings({
+        ...DEFAULT_SYSTEM_SETTINGS,
+        auto_attendance_enabled: true,
+        auto_attendance_allow_override_scan: true,
+      }, 'MOCK_ADMIN_TOKEN');
+
+      const allowedOverrideScan = await mockProvider.scanAttendance({
+        token: 'MOCK_GURU_TOKEN',
+        user_id: overrideCfgUser.id,
+        qr_seed: 'SMART_ABSENSI_OFFICIAL_QR_2026',
+        user_lat: -6.613144,
+        user_lng: 106.684975,
+        device_uuid: 'dev_cfg_override',
+        timestamp: `${todayStr}T07:10:00+07:00`,
+      });
+
+      assert(
+        'AutoAttendance 18: auto_attendance_allow_override_scan=false blocks QR override of SYSTEM_AUTO while true permits it',
+        blockedOverrideScan.attendance_action === 'ALREADY_COMPLETED' &&
+          allowedOverrideScan.attendance_action === 'CHECK_IN' &&
+          allowedOverrideScan.status === 'HADIR',
+        `blocked=${blockedOverrideScan.attendance_action}, allowed=${allowedOverrideScan.attendance_action}:${allowedOverrideScan.status}`
+      );
+
+      // ── Test 19: Server runAutoCheckout & MockProvider.runServerAutoCheckout respect all configured rules
+      const buildCfgCronSupabase = (
+        settingsRows: Array<{ key: string; value: string }>,
+        attRows: any[],
+        ptRows: any[]
+      ) => ({
+        from: (table: string) => {
+          const filters: Record<string, any> = {};
+          let updatePayload: any = null;
+          const execSelect = () => {
+            if (table === 'system_settings') return { data: settingsRows, error: null };
+            if (table === 'holidays') {
+              return {
+                data: [{ id: 'hol_fri_cfg', date: '2026-11-27', name: 'Libur Uji Jumat', type: 'NATIONAL_HOLIDAY', is_holiday: true }],
+                error: null,
+              };
+            }
+            if (table === 'users') {
+              return { data: [{ id: 'u_cfg_1', full_name: 'Guru Cron Config', role: 'GURU', account_status: 'ACTIVE' }], error: null };
+            }
+            if (table === 'leaves') {
+              return {
+                data: [{ id: 'lv_cfg_1', user_id: 'u_cfg_1', type: 'IZIN', status: 'APPROVED', start_date: '2026-11-27', end_date: '2026-11-27', reason: 'Izin' }],
+                error: null,
+              };
+            }
+            if (table === 'attendance') {
+              return { data: attRows.filter((r) => !filters.date || r.date === filters.date), error: null };
+            }
+            if (table === 'teacher_point_history') {
+              return {
+                data: ptRows.filter((p) => (!filters.user_id || p.user_id === filters.user_id) && (!filters.date || p.date === filters.date) && (!filters.activity_type || p.activity_type === filters.activity_type)),
+                error: null,
+              };
+            }
+            return { data: [], error: null };
+          };
+          const chain: any = {
+            select: () => chain,
+            eq: (col: string, val: any) => {
+              filters[col] = val;
+              if (updatePayload && table === 'attendance' && col === 'id') {
+                const idx = attRows.findIndex((r) => r.id === val);
+                if (idx >= 0) attRows[idx] = { ...attRows[idx], ...updatePayload };
+                return Promise.resolve({ error: null });
+              }
+              return chain;
+            },
+            lte: () => chain,
+            gte: () => chain,
+            update: (payload: any) => { updatePayload = payload; return chain; },
+            insert: (payload: any) => {
+              if (table === 'teacher_point_history') ptRows.push(payload);
+              return Promise.resolve({ data: payload, error: null });
+            },
+            maybeSingle: async () => {
+              const res = execSelect();
+              return { data: res.data?.[0] || null, error: null };
+            },
+            then: (resolve: any, reject?: any) => Promise.resolve(execSelect()).then(resolve, reject),
+          };
+          return chain;
+        },
+      });
+
+      const masterOffCron = await runAutoCheckout(
+        buildCfgCronSupabase([{ key: 'auto_attendance_enabled', value: 'false' }], [], []),
+        { targetDateStr: '2026-11-25' }
+      );
+      const coOffCron = await runAutoCheckout(
+        buildCfgCronSupabase(
+          [
+            { key: 'auto_attendance_enabled', value: 'true' },
+            { key: 'auto_checkout_enabled', value: 'false' },
+          ],
+          [],
+          []
+        ),
+        { targetDateStr: '2026-11-25' }
+      );
+
+      const forceRows = [
+        {
+          id: 'att_cfg_fri',
+          user_id: 'u_cfg_1',
+          date: '2026-11-27',
+          status: 'HADIR',
+          check_in_time: '07:10:00',
+          check_out_time: null,
+          verification_method: 'QR_GPS',
+          attendance_source: 'QR',
+          notes: '',
+        },
+      ];
+      const forcePts: any[] = [];
+      const customForceCron = await runAutoCheckout(
+        buildCfgCronSupabase(
+          [
+            { key: 'auto_attendance_enabled', value: 'true' },
+            { key: 'auto_checkout_enabled', value: 'false' },
+            { key: 'auto_checkout_time_mode', value: 'CUSTOM' },
+            { key: 'auto_checkout_custom_friday_time', value: '11:25' },
+            { key: 'auto_checkout_points', value: '5' },
+            { key: 'auto_attendance_skip_holidays', value: 'false' },
+            { key: 'auto_attendance_skip_leaves', value: 'false' },
+            { key: 'auto_checkout_preserve_checkin_source', value: 'false' },
+          ],
+          forceRows,
+          forcePts
+        ),
+        { targetDateStr: '2026-11-27', forceRun: true }
+      );
+
+      await mockProvider.updateSettings({
+        ...DEFAULT_SYSTEM_SETTINGS,
+        auto_attendance_enabled: false,
+      }, 'MOCK_ADMIN_TOKEN');
+      const mockRunDisabled = await mockProvider.runServerAutoCheckout('2026-11-25', 'MOCK_ADMIN_TOKEN');
+
+      assert(
+        'AutoAttendance 19: Server runAutoCheckout & MockProvider honor master/checkout switches, forceRun, CUSTOM Friday time, skip flags, points, and preserve_source=false',
+        masterOffCron.skippedReason === 'DISABLED_BY_SETTINGS' &&
+          coOffCron.skippedReason === 'AUTO_CHECKOUT_DISABLED' &&
+          customForceCron.processedCount === 1 &&
+          customForceCron.checkoutTimeApplied === '11:25:00' &&
+          customForceCron.pointsAwardedPerTeacher === 5 &&
+          forceRows[0].check_out_time === '11:25:00' &&
+          forceRows[0].verification_method === 'SYSTEM_AUTO' &&
+          forceRows[0].attendance_source === 'SYSTEM_AUTO' &&
+          forcePts[0]?.points === 5 &&
+          mockRunDisabled.skippedReason === 'DISABLED_BY_SETTINGS',
+        `master=${masterOffCron.skippedReason}, co=${coOffCron.skippedReason}, out=${forceRows[0].check_out_time}, pts=${forcePts[0]?.points}, mockDis=${mockRunDisabled.skippedReason}`
+      );
+    } finally {
+      await mockProvider.updateSettings({ ...DEFAULT_SYSTEM_SETTINGS }, 'MOCK_ADMIN_TOKEN');
     }
   } finally {
     useAuthStore.setState(prevAuthState);

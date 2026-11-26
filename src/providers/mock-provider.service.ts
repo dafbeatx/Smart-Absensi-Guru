@@ -10,7 +10,7 @@ import type {
   UpdateCounselingDTO,
   CounselingFilter,
 } from '../types/counseling.types';
-import type { IDataProvider, AutoAttendTeacherDTO, AutoAttendMode } from './data-provider.interface';
+import type { IDataProvider, AutoAttendTeacherDTO, AutoAttendMode, ServerAutoCheckoutSummary } from './data-provider.interface';
 import type {
   UserProfile,
   AttendanceRecord,
@@ -103,6 +103,8 @@ import {
   generateRandomLateCheckInTime,
   isAutoCheckInRecord,
   isAutoCheckOutRecord,
+  resolveAutoCheckoutTimeHhMm,
+  isDateOffDay,
 } from '../utils/time.utils';
 import { normalizeClassCode } from '../utils/class.utils';
 import {
@@ -429,6 +431,7 @@ export class MockProvider implements IDataProvider {
 
     const existingIsAutoCheckIn = isAutoCheckInRecord(existingRecord);
     const existingIsAutoCheckOut = isAutoCheckOutRecord(existingRecord);
+    const allowOverrideScan = settings.auto_attendance_allow_override_scan !== false;
 
     // Strict Jakarta Time Window & Double Attendance Validation (Anti Absen Ganda)
     const effectiveCheckInTime = existingRecord?.check_in_time || (shouldReconcileAsCheckout ? (pendingCorrection?.targetIn || '07:00:00') : null);
@@ -442,8 +445,8 @@ export class MockProvider implements IDataProvider {
       fridayCheckoutStart: settings.friday_checkout_start,
       isFriday: dayOfWeek === 5,
       bypassTimeWindow: dto.bypass_time_window || isTestBioBypass,
-      isAutoCheckIn: existingIsAutoCheckIn,
-      isAutoCheckOut: existingIsAutoCheckOut,
+      isAutoCheckIn: existingIsAutoCheckIn && allowOverrideScan,
+      isAutoCheckOut: existingIsAutoCheckOut && allowOverrideScan,
     });
 
     if (!timeValidation.isValid) {
@@ -856,25 +859,26 @@ export class MockProvider implements IDataProvider {
   }
 
   public async autoAttendTeacher(dto: AutoAttendTeacherDTO, _token?: string): Promise<AttendanceRecord> {
-    let fridayCheckout: string = CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START;
-    let normalCheckout: string = CONSTANTS.DEFAULTS.WORK_CHECKOUT_START;
     let settings: SystemSettings | null = null;
     try {
       settings = await this.getSettings();
-      if (settings?.friday_checkout_start) {
-        fridayCheckout = settings.friday_checkout_start.slice(0, 5);
-      }
-      if (settings?.work_checkout_start) {
-        normalCheckout = settings.work_checkout_start.slice(0, 5);
-      }
     } catch {
       // fallback to default
+    }
+
+    const mode: AutoAttendMode = dto.mode || 'BOTH';
+
+    if (settings?.auto_attendance_enabled === false) {
+      throw new Error('Fitur Auto Absen sedang dinonaktifkan pada Pengaturan Sistem.');
+    }
+    if (mode !== 'CHECK_OUT' && settings?.auto_checkin_mode === 'DISABLED') {
+      throw new Error('Mode Auto Masuk dinonaktifkan pada Pengaturan Sistem (hanya Auto Pulang diizinkan).');
     }
 
     const [y, m, d] = dto.date.split('-').map(Number);
     const dayOfWeek = new Date(y, (m || 1) - 1, d || 1).getDay();
     const isFriday = dayOfWeek === 5;
-    const checkoutStart = isFriday ? fridayCheckout : normalCheckout;
+    const checkoutStart = resolveAutoCheckoutTimeHhMm(isFriday, settings);
 
     const ALL_KEY = 'smart_absensi_all_attendance_history';
     let allRecords: AttendanceRecord[] = [];
@@ -889,19 +893,30 @@ export class MockProvider implements IDataProvider {
     const existingIdx = allRecords.findIndex((r) => r.user_id === dto.user_id && r.date === dto.date);
     const existing = existingIdx >= 0 ? allRecords[existingIdx] : null;
 
-    const mode: AutoAttendMode = dto.mode || 'BOTH';
-    const randomLateCheckIn = generateRandomLateCheckInTime(`${dto.user_id}_${dto.date}`);
+    const minInHhMm = settings?.auto_checkin_time_min || CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN;
+    const maxInHhMm = settings?.auto_checkin_time_max || CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX;
+    const randomLateCheckIn = generateRandomLateCheckInTime(`${dto.user_id}_${dto.date}`, minInHhMm, maxInHhMm);
+
+    const autoCheckInPts =
+      typeof settings?.auto_checkin_points === 'number' && !isNaN(settings.auto_checkin_points)
+        ? Math.max(0, Math.min(15, Math.round(settings.auto_checkin_points)))
+        : CONSTANTS.DEFAULTS.AUTO_CHECKIN_POINTS;
+    const autoCheckOutPts =
+      typeof settings?.auto_checkout_points === 'number' && !isNaN(settings.auto_checkout_points)
+        ? Math.max(0, Math.min(20, Math.round(settings.auto_checkout_points)))
+        : CONSTANTS.DEFAULTS.AUTO_CHECKOUT_POINTS;
+    const preserveCheckInSource = settings?.auto_checkout_preserve_checkin_source !== false;
 
     let finalStatus: AttendanceStatus = 'TERLAMBAT';
     let finalCheckInTime: string | null = dto.check_in_time || existing?.check_in_time || randomLateCheckIn;
     let finalCheckOutTime: string | null = null;
-    let defaultNotes = 'Presensi otomatis sistem (Terlambat - 0 Poin)';
+    let defaultNotes = `Presensi otomatis sistem (Terlambat - ${autoCheckInPts} Poin)`;
 
     if (mode === 'CHECK_IN') {
       finalStatus = 'TERLAMBAT';
       finalCheckInTime = dto.check_in_time || existing?.check_in_time || randomLateCheckIn;
       finalCheckOutTime = existing?.check_out_time || null;
-      defaultNotes = 'Presensi otomatis sistem (Masuk Terlambat - 0 Poin)';
+      defaultNotes = `Presensi otomatis sistem (Masuk Terlambat - ${autoCheckInPts} Poin)`;
     } else if (mode === 'CHECK_OUT') {
       finalStatus = existing?.status || 'HADIR';
       finalCheckInTime = existing?.check_in_time || dto.check_in_time || (existing ? null : randomLateCheckIn);
@@ -914,10 +929,10 @@ export class MockProvider implements IDataProvider {
       finalStatus = 'TERLAMBAT';
       finalCheckInTime = dto.check_in_time || existing?.check_in_time || randomLateCheckIn;
       finalCheckOutTime = dto.check_out_time || `${checkoutStart}:00`;
-      defaultNotes = 'Presensi otomatis sistem (Masuk Terlambat 0 Poin & Pulang Tuntas)';
+      defaultNotes = `Presensi otomatis sistem (Masuk Terlambat ${autoCheckInPts} Poin & Pulang Tuntas)`;
     }
 
-    const existingCheckInIsReal = Boolean(existing?.check_in_time && !isAutoCheckInRecord(existing));
+    const existingCheckInIsReal = preserveCheckInSource && Boolean(existing?.check_in_time && !isAutoCheckInRecord(existing));
     const resolvedVerificationMethod: VerificationMethod =
       mode === 'CHECK_OUT' && existingCheckInIsReal
         ? (existing!.verification_method || 'QR_GPS')
@@ -942,7 +957,7 @@ export class MockProvider implements IDataProvider {
       is_offline: false,
       is_auto_attendance: !(mode === 'CHECK_OUT' && existingCheckInIsReal),
       notes: dto.notes || defaultNotes,
-      points_awarded: (mode === 'CHECK_IN' || mode === 'BOTH') ? 0 : (existing?.points_awarded || 0),
+      points_awarded: (mode === 'CHECK_IN' || mode === 'BOTH') ? autoCheckInPts : autoCheckOutPts,
       created_at: existing?.created_at || new Date().toISOString(),
     };
 
@@ -966,13 +981,13 @@ export class MockProvider implements IDataProvider {
           user_id: dto.user_id,
           teacher_name: dto.teacher_name,
           date: dto.date,
-          points: 0,
+          points: autoCheckInPts,
           activity_type: 'CHECK_IN_LATE',
-          title: 'Presensi Otomatis Sistem (Terlambat - 0 Poin)',
-          description: 'Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (0 Poin)',
+          title: `Presensi Otomatis Sistem (Terlambat - ${autoCheckInPts} Poin)`,
+          description: `Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (${autoCheckInPts} Poin)`,
         });
       } catch (errPoint) {
-        console.warn('Failed to record 0 points for auto attendance check-in:', errPoint);
+        console.warn('Failed to record auto attendance check-in points:', errPoint);
       }
     }
 
@@ -982,9 +997,9 @@ export class MockProvider implements IDataProvider {
           user_id: dto.user_id,
           teacher_name: dto.teacher_name,
           date: dto.date,
-          points: 10,
+          points: autoCheckOutPts,
           activity_type: 'CHECK_OUT',
-          title: 'Presensi Pulang Tuntas Bertugas',
+          title: autoCheckOutPts > 0 ? 'Presensi Pulang Tuntas Bertugas' : 'Presensi Pulang Otomatis (0 Poin)',
           description: `Tercatat presensi pulang otomatis pada pukul ${finalCheckOutTime} WIB`,
         });
       } catch (errPoint) {
@@ -998,6 +1013,106 @@ export class MockProvider implements IDataProvider {
     }
 
     return autoRecord;
+  }
+
+  public async runServerAutoCheckout(date?: string, _token?: string): Promise<ServerAutoCheckoutSummary> {
+    const targetDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : getTodayDateInJakarta();
+    const settings = await this.getSettings();
+    if (settings.auto_attendance_enabled === false) {
+      return {
+        ok: true,
+        date: targetDate,
+        skippedReason: 'DISABLED_BY_SETTINGS',
+        processedCount: 0,
+        skippedNoCheckInCount: 0,
+        skippedAlreadyCheckedOutCount: 0,
+        skippedLeaveCount: 0,
+      };
+    }
+
+    const holidays = await this.getHolidays().catch(() => []);
+    if (settings.auto_attendance_skip_holidays !== false) {
+      const off = isDateOffDay(targetDate, settings, holidays);
+      if (off.isOff) {
+        return {
+          ok: true,
+          date: targetDate,
+          skippedReason: off.reason || 'HOLIDAY',
+          processedCount: 0,
+          skippedNoCheckInCount: 0,
+          skippedAlreadyCheckedOutCount: 0,
+          skippedLeaveCount: 0,
+        };
+      }
+    }
+
+    const users = await this.getAllUsers(_token || 'MOCK_TOKEN');
+    const leaves = settings.auto_attendance_skip_leaves !== false ? await this.getAllLeaves(_token || 'MOCK_TOKEN') : [];
+    const ALL_KEY = 'smart_absensi_all_attendance_history';
+    let allRecords: AttendanceRecord[] = [];
+    try {
+      const raw = safeGetStorage(ALL_KEY);
+      if (raw) allRecords = JSON.parse(raw);
+      if (!Array.isArray(allRecords)) allRecords = [];
+    } catch {
+      allRecords = [];
+    }
+
+    const updatedUserIds: string[] = [];
+    let skippedNoCheckInCount = 0;
+    let skippedAlreadyCheckedOutCount = 0;
+    let skippedLeaveCount = 0;
+
+    for (const u of users) {
+      if (u.is_active === false) continue;
+      if (settings.auto_attendance_skip_leaves !== false) {
+        const hasLeave = leaves.some((l) => {
+          const st = String(l.approval_status || l.status || 'PENDING').toUpperCase();
+          return l.user_id === u.id && l.start_date <= targetDate && targetDate <= l.end_date && (st === 'APPROVED' || st === 'PENDING');
+        });
+        if (hasLeave) {
+          skippedLeaveCount++;
+          continue;
+        }
+      }
+
+      const rec = allRecords.find((r) => r.user_id === u.id && r.date === targetDate);
+      if (!rec || !rec.check_in_time) {
+        skippedNoCheckInCount++;
+        continue;
+      }
+      if (rec.check_out_time) {
+        skippedAlreadyCheckedOutCount++;
+        continue;
+      }
+      if (rec.status !== 'HADIR' && rec.status !== 'TERLAMBAT') {
+        skippedLeaveCount++;
+        continue;
+      }
+
+      await this.autoAttendTeacher({
+        user_id: u.id,
+        date: targetDate,
+        teacher_name: u.full_name,
+        mode: 'CHECK_OUT',
+      }, _token);
+      updatedUserIds.push(u.id);
+    }
+
+    const [y, m, d] = targetDate.split('-').map(Number);
+    const isFri = new Date(Date.UTC(y, (m || 1) - 1, d || 1)).getUTCDay() === 5;
+    const checkoutHhMm = resolveAutoCheckoutTimeHhMm(isFri, settings);
+
+    return {
+      ok: true,
+      date: targetDate,
+      checkoutTimeApplied: `${checkoutHhMm}:00`,
+      processedCount: updatedUserIds.length,
+      skippedNoCheckInCount,
+      skippedAlreadyCheckedOutCount,
+      skippedLeaveCount,
+      updatedUserIds,
+    };
   }
 
   public async resetAttendance(targetUserId: string, date: string, adminPasswordInput: string, _token: string): Promise<boolean> {
@@ -1357,7 +1472,11 @@ export class MockProvider implements IDataProvider {
         }
 
         // Bersihkan log poin otomatis (0 Poin / Auto Pulang) jika digantikan izin/sakit/cuti
-        if (targetLeave.leave_type !== 'KOREKSI_ABSEN' || leaveStatus !== 'HADIR') {
+        const currentSettingsForLeave = await this.getSettings().catch(() => null);
+        if (
+          (targetLeave.leave_type !== 'KOREKSI_ABSEN' || leaveStatus !== 'HADIR') &&
+          currentSettingsForLeave?.auto_attendance_allow_override_leave !== false
+        ) {
           try {
             const ptRaw = safeGetStorage('smart_absensi_teacher_point_history');
             if (ptRaw) {
@@ -1819,15 +1938,7 @@ export class MockProvider implements IDataProvider {
   }
 
   public async getSettings(): Promise<SystemSettings> {
-    const saved = safeGetStorage('smart_absensi_system_settings');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse saved settings:', e);
-      }
-    }
-    return {
+    const defaults: SystemSettings = {
       app_name: 'Smart Absensi Guru',
       institution_name: 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam',
       work_checkin_start: CONSTANTS.DEFAULTS.WORK_CHECKIN_START,
@@ -1845,7 +1956,33 @@ export class MockProvider implements IDataProvider {
       reminder_friday_checkout_time: CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME,
       reminder_checkout_enabled: CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_ENABLED,
       reminder_early_checkout_enabled: CONSTANTS.DEFAULTS.REMINDER_EARLY_CHECKOUT_ENABLED,
+      auto_attendance_enabled: CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ENABLED,
+      auto_checkout_enabled: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_ENABLED,
+      auto_checkin_mode: CONSTANTS.DEFAULTS.AUTO_CHECKIN_MODE,
+      auto_checkout_time_mode: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TIME_MODE,
+      auto_checkout_custom_time: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME,
+      auto_checkout_custom_friday_time: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME,
+      auto_checkout_trigger_time: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME,
+      auto_checkin_time_min: CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN,
+      auto_checkin_time_max: CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX,
+      auto_checkin_points: CONSTANTS.DEFAULTS.AUTO_CHECKIN_POINTS,
+      auto_checkout_points: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_POINTS,
+      auto_attendance_skip_holidays: CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_SKIP_HOLIDAYS,
+      auto_attendance_skip_leaves: CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_SKIP_LEAVES,
+      auto_attendance_allow_override_scan: CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_SCAN,
+      auto_attendance_allow_override_leave: CONSTANTS.DEFAULTS.AUTO_ATTENDANCE_ALLOW_OVERRIDE_LEAVE,
+      auto_checkout_preserve_checkin_source: CONSTANTS.DEFAULTS.AUTO_CHECKOUT_PRESERVE_CHECKIN_SOURCE,
     };
+
+    const saved = safeGetStorage('smart_absensi_system_settings');
+    if (saved) {
+      try {
+        return { ...defaults, ...JSON.parse(saved) };
+      } catch (e) {
+        console.error('Failed to parse saved settings:', e);
+      }
+    }
+    return defaults;
   }
 
   public async updateSettings(settings: SystemSettings, _token: string): Promise<boolean> {

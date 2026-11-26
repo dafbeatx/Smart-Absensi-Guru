@@ -93,6 +93,20 @@ export interface AutoAttendTeacherDTO {
   notes?: string;
 }
 
+export interface ServerAutoCheckoutSummary {
+  ok: boolean;
+  date: string;
+  skippedReason?: string;
+  holidayName?: string;
+  checkoutTimeApplied?: string;
+  processedCount: number;
+  skippedNoCheckInCount: number;
+  skippedAlreadyCheckedOutCount: number;
+  skippedLeaveCount: number;
+  updatedUserIds?: string[];
+  errorMessage?: string;
+}
+
 export interface IDataProvider {
   // Auth API
   login(dto: LoginDTO): Promise<LoginResponseDTO>;
@@ -111,6 +125,7 @@ export interface IDataProvider {
   getDailyAttendance(date: string, token: string): Promise<AttendanceRecord[]>;
   updateAttendanceNote(userId: string, date: string, note: string, token: string): Promise<boolean>;
   autoAttendTeacher(dto: AutoAttendTeacherDTO, token?: string): Promise<AttendanceRecord>;
+  runServerAutoCheckout?(date?: string, token?: string): Promise<ServerAutoCheckoutSummary>;
   subscribeToAttendanceUpdates?(callback: (event: { table: string; eventType: string }) => void): () => void;
 
   // Leave & Approval API

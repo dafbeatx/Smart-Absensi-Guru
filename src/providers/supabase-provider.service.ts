@@ -12,7 +12,7 @@ import type {
 } from '../types/counseling.types';
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { IDataProvider, AutoAttendTeacherDTO, AutoAttendMode } from './data-provider.interface';
+import type { IDataProvider, AutoAttendTeacherDTO, AutoAttendMode, ServerAutoCheckoutSummary } from './data-provider.interface';
 import type {
   UserProfile,
   AttendanceRecord,
@@ -87,6 +87,7 @@ import {
   generateRandomLateCheckInTime,
   isAutoCheckInRecord,
   isAutoCheckOutRecord,
+  resolveAutoCheckoutTimeHhMm,
 } from '../utils/time.utils';
 import { NotificationService } from '../services/notification-permission.service';
 import { hashPin } from '../utils/hash.utils';
@@ -895,6 +896,7 @@ export class SupabaseProvider implements IDataProvider {
 
     const existingIsAutoCheckIn = isAutoCheckInRecord(existing);
     const existingIsAutoCheckOut = isAutoCheckOutRecord(existing);
+    const allowOverrideScan = settings.auto_attendance_allow_override_scan !== false;
 
     // Strict Jakarta Time Window & Double Attendance Validation (Anti Absen Ganda)
     const timeValidation = validateAttendanceTimeWindow({
@@ -906,8 +908,8 @@ export class SupabaseProvider implements IDataProvider {
       fridayCheckoutStart: settings.friday_checkout_start,
       isFriday: dayOfWeek === 5,
       bypassTimeWindow: dto.bypass_time_window,
-      isAutoCheckIn: existingIsAutoCheckIn,
-      isAutoCheckOut: existingIsAutoCheckOut,
+      isAutoCheckIn: existingIsAutoCheckIn && allowOverrideScan,
+      isAutoCheckOut: existingIsAutoCheckOut && allowOverrideScan,
     });
 
     if (!timeValidation.isValid && !isOfflineSync) {
@@ -1540,23 +1542,26 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async autoAttendTeacher(dto: AutoAttendTeacherDTO, token?: string): Promise<AttendanceRecord> {
-    let fridayCheckout: string = CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START;
-    let normalCheckout: string = CONSTANTS.DEFAULTS.WORK_CHECKOUT_START;
     let settings: SystemSettings | null = null;
     try {
       settings = await this.getSettings();
-      if (settings?.friday_checkout_start) fridayCheckout = settings.friday_checkout_start.slice(0, 5);
-      if (settings?.work_checkout_start) normalCheckout = settings.work_checkout_start.slice(0, 5);
     } catch {
       // fallback
+    }
+
+    const mode: AutoAttendMode = dto.mode || 'BOTH';
+
+    if (settings?.auto_attendance_enabled === false) {
+      throw new Error('Fitur Auto Absen sedang dinonaktifkan pada Pengaturan Sistem.');
+    }
+    if (mode !== 'CHECK_OUT' && settings?.auto_checkin_mode === 'DISABLED') {
+      throw new Error('Mode Auto Masuk dinonaktifkan pada Pengaturan Sistem (hanya Auto Pulang diizinkan).');
     }
 
     const [y, m, d] = dto.date.split('-').map(Number);
     const dayOfWeek = new Date(y, (m || 1) - 1, d || 1).getDay();
     const isFriday = dayOfWeek === 5;
-    const checkoutStart = isFriday ? fridayCheckout : normalCheckout;
-
-    const mode: AutoAttendMode = dto.mode || 'BOTH';
+    const checkoutStart = resolveAutoCheckoutTimeHhMm(isFriday, settings);
 
     // Check existing record
     let existing: any = null;
@@ -1572,18 +1577,30 @@ export class SupabaseProvider implements IDataProvider {
       // ignore
     }
 
-    const randomLateCheckIn = generateRandomLateCheckInTime(`${dto.user_id}_${dto.date}`);
+    const minInHhMm = settings?.auto_checkin_time_min || CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN;
+    const maxInHhMm = settings?.auto_checkin_time_max || CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX;
+    const randomLateCheckIn = generateRandomLateCheckInTime(`${dto.user_id}_${dto.date}`, minInHhMm, maxInHhMm);
+
+    const autoCheckInPts =
+      typeof settings?.auto_checkin_points === 'number' && !isNaN(settings.auto_checkin_points)
+        ? Math.max(0, Math.min(15, Math.round(settings.auto_checkin_points)))
+        : CONSTANTS.DEFAULTS.AUTO_CHECKIN_POINTS;
+    const autoCheckOutPts =
+      typeof settings?.auto_checkout_points === 'number' && !isNaN(settings.auto_checkout_points)
+        ? Math.max(0, Math.min(20, Math.round(settings.auto_checkout_points)))
+        : CONSTANTS.DEFAULTS.AUTO_CHECKOUT_POINTS;
+    const preserveCheckInSource = settings?.auto_checkout_preserve_checkin_source !== false;
 
     let finalStatus: AttendanceStatus = 'TERLAMBAT';
     let finalCheckInTime: string | null = dto.check_in_time || existing?.check_in_time || randomLateCheckIn;
     let finalCheckOutTime: string | null = null;
-    let defaultNotes = 'Presensi otomatis sistem (Terlambat - 0 Poin)';
+    let defaultNotes = `Presensi otomatis sistem (Terlambat - ${autoCheckInPts} Poin)`;
 
     if (mode === 'CHECK_IN') {
       finalStatus = 'TERLAMBAT';
       finalCheckInTime = dto.check_in_time || existing?.check_in_time || randomLateCheckIn;
       finalCheckOutTime = existing?.check_out_time || null;
-      defaultNotes = 'Presensi otomatis sistem (Masuk Terlambat - 0 Poin)';
+      defaultNotes = `Presensi otomatis sistem (Masuk Terlambat - ${autoCheckInPts} Poin)`;
     } else if (mode === 'CHECK_OUT') {
       finalStatus = existing?.status || 'HADIR';
       finalCheckInTime = existing?.check_in_time || dto.check_in_time || (existing ? null : randomLateCheckIn);
@@ -1596,10 +1613,10 @@ export class SupabaseProvider implements IDataProvider {
       finalStatus = 'TERLAMBAT';
       finalCheckInTime = dto.check_in_time || existing?.check_in_time || randomLateCheckIn;
       finalCheckOutTime = dto.check_out_time || `${checkoutStart}:00`;
-      defaultNotes = 'Presensi otomatis sistem (Masuk Terlambat 0 Poin & Pulang Tuntas)';
+      defaultNotes = `Presensi otomatis sistem (Masuk Terlambat ${autoCheckInPts} Poin & Pulang Tuntas)`;
     }
 
-    const existingCheckInIsReal = Boolean(existing?.check_in_time && !isAutoCheckInRecord(existing));
+    const existingCheckInIsReal = preserveCheckInSource && Boolean(existing?.check_in_time && !isAutoCheckInRecord(existing));
     const resolvedVerificationMethod: VerificationMethod =
       mode === 'CHECK_OUT' && existingCheckInIsReal
         ? ((existing.verification_method as VerificationMethod) || 'QR_GPS')
@@ -1667,15 +1684,15 @@ export class SupabaseProvider implements IDataProvider {
             user_id: dto.user_id,
             teacher_name: dto.teacher_name,
             date: dto.date,
-            points: 0,
+            points: autoCheckInPts,
             activity_type: 'CHECK_IN_LATE',
-            title: 'Presensi Otomatis Sistem (Terlambat - 0 Poin)',
-            description: 'Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (0 Poin)',
+            title: `Presensi Otomatis Sistem (Terlambat - ${autoCheckInPts} Poin)`,
+            description: `Tercatat presensi otomatis sistem karena tidak melakukan absensi mandiri (${autoCheckInPts} Poin)`,
           },
           token
         );
       } catch (ePoint) {
-        logger.warn('SupabaseProvider', 'Failed to record 0 points for auto attendance check-in:', ePoint);
+        logger.warn('SupabaseProvider', 'Failed to record auto attendance check-in points:', ePoint);
       }
     }
 
@@ -1686,9 +1703,9 @@ export class SupabaseProvider implements IDataProvider {
             user_id: dto.user_id,
             teacher_name: dto.teacher_name,
             date: dto.date,
-            points: 10,
+            points: autoCheckOutPts,
             activity_type: 'CHECK_OUT',
-            title: 'Presensi Pulang Tuntas Bertugas',
+            title: autoCheckOutPts > 0 ? 'Presensi Pulang Tuntas Bertugas' : 'Presensi Pulang Otomatis (0 Poin)',
             description: `Tercatat presensi pulang otomatis pada pukul ${finalCheckOutTime} WIB`,
           },
           token
@@ -1709,9 +1726,31 @@ export class SupabaseProvider implements IDataProvider {
     return {
       ...payload,
       is_auto_attendance: !(mode === 'CHECK_OUT' && existingCheckInIsReal),
-      points_awarded: (mode === 'CHECK_IN' || mode === 'BOTH') ? 0 : 10,
+      points_awarded: (mode === 'CHECK_IN' || mode === 'BOTH') ? autoCheckInPts : autoCheckOutPts,
       created_at: existing?.created_at || new Date().toISOString(),
     } as AttendanceRecord;
+  }
+
+  public async runServerAutoCheckout(date?: string, token?: string): Promise<ServerAutoCheckoutSummary> {
+    const querySuffix = date ? `&date=${encodeURIComponent(date)}` : '';
+    const response = await fetch(
+      `/api/cron-attendance-alerts?type=auto-checkout${querySuffix}`,
+      buildAuthenticatedFetchOptions('POST', date ? { date } : {}, token)
+    );
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok || json.ok === false) {
+      throw new Error(json.errorMessage || `Gagal mengeksekusi Auto Pulang server (HTTP ${response.status}).`);
+    }
+
+    this.cachedTodayAttendance.clear();
+    this.cachedMonthlyAttendance.clear();
+    if (typeof window !== 'undefined' && Number(json.processedCount || 0) > 0) {
+      window.dispatchEvent(new Event('smart_absensi_scanned'));
+      window.dispatchEvent(new Event('smart_absensi_records_updated'));
+      window.dispatchEvent(new Event('smart_absensi_points_updated'));
+    }
+
+    return json as ServerAutoCheckoutSummary;
   }
 
   public async resetAttendance(targetUserId: string, date: string, adminPasswordInput: string, _token: string): Promise<boolean> {
@@ -2209,21 +2248,24 @@ export class SupabaseProvider implements IDataProvider {
               // Void stale SYSTEM_AUTO / Auto Pulang points if teacher is excused for this date
               if (lType !== 'KOREKSI_ABSEN' || status !== 'HADIR') {
                 try {
-                  const ptLogs = await this.getTeacherPointHistory(leaveRow.user_id, _token);
-                  for (const pt of ptLogs) {
-                    if (
-                      pt.date === dateStr &&
-                      pt.status !== 'VOIDED' &&
-                      (pt.title?.includes('Otomatis Sistem') ||
-                        pt.description?.includes('otomatis') ||
-                        pt.description?.includes('Auto Pulang'))
-                    ) {
-                      await this.voidTeacherPointLog(
-                        pt.id,
-                        `Digantikan oleh pengajuan ${lType} yang disetujui`,
-                        undefined,
-                        _token
-                      ).catch(() => {});
+                  const leaveSettings = await this.getSettings().catch(() => null);
+                  if (leaveSettings?.auto_attendance_allow_override_leave !== false) {
+                    const ptLogs = await this.getTeacherPointHistory(leaveRow.user_id, _token);
+                    for (const pt of ptLogs) {
+                      if (
+                        pt.date === dateStr &&
+                        pt.status !== 'VOIDED' &&
+                        (pt.title?.includes('Otomatis Sistem') ||
+                          pt.description?.includes('otomatis') ||
+                          pt.description?.includes('Auto Pulang'))
+                      ) {
+                        await this.voidTeacherPointLog(
+                          pt.id,
+                          `Digantikan oleh pengajuan ${lType} yang disetujui`,
+                          undefined,
+                          _token
+                        ).catch(() => {});
+                      }
                     }
                   }
                 } catch {
@@ -2456,6 +2498,13 @@ export class SupabaseProvider implements IDataProvider {
         map[row.key] = row.value;
       });
 
+      const parseBoundedInt = (raw: string | undefined, fallback: number, min: number, max: number): number => {
+        if (raw === undefined) return fallback;
+        const parsedInt = parseInt(raw, 10);
+        if (isNaN(parsedInt)) return fallback;
+        return Math.max(min, Math.min(max, parsedInt));
+      };
+
       const parsed: SystemSettings = {
         app_name: map.app_name || 'Smart Absensi Guru',
         institution_name: map.institution_name || 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam',
@@ -2475,6 +2524,22 @@ export class SupabaseProvider implements IDataProvider {
         reminder_friday_checkout_time: map.reminder_friday_checkout_time || CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME,
         reminder_checkout_enabled: map.reminder_checkout_enabled !== 'false',
         reminder_early_checkout_enabled: map.reminder_early_checkout_enabled !== 'false',
+        auto_attendance_enabled: map.auto_attendance_enabled !== 'false',
+        auto_checkout_enabled: map.auto_checkout_enabled !== 'false',
+        auto_checkin_mode: map.auto_checkin_mode === 'DISABLED' ? 'DISABLED' : 'MANUAL_ONLY',
+        auto_checkout_time_mode: map.auto_checkout_time_mode === 'CUSTOM' ? 'CUSTOM' : 'FOLLOW_SCHEDULE',
+        auto_checkout_custom_time: map.auto_checkout_custom_time || CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME,
+        auto_checkout_custom_friday_time: map.auto_checkout_custom_friday_time || CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME,
+        auto_checkout_trigger_time: map.auto_checkout_trigger_time || CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME,
+        auto_checkin_time_min: map.auto_checkin_time_min || CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN,
+        auto_checkin_time_max: map.auto_checkin_time_max || CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX,
+        auto_checkin_points: parseBoundedInt(map.auto_checkin_points, CONSTANTS.DEFAULTS.AUTO_CHECKIN_POINTS, 0, 15),
+        auto_checkout_points: parseBoundedInt(map.auto_checkout_points, CONSTANTS.DEFAULTS.AUTO_CHECKOUT_POINTS, 0, 20),
+        auto_attendance_skip_holidays: map.auto_attendance_skip_holidays !== 'false',
+        auto_attendance_skip_leaves: map.auto_attendance_skip_leaves !== 'false',
+        auto_attendance_allow_override_scan: map.auto_attendance_allow_override_scan !== 'false',
+        auto_attendance_allow_override_leave: map.auto_attendance_allow_override_leave !== 'false',
+        auto_checkout_preserve_checkin_source: map.auto_checkout_preserve_checkin_source !== 'false',
       };
 
       this.cachedSettings = parsed;
@@ -2505,6 +2570,22 @@ export class SupabaseProvider implements IDataProvider {
       { key: 'reminder_friday_checkout_time', value: settings.reminder_friday_checkout_time || CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME },
       { key: 'reminder_checkout_enabled', value: String(settings.reminder_checkout_enabled !== false) },
       { key: 'reminder_early_checkout_enabled', value: String(settings.reminder_early_checkout_enabled !== false) },
+      { key: 'auto_attendance_enabled', value: String(settings.auto_attendance_enabled !== false) },
+      { key: 'auto_checkout_enabled', value: String(settings.auto_checkout_enabled !== false) },
+      { key: 'auto_checkin_mode', value: settings.auto_checkin_mode === 'DISABLED' ? 'DISABLED' : 'MANUAL_ONLY' },
+      { key: 'auto_checkout_time_mode', value: settings.auto_checkout_time_mode === 'CUSTOM' ? 'CUSTOM' : 'FOLLOW_SCHEDULE' },
+      { key: 'auto_checkout_custom_time', value: settings.auto_checkout_custom_time || CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_TIME },
+      { key: 'auto_checkout_custom_friday_time', value: settings.auto_checkout_custom_friday_time || CONSTANTS.DEFAULTS.AUTO_CHECKOUT_CUSTOM_FRIDAY_TIME },
+      { key: 'auto_checkout_trigger_time', value: settings.auto_checkout_trigger_time || CONSTANTS.DEFAULTS.AUTO_CHECKOUT_TRIGGER_TIME },
+      { key: 'auto_checkin_time_min', value: settings.auto_checkin_time_min || CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MIN },
+      { key: 'auto_checkin_time_max', value: settings.auto_checkin_time_max || CONSTANTS.DEFAULTS.AUTO_CHECKIN_TIME_MAX },
+      { key: 'auto_checkin_points', value: String(settings.auto_checkin_points ?? CONSTANTS.DEFAULTS.AUTO_CHECKIN_POINTS) },
+      { key: 'auto_checkout_points', value: String(settings.auto_checkout_points ?? CONSTANTS.DEFAULTS.AUTO_CHECKOUT_POINTS) },
+      { key: 'auto_attendance_skip_holidays', value: String(settings.auto_attendance_skip_holidays !== false) },
+      { key: 'auto_attendance_skip_leaves', value: String(settings.auto_attendance_skip_leaves !== false) },
+      { key: 'auto_attendance_allow_override_scan', value: String(settings.auto_attendance_allow_override_scan !== false) },
+      { key: 'auto_attendance_allow_override_leave', value: String(settings.auto_attendance_allow_override_leave !== false) },
+      { key: 'auto_checkout_preserve_checkin_source', value: String(settings.auto_checkout_preserve_checkin_source !== false) },
     ];
 
     if (settings.admin_reset_password !== undefined) {
