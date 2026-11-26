@@ -44,6 +44,8 @@ import {
 import {
   findAssignmentsForTeacher,
   findMatchingOfficialOralGroup,
+  hydrateOralExamAssignmentsWithTeachers,
+  resolveAssignmentDisplayForUser,
 } from '../../../data/oral-exam-groups';
 import {
   getEffectiveSubjectScope,
@@ -65,7 +67,7 @@ import {
 } from '../../../utils/oral-exam-scoring.utils';
 import { areClassCodesEqual, normalizeClassCode } from '../../../utils/class.utils';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
-import type { StudentItem } from '../../../types/database.types';
+import type { StudentItem, UserProfile } from '../../../types/database.types';
 import { OralExamAdminSetupModal } from './OralExamAdminSetupModal';
 
 export interface OralExamAssessmentModalProps {
@@ -99,7 +101,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   academicYear: propAcademicYear,
   roleMode = 'GURU',
 }) => {
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
   const { showToast } = useToastStore();
 
   const isAdminControl = roleMode === 'ADMIN';
@@ -116,6 +118,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
   // Admin-configured Examiner Assignments (Cloud Synced)
   const [allAssignments, setAllAssignments] = useState<OralExamAssignment[]>([]);
+  const [staffDirectory, setStaffDirectory] = useState<UserProfile[]>([]);
   const [isLoadingAssignments, setIsLoadingAssignments] = useState<boolean>(false);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>('');
   const [isAdminSetupOpen, setIsAdminSetupOpen] = useState<boolean>(false);
@@ -130,7 +133,10 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   const [rosterSourceMode, setRosterSourceMode] = useState<RosterSourceMode>('OFFICIAL_GROUP');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [selectedClass, setSelectedClass] = useState<string>('7');
+  const [selectedExaminerUserId, setSelectedExaminerUserId] = useState<string>('');
   const [examinerName, setExaminerName] = useState<string>('');
+  const [examinerNppDraft, setExaminerNppDraft] = useState<string | null>(null);
+  const [useManualExaminerInput, setUseManualExaminerInput] = useState<boolean>(false);
   const [roomNumber, setRoomNumber] = useState<string>('Ruang 01');
   const [sessionTitle, setSessionTitle] = useState<string>('');
   const [sessionDate, setSessionDate] = useState<string>(() => getTodayDateInJakarta());
@@ -177,13 +183,23 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   const loadAssignments = useCallback(async () => {
     setIsLoadingAssignments(true);
     try {
-      const list = await OralExamAssignmentRepository.getAssignments(activeAcademicYear);
-      setAllAssignments(list);
+      const [list, loadedStaff] = await Promise.all([
+        OralExamAssignmentRepository.getAssignments(activeAcademicYear),
+        isAdminControl
+          ? OralExamAssignmentRepository.getStaffDirectory(token || '')
+          : Promise.resolve<UserProfile[]>([]),
+      ]);
+      if (isAdminControl) {
+        setStaffDirectory(loadedStaff);
+        setAllAssignments(hydrateOralExamAssignmentsWithTeachers(list, loadedStaff));
+      } else {
+        setAllAssignments(list);
+      }
       return list;
     } finally {
       setIsLoadingAssignments(false);
     }
-  }, [activeAcademicYear]);
+  }, [activeAcademicYear, isAdminControl, token]);
 
   // Reset modal entry state cleanly when opened + listen for Admin assignment updates
   useEffect(() => {
@@ -199,13 +215,18 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       loadAssignments();
     };
     window.addEventListener(ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT, handleAssignmentsChanged);
+    window.addEventListener('smart_absensi_teachers_updated', handleAssignmentsChanged);
     return () => {
       window.removeEventListener(ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT, handleAssignmentsChanged);
+      window.removeEventListener('smart_absensi_teachers_updated', handleAssignmentsChanged);
     };
   }, [isOpen, loadSessions, loadAssignments]);
 
   const guruAssignments = useMemo(
-    () => findAssignmentsForTeacher(allAssignments, user),
+    () =>
+      findAssignmentsForTeacher(allAssignments, user).map((assignment) =>
+        resolveAssignmentDisplayForUser(assignment, user)
+      ),
     [allAssignments, user]
   );
 
@@ -282,11 +303,18 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     if (targetGrp) {
       setRosterSourceMode('OFFICIAL_GROUP');
       setSelectedGroupId(targetGrp.id);
+      setSelectedExaminerUserId(targetGrp.examinerUserId || '');
       setExaminerName(targetGrp.examinerName);
+      setExaminerNppDraft(targetGrp.examinerNpp || null);
+      setUseManualExaminerInput(!targetGrp.examinerUserId && Boolean(targetGrp.examinerName));
       setRoomNumber(targetGrp.roomNumber);
       setSelectedClass(targetGrp.className);
     } else {
-      setExaminerName(user?.full_name || 'Guru Penguji');
+      const firstStaff = staffDirectory[0];
+      setSelectedExaminerUserId(firstStaff?.id || user?.id || '');
+      setExaminerName(firstStaff?.full_name || user?.full_name || 'Guru Penguji');
+      setExaminerNppDraft(firstStaff?.nip ?? user?.nip ?? null);
+      setUseManualExaminerInput(false);
     }
     setScreen('CREATE');
   };
@@ -295,9 +323,26 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     setSelectedGroupId(groupId);
     const grp = allAssignments.find((g) => g.id === groupId);
     if (grp) {
+      setSelectedExaminerUserId(grp.examinerUserId || '');
       setExaminerName(grp.examinerName);
+      setExaminerNppDraft(grp.examinerNpp || null);
+      setUseManualExaminerInput(!grp.examinerUserId && Boolean(grp.examinerName));
       setRoomNumber(grp.roomNumber);
       setSelectedClass(grp.className);
+    }
+  };
+
+  const handleSelectExaminerStaff = (staffId: string) => {
+    setSelectedExaminerUserId(staffId);
+    if (!staffId) {
+      setExaminerNppDraft(null);
+      return;
+    }
+    const found = staffDirectory.find((t) => t.id === staffId);
+    if (found) {
+      setExaminerName(found.full_name);
+      setExaminerNppDraft(found.nip || null);
+      setUseManualExaminerInput(false);
     }
   };
 
@@ -341,6 +386,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       let targetClassName = selectedClass;
       let targetRoomNumber = roomNumber.trim() || 'Ruang 01';
       let targetExaminerName = examinerName.trim() || user?.full_name || 'Guru Penguji';
+      let targetExaminerNpp: string | null = examinerNppDraft ?? user?.nip ?? null;
       let groupId: string | null = null;
       let classStudents: Array<{ studentId: string; studentName: string; nisn?: string; className?: string }> = [];
 
@@ -348,6 +394,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
         targetClassName = selectedAdminAssignment.className;
         targetRoomNumber = roomNumber.trim() || selectedAdminAssignment.roomNumber;
         targetExaminerName = examinerName.trim() || selectedAdminAssignment.examinerName;
+        targetExaminerNpp = examinerNppDraft ?? selectedAdminAssignment.examinerNpp ?? null;
         groupId = selectedAdminAssignment.id;
         classStudents = selectedAdminAssignment.students.map((s) => ({
           studentId: s.studentId,
@@ -405,7 +452,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
         academicYear: activeAcademicYear,
         semester: activeSemester,
         examinerName: targetExaminerName,
-        examinerNpp: user?.nip || null,
+        examinerNpp: targetExaminerNpp,
         roomNumber: targetRoomNumber,
         className: targetClassName,
         date: sessionDate,
@@ -1633,14 +1680,51 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
                   <div className="space-y-2.5">
                     <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">Nama Penguji</label>
-                      <input
-                        type="text"
-                        value={examinerName}
-                        onChange={(e) => setExaminerName(e.target.value)}
-                        placeholder="Nama lengkap penguji"
-                        className="w-full h-11 px-3.5 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
-                      />
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <label className="text-xs font-bold text-slate-700">
+                          Nama Penguji (Manajemen Guru &amp; Staf)
+                        </label>
+                        {staffDirectory.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setUseManualExaminerInput((prev) => !prev)}
+                            className="text-[11px] font-semibold text-[#023246] hover:underline cursor-pointer"
+                          >
+                            {useManualExaminerInput ? 'Pilih dari Daftar Guru' : 'Ketik Manual'}
+                          </button>
+                        )}
+                      </div>
+
+                      {!useManualExaminerInput && staffDirectory.length > 0 ? (
+                        <select
+                          value={selectedExaminerUserId}
+                          onChange={(e) => handleSelectExaminerStaff(e.target.value)}
+                          className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                        >
+                          <option value="">
+                            {examinerName
+                              ? `-- Pilih Guru / Staf (Saat ini: ${examinerName}) --`
+                              : `-- Pilih Guru / Staf (${staffDirectory.length} akun) --`}
+                          </option>
+                          {staffDirectory.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.full_name} ({t.role})
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={examinerName}
+                          onChange={(e) => {
+                            setExaminerName(e.target.value);
+                            setSelectedExaminerUserId('');
+                            setExaminerNppDraft(null);
+                          }}
+                          placeholder="Nama lengkap penguji"
+                          className="w-full h-11 px-3.5 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                        />
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-2.5">

@@ -18,6 +18,8 @@ import {
   findMatchingOfficialOralGroup,
   getDefaultOralExamAssignments,
   findAssignmentsForTeacher,
+  hydrateOralExamAssignmentsWithTeachers,
+  resolveAssignmentDisplayForUser,
 } from '../../data/oral-exam-groups';
 import { ProviderFactory } from '../../providers/provider-factory';
 import { MockProvider } from '../../providers/mock-provider.service';
@@ -29,6 +31,7 @@ import {
   type OralExamSession,
   type OralExamAssignment,
 } from '../../types/oral-exam.types';
+import type { UserProfile } from '../../types/database.types';
 import type { TestResultItem } from '../test-runner.service';
 
 export const runOralExamAssessmentTestSuite = async (): Promise<{
@@ -584,6 +587,88 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
         resyncedSession.students[0].englishScore === 100 &&
         resyncedSession.students[2].studentName === 'Siswa Tambahan Admin',
       `room=${resyncedSession.roomNumber}, scope=${resyncedSession.subjectScope}, count=${resyncedSession.students.length}, preserved=${resyncedSession.students[0].englishScore}`
+    );
+
+    // Test 12: Sinkronisasi Nama Penguji dari Data Manajemen Guru & Staf
+    const prevGetAllUsers = mockProv.getAllUsers.bind(mockProv);
+    const mockStaffFromManagement: UserProfile[] = [
+      {
+        id: 'usr_mgm_adi',
+        nip: '1991041201',
+        full_name: 'Adi Prasetyo, S.Pd., M.Pd',
+        phone_number: '0811111111',
+        role: 'GURU',
+        position: 'Guru Bahasa Inggris',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'usr_mgm_dafa',
+        nip: '1995020102',
+        full_name: 'Dafa Maulana, S.Pd',
+        phone_number: '0822222222',
+        role: 'GURU',
+        position: 'Guru PJOK',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'usr_mgm_nonaktif',
+        nip: '1980010100',
+        full_name: 'Staf Resign Nonaktif',
+        phone_number: '0833333333',
+        role: 'GURU',
+        position: 'Guru',
+        avatar_url: null,
+        is_active: false,
+        created_at: new Date().toISOString(),
+      },
+    ];
+
+    let staffDir: UserProfile[] = [];
+    try {
+      (mockProv as any).getAllUsers = async () => mockStaffFromManagement;
+      staffDir = await OralExamAssignmentRepository.getStaffDirectory('MOCK_TOKEN');
+    } finally {
+      (mockProv as any).getAllUsers = prevGetAllUsers;
+    }
+
+    const hydratedDefaults = getDefaultOralExamAssignments('2026/2027', staffDir);
+    const grpAdi = hydratedDefaults.find((g) => g.id === 'oral_grp_01_adi');
+    const grpDafa = hydratedDefaults.find((g) => g.id === 'oral_grp_06_dafa');
+
+    // Simulasi nama di Manajemen Guru & Staf diedit menjadi bergelar baru -> wajib ikut terbarui
+    const renamedHydrated = hydrateOralExamAssignmentsWithTeachers(hydratedDefaults, [
+      {
+        ...mockStaffFromManagement[1],
+        full_name: 'Dafa Maulana, M.Pd',
+      },
+    ]);
+    const grpDafaRenamed = renamedHydrated.find((g) => g.id === 'oral_grp_06_dafa');
+
+    const guruDisplayResolved = resolveAssignmentDisplayForUser(
+      defaultAssignments.find((g) => g.id === 'oral_grp_03_nurul')!,
+      {
+        id: 'usr_nurul_official',
+        full_name: 'Nurul Farhiyah, S.Pd., Gr',
+        nip: '1993050503',
+      }
+    );
+
+    assert(
+      'Manajemen Guru & Staf Sync: getStaffDirectory memfilter staf nonaktif, menautkan ID/NPP & nama resmi terbaru otomatis ke penugasan',
+      staffDir.length === 2 &&
+        staffDir[0].full_name === 'Adi Prasetyo, S.Pd., M.Pd' &&
+        grpAdi?.examinerUserId === 'usr_mgm_adi' &&
+        grpAdi?.examinerName === 'Adi Prasetyo, S.Pd., M.Pd' &&
+        grpAdi?.examinerNpp === '1991041201' &&
+        grpDafa?.examinerUserId === 'usr_mgm_dafa' &&
+        grpDafaRenamed?.examinerName === 'Dafa Maulana, M.Pd' &&
+        guruDisplayResolved.examinerName === 'Nurul Farhiyah, S.Pd., Gr' &&
+        guruDisplayResolved.examinerNpp === '1993050503',
+      `staff=${staffDir.length}, adiId=${grpAdi?.examinerUserId}, renamed=${grpDafaRenamed?.examinerName}, resolved=${guruDisplayResolved.examinerName}`
     );
 
     await OralExamAssignmentRepository.resetToOfficialDefaults('2026/2027', 'MOCK_TOKEN');

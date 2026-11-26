@@ -5,7 +5,7 @@
  * Disinkronkan ke Cloud Supabase agar Guru tinggal siap pakai di HP masing-masing.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
@@ -13,6 +13,7 @@ import {
   Check,
   Languages,
   Plus,
+  RefreshCw,
   RotateCcw,
   Save,
   Search,
@@ -23,12 +24,14 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
-import { ProviderFactory } from '../../../providers/provider-factory';
 import { AdministrationRepository } from '../../../repositories/AdministrationRepository';
 import { OralExamAssignmentRepository } from '../../../repositories/OralExamAssignmentRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { AuditLogger } from '../../../services/audit-logger.service';
-import { getDefaultOralExamAssignments } from '../../../data/oral-exam-groups';
+import {
+  getDefaultOralExamAssignments,
+  hydrateOralExamAssignmentsWithTeachers,
+} from '../../../data/oral-exam-groups';
 import { areClassCodesEqual, normalizeClassCode } from '../../../utils/class.utils';
 import type { StudentItem, UserProfile } from '../../../types/database.types';
 import type {
@@ -65,10 +68,13 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [syncedWithStaffCount, setSyncedWithStaffCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Focused edit state
   const [editingGroup, setEditingGroup] = useState<OralExamAssignment | null>(null);
+  const [teacherSearchQuery, setTeacherSearchQuery] = useState('');
+  const [useManualExaminerInput, setUseManualExaminerInput] = useState(false);
   const [manualStudentDraft, setManualStudentDraft] = useState('');
   const [showMasterPicker, setShowMasterPicker] = useState(false);
   const [selectedMasterIds, setSelectedMasterIds] = useState<Set<string>>(new Set());
@@ -82,35 +88,84 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
     };
   }, [isOpen]);
 
+  const loadAllData = useCallback(async (preserveEditing = false) => {
+    if (!preserveEditing) setIsLoading(true);
+    try {
+      const [loadedAssignments, loadedStaff, loadedStudents] = await Promise.all([
+        OralExamAssignmentRepository.getAssignments(activeAcademicYear),
+        OralExamAssignmentRepository.getStaffDirectory(token || ''),
+        StudentRepository.getStudents(token || '').catch(() => []),
+      ]);
+      const hydrated = hydrateOralExamAssignmentsWithTeachers(loadedAssignments, loadedStaff);
+      const changedCount = hydrated.reduce((acc, item, idx) => {
+        const orig = loadedAssignments[idx];
+        if (
+          !orig ||
+          orig.examinerUserId !== item.examinerUserId ||
+          orig.examinerName !== item.examinerName ||
+          (orig.examinerNpp || null) !== (item.examinerNpp || null)
+        ) {
+          return acc + 1;
+        }
+        return acc;
+      }, 0);
+
+      setTeachers(loadedStaff);
+      setMasterStudents(loadedStudents || []);
+      if (!preserveEditing) {
+        setAssignments(hydrated);
+        setSyncedWithStaffCount(changedCount);
+        setHasUnsavedChanges(changedCount > 0);
+        setEditingGroup(null);
+      } else {
+        setAssignments((prev) => hydrateOralExamAssignmentsWithTeachers(prev, loadedStaff));
+      }
+    } finally {
+      if (!preserveEditing) setIsLoading(false);
+    }
+  }, [activeAcademicYear, token]);
+
   useEffect(() => {
     if (!isOpen) return;
-    let isMounted = true;
-    const loadInitial = async () => {
-      setIsLoading(true);
-      try {
-        const provider = ProviderFactory.getProvider();
-        const [loadedAssignments, loadedUsers, loadedStudents] = await Promise.all([
-          OralExamAssignmentRepository.getAssignments(activeAcademicYear),
-          provider.getAllUsers(token || '').catch(() => []),
-          StudentRepository.getStudents(token || '').catch(() => []),
-        ]);
-        if (!isMounted) return;
-        setAssignments(loadedAssignments);
-        setTeachers(
-          (loadedUsers || []).filter((u) => u.is_active !== false)
-        );
-        setMasterStudents(loadedStudents || []);
-        setHasUnsavedChanges(false);
-        setEditingGroup(null);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
+    loadAllData(false);
+    const handleTeachersUpdated = () => {
+      loadAllData(true);
     };
-    loadInitial();
+    window.addEventListener('smart_absensi_teachers_updated', handleTeachersUpdated);
     return () => {
-      isMounted = false;
+      window.removeEventListener('smart_absensi_teachers_updated', handleTeachersUpdated);
     };
-  }, [isOpen, activeAcademicYear, token]);
+  }, [isOpen, loadAllData]);
+
+  const filteredTeachers = useMemo(() => {
+    const q = teacherSearchQuery.trim().toLowerCase();
+    const list = !q
+      ? teachers
+      : teachers.filter((t) => {
+          const subject = Array.isArray(t.teaching_assignment)
+            ? t.teaching_assignment.join(' ')
+            : String(t.teaching_assignment || '');
+          return (
+            t.full_name.toLowerCase().includes(q) ||
+            (t.nip && t.nip.toLowerCase().includes(q)) ||
+            (t.position && t.position.toLowerCase().includes(q)) ||
+            subject.toLowerCase().includes(q) ||
+            t.role.toLowerCase().includes(q)
+          );
+        });
+    if (editingGroup?.examinerUserId) {
+      const selected = teachers.find((t) => t.id === editingGroup.examinerUserId);
+      if (selected && !list.some((t) => t.id === selected.id)) {
+        return [selected, ...list];
+      }
+    }
+    return list;
+  }, [teachers, teacherSearchQuery, editingGroup?.examinerUserId]);
+
+  const selectedEditingTeacher = useMemo(
+    () => (editingGroup?.examinerUserId ? teachers.find((t) => t.id === editingGroup.examinerUserId) || null : null),
+    [teachers, editingGroup?.examinerUserId]
+  );
 
   const filteredAssignments = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -153,6 +208,7 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
         return;
       }
       setHasUnsavedChanges(false);
+      setSyncedWithStaffCount(0);
       await AuditLogger.log({
         actorId: user?.id || 'admin',
         actorRole: user?.role || 'ADMIN',
@@ -172,13 +228,17 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
   };
 
   const handleResetDefaults = () => {
-    const defaults = getDefaultOralExamAssignments(activeAcademicYear);
+    const defaults = getDefaultOralExamAssignments(activeAcademicYear, teachers);
     setAssignments(defaults);
+    const linked = defaults.filter((d) => Boolean(d.examinerUserId)).length;
+    setSyncedWithStaffCount(linked);
     setHasUnsavedChanges(true);
     showToast(
       'info',
       'Dimuat ke 12 Kelompok Resmi',
-      'Tekan "Simpan Penempatan ke Server" untuk menerapkan pengaturan resmi ke semua perangkat guru.'
+      linked > 0
+        ? `${linked} nama penguji otomatis disinkronkan dari Manajemen Guru & Staf. Tekan Simpan untuk menerapkan.`
+        : 'Tekan "Simpan Penempatan ke Server" untuk menerapkan pengaturan resmi ke semua perangkat guru.'
     );
   };
 
@@ -199,6 +259,8 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
       updatedAt: new Date().toISOString(),
     };
     setEditingGroup(newGrp);
+    setTeacherSearchQuery('');
+    setUseManualExaminerInput(false);
     setManualStudentDraft('');
     setShowMasterPicker(false);
   };
@@ -217,6 +279,7 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
         examinerName: found.full_name,
         examinerNpp: found.nip || null,
       });
+      setUseManualExaminerInput(false);
     }
   };
 
@@ -352,40 +415,116 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
               /* ==================== SUB-VIEW: EDIT GROUP ==================== */
               <div className="space-y-4">
                 <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    1. Penugasan Guru Penguji
-                  </h3>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      1. Pilih Penguji (Dari Manajemen Guru &amp; Staf)
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold">
+                      {teachers.length} Guru &amp; Staf Terdaftar
+                    </span>
+                  </div>
+
+                  {teachers.length > 0 && (
+                    <div>
+                      <div className="relative mb-2">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={teacherSearchQuery}
+                          onChange={(e) => setTeacherSearchQuery(e.target.value)}
+                          placeholder="Cari nama, NPP, atau mapel di Manajemen Guru..."
+                          className="w-full h-10 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Tautkan dengan Akun Guru Terdaftar (Direkomendasikan)
+                      Nama Guru / Staf Penguji
                     </label>
                     <select
                       value={editingGroup.examinerUserId || ''}
                       onChange={(e) => handleSelectTeacherForGroup(e.target.value)}
                       className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
                     >
-                      <option value="">-- Pencocokan Otomatis Berdasarkan Nama --</option>
-                      {teachers.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.full_name} ({t.role})
-                        </option>
-                      ))}
+                      <option value="">
+                        {teachers.length > 0
+                          ? `-- Pilih Guru / Staf (${filteredTeachers.length} tersedia) --`
+                          : '-- Data Manajemen Guru belum dimuat --'}
+                      </option>
+                      {filteredTeachers.map((t) => {
+                        const subj = Array.isArray(t.teaching_assignment)
+                          ? t.teaching_assignment.join(', ')
+                          : t.teaching_assignment;
+                        const detail = subj || t.position || t.role;
+                        return (
+                          <option key={t.id} value={t.id}>
+                            {t.full_name} • {detail}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Nama Penguji Tercetak di Lembar
-                    </label>
-                    <input
-                      type="text"
-                      value={editingGroup.examinerName}
-                      onChange={(e) => setEditingGroup({ ...editingGroup, examinerName: e.target.value })}
-                      placeholder="Contoh: Adi Prastyo, S.Pd"
-                      className="w-full h-11 px-3.5 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
-                    />
-                  </div>
+                  {selectedEditingTeacher && (
+                    <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-xs font-extrabold text-emerald-950 truncate">
+                          {selectedEditingTeacher.full_name}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold inline-flex items-center gap-1">
+                          <UserCheck className="w-3 h-3" /> Tersinkron Manajemen Guru &amp; Staf
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-900/80">
+                        NPP: <strong>{selectedEditingTeacher.nip || 'Belum diisi'}</strong> • Peran:{' '}
+                        <strong>{selectedEditingTeacher.role}</strong>
+                        {selectedEditingTeacher.position ? ` (${selectedEditingTeacher.position})` : ''}
+                      </p>
+                    </div>
+                  )}
+
+                  {!useManualExaminerInput ? (
+                    <button
+                      type="button"
+                      onClick={() => setUseManualExaminerInput(true)}
+                      className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                    >
+                      Atau ketik nama manual (jika penguji tamu belum punya akun)
+                    </button>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-xs font-bold text-slate-700">
+                          Nama Penguji Manual / Khusus
+                        </label>
+                        {selectedEditingTeacher && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingGroup({
+                                ...editingGroup,
+                                examinerName: selectedEditingTeacher.full_name,
+                                examinerNpp: selectedEditingTeacher.nip || null,
+                              });
+                              setUseManualExaminerInput(false);
+                            }}
+                            className="text-[11px] font-bold text-[#023246] hover:underline cursor-pointer"
+                          >
+                            Gunakan Nama Manajemen Guru
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={editingGroup.examinerName}
+                        onChange={(e) => setEditingGroup({ ...editingGroup, examinerName: e.target.value })}
+                        placeholder="Ketik nama penguji..."
+                        className="w-full h-11 px-3.5 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                      />
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-2.5">
                     <div>
@@ -633,7 +772,16 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                       Guru yang ditugaskan akan langsung melihat ruangan &amp; daftar siswanya tanpa pengaturan manual.
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => loadAllData(true)}
+                      title="Muat ulang nama guru dari Manajemen Guru & Staf"
+                      className="h-10 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Muat Ulang Guru</span>
+                    </button>
                     <button
                       type="button"
                       onClick={handleResetDefaults}
@@ -652,6 +800,14 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                     </button>
                   </div>
                 </div>
+
+                {syncedWithStaffCount > 0 && (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 font-medium">
+                    <strong>{syncedWithStaffCount} nama penguji</strong> otomatis diselaraskan dari{' '}
+                    <strong>Data Manajemen Guru &amp; Staf</strong> ({teachers.length} akun aktif). Tekan tombol{' '}
+                    <strong>Simpan Penempatan ke Server</strong> di bawah agar tersinkron ke seluruh perangkat.
+                  </div>
+                )}
 
                 <div className="relative">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -703,6 +859,8 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                             type="button"
                             onClick={() => {
                               setEditingGroup(JSON.parse(JSON.stringify(grp)));
+                              setTeacherSearchQuery('');
+                              setUseManualExaminerInput(!grp.examinerUserId && Boolean(grp.examinerName));
                               setManualStudentDraft('');
                               setShowMasterPicker(false);
                             }}

@@ -4,6 +4,7 @@
  * yang ditetapkan Admin (Supabase Cloud + LocalStorage fallback) untuk langsung dipakai Guru.
  */
 
+import type { UserProfile } from '../types/database.types';
 import type { OralExamAssignment } from '../types/oral-exam.types';
 import { getDefaultOralExamAssignments } from '../data/oral-exam-groups';
 import { AdministrationRepository } from './AdministrationRepository';
@@ -125,11 +126,58 @@ export class OralExamAssignmentRepository {
    */
   public static async resetToOfficialDefaults(
     academicYear?: string,
-    token?: string
+    token?: string,
+    staffList?: UserProfile[]
   ): Promise<OralExamAssignment[]> {
     const targetYear = academicYear || AdministrationRepository.getActiveAcademicYear();
-    const defaults = getDefaultOralExamAssignments(targetYear);
+    const defaults = getDefaultOralExamAssignments(targetYear, staffList);
     await this.saveAssignments(defaults, targetYear, token);
     return defaults;
+  }
+
+  /**
+   * Mengambil daftar guru & staf aktif langsung dari Data Manajemen Guru & Staf
+   * (Provider cloud/mock + fallback cermin lokal `smart_absensi_teachers`), terurut alfabetis.
+   */
+  public static async getStaffDirectory(token?: string): Promise<UserProfile[]> {
+    let rawUsers: UserProfile[] = [];
+    try {
+      const provider = ProviderFactory.getProvider();
+      if (provider && typeof provider.getAllUsers === 'function') {
+        const fetched = await provider.getAllUsers(token || '');
+        if (Array.isArray(fetched) && fetched.length > 0) {
+          rawUsers = fetched;
+        }
+      }
+    } catch (err) {
+      logger.warn('OralExamAssignmentRepository', 'Gagal mengambil daftar Manajemen Guru & Staf dari provider:', err);
+    }
+
+    if (rawUsers.length === 0) {
+      try {
+        const cachedRaw = safeGetStorage('smart_absensi_teachers');
+        if (cachedRaw) {
+          const parsed = JSON.parse(cachedRaw);
+          if (Array.isArray(parsed)) {
+            rawUsers = parsed;
+          }
+        }
+      } catch {
+        // ignore storage parse failure
+      }
+    }
+
+    const deduped = new Map<string, UserProfile>();
+    for (const u of rawUsers) {
+      if (!u || !u.id || u.is_active === false) continue;
+      if (!u.full_name || !u.full_name.trim()) continue;
+      if (!deduped.has(u.id)) {
+        deduped.set(u.id, u);
+      }
+    }
+
+    return Array.from(deduped.values()).sort((a, b) =>
+      a.full_name.localeCompare(b.full_name, 'id', { sensitivity: 'base' })
+    );
   }
 }

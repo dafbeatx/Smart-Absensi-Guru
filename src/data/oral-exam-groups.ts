@@ -269,24 +269,57 @@ export const ORAL_EXAM_OFFICIAL_GROUPS: OfficialOralExamGroup[] = [
 const normalizeExaminerPersonName = (name: string): string =>
   name
     .toLowerCase()
-    .replace(/^(ust\.?|ibu|bapak|pak|bu)\s+/i, '')
+    .replace(/^(ust\.?|ustadz\.?|ibu|bapak|pak|bu|dr\.?|drs\.?|h\.?|hj\.?)\s+/i, '')
     .split(',')[0]
     .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\b(muhammad|muhamad|mohammad|mohamad|mochamad)\b/g, 'muhamad')
     .replace(/\s+/g, ' ')
     .trim();
+
+const levenshteinDistance = (a: string, b: string): number => {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const dp: number[] = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i += 1) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const temp = dp[j];
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + cost);
+      prev = temp;
+    }
+  }
+  return dp[b.length];
+};
+
+const isSimilarNameToken = (ta: string, tb: string): boolean => {
+  if (ta === tb) return true;
+  if (ta.length >= 5 && tb.length >= 5 && ta.slice(0, 5) === tb.slice(0, 5)) return true;
+  if (ta.length >= 5 && tb.length >= 5 && ta.slice(0, 2) === tb.slice(0, 2)) {
+    return levenshteinDistance(ta, tb) <= 2;
+  }
+  return false;
+};
 
 const isPersonNameMatch = (nameA: string, nameB: string): boolean => {
   const normA = normalizeExaminerPersonName(nameA);
   const normB = normalizeExaminerPersonName(nameB);
   if (!normA || !normB) return false;
-  if (normA === normB || normA.includes(normB) || normB.includes(normA)) {
+  const compactA = normA.replace(/\s+/g, '');
+  const compactB = normB.replace(/\s+/g, '');
+  if (
+    normA === normB ||
+    normA.includes(normB) ||
+    normB.includes(normA) ||
+    compactA === compactB
+  ) {
     return true;
   }
   const tokensA = normA.split(' ').filter((t) => t.length >= 3);
   const tokensB = normB.split(' ').filter((t) => t.length >= 3);
-  const matched = tokensA.filter((ta) =>
-    tokensB.some((tb) => tb === ta || (ta.length >= 5 && tb.length >= 5 && ta.slice(0, 5) === tb.slice(0, 5)))
-  );
+  const matched = tokensA.filter((ta) => tokensB.some((tb) => isSimilarNameToken(ta, tb)));
   return matched.length >= 2;
 };
 
@@ -306,11 +339,111 @@ export function findMatchingOfficialOralGroup(
 }
 
 /**
- * Menghasilkan daftar penugasan penguji bawaan dari 12 kelompok resmi sekolah.
+ * Mencari akun Guru / Staf aktif pada data Manajemen Guru & Staf yang cocok dengan nama penguji.
  */
-export function getDefaultOralExamAssignments(academicYear: string = '2026/2027'): OralExamAssignment[] {
+export function findMatchingStaffForExaminer(
+  examinerName?: string | null,
+  staffList: UserProfile[] = []
+): UserProfile | null {
+  const cleanTarget = (examinerName || '').trim();
+  if (!cleanTarget || !Array.isArray(staffList) || staffList.length === 0) return null;
+
+  const activeStaff = staffList.filter((u) => u && u.is_active !== false && Boolean(u.full_name?.trim()));
+  const normTarget = normalizeExaminerPersonName(cleanTarget);
+  if (!normTarget) return null;
+
+  // Prioritas 1: Persis sama setelah normalisasi gelar
+  const exactMatch = activeStaff.find(
+    (u) => normalizeExaminerPersonName(u.full_name) === normTarget
+  );
+  if (exactMatch) return exactMatch;
+
+  // Prioritas 2: Kecocokan parsial / 2 token nama utama
+  return activeStaff.find((u) => isPersonNameMatch(cleanTarget, u.full_name)) || null;
+}
+
+/**
+ * Menghidrasi nama, user ID, dan NPP penguji dari data resmi Manajemen Guru & Staf.
+ * Memastikan setiap penguji memakai nama resmi terbaru yang tercatat di Manajemen Guru & Staf.
+ */
+export function hydrateOralExamAssignmentsWithTeachers(
+  assignments: OralExamAssignment[],
+  staffList: UserProfile[]
+): OralExamAssignment[] {
+  if (!Array.isArray(assignments) || !Array.isArray(staffList) || staffList.length === 0) {
+    return assignments;
+  }
+
+  const activeById = new Map<string, UserProfile>();
+  staffList.forEach((u) => {
+    if (u && u.id && u.is_active !== false) {
+      activeById.set(u.id, u);
+    }
+  });
+
+  return assignments.map((assignment) => {
+    if (assignment.examinerUserId && activeById.has(assignment.examinerUserId)) {
+      const matched = activeById.get(assignment.examinerUserId)!;
+      const nextName = matched.full_name?.trim() || assignment.examinerName;
+      const nextNpp = matched.nip ?? assignment.examinerNpp ?? null;
+      if (nextName === assignment.examinerName && nextNpp === (assignment.examinerNpp ?? null)) {
+        return assignment;
+      }
+      return {
+        ...assignment,
+        examinerName: nextName,
+        examinerNpp: nextNpp,
+      };
+    }
+
+    if (!assignment.examinerUserId) {
+      const matched = findMatchingStaffForExaminer(assignment.examinerName, staffList);
+      if (matched) {
+        return {
+          ...assignment,
+          examinerUserId: matched.id,
+          examinerName: matched.full_name?.trim() || assignment.examinerName,
+          examinerNpp: matched.nip ?? assignment.examinerNpp ?? null,
+        };
+      }
+    }
+
+    return assignment;
+  });
+}
+
+/**
+ * Menyelaraskan nama & NPP penguji di Mode Guru dengan profil akun Manajemen Guru & Staf yang sedang login.
+ */
+export function resolveAssignmentDisplayForUser(
+  assignment: OralExamAssignment,
+  user?: Pick<UserProfile, 'id' | 'full_name' | 'nip'> | null
+): OralExamAssignment {
+  if (!user) return assignment;
+  const isSameId = Boolean(assignment.examinerUserId && user.id && assignment.examinerUserId === user.id);
+  const isNameMatch = Boolean(
+    !assignment.examinerUserId && user.full_name && isPersonNameMatch(assignment.examinerName, user.full_name)
+  );
+  if (!isSameId && !isNameMatch) return assignment;
+
+  return {
+    ...assignment,
+    examinerUserId: user.id || assignment.examinerUserId,
+    examinerName: user.full_name?.trim() || assignment.examinerName,
+    examinerNpp: user.nip ?? assignment.examinerNpp ?? null,
+  };
+}
+
+/**
+ * Menghasilkan daftar penugasan penguji bawaan dari 12 kelompok resmi sekolah.
+ * Bila `staffList` (Manajemen Guru & Staf) diberikan, otomatis menautkan nama resmi, ID, dan NPP-nya.
+ */
+export function getDefaultOralExamAssignments(
+  academicYear: string = '2026/2027',
+  staffList?: UserProfile[]
+): OralExamAssignment[] {
   const nowIso = new Date().toISOString();
-  return ORAL_EXAM_OFFICIAL_GROUPS.map((grp) => ({
+  const base: OralExamAssignment[] = ORAL_EXAM_OFFICIAL_GROUPS.map((grp) => ({
     id: grp.id,
     examinerUserId: null,
     examinerName: grp.examinerName,
@@ -329,6 +462,11 @@ export function getDefaultOralExamAssignments(academicYear: string = '2026/2027'
     isActive: true,
     updatedAt: nowIso,
   }));
+
+  if (staffList && staffList.length > 0) {
+    return hydrateOralExamAssignmentsWithTeachers(base, staffList);
+  }
+  return base;
 }
 
 /**
