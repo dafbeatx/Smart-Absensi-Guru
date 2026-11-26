@@ -1,38 +1,52 @@
 /**
- * SMART ABSENSI GURU - MODAL PENILAIAN UJIAN LISAN
- * Modul Administrasi Ujian Lisan:
- * 1. Template BTQ & Hafalan (Nilai Langsung 0-100 & Predikat A/B/C/D)
- * 2. Template Bahasa Inggris & Bahasa Arab (Checklist 15 Butir Soal, Auto-Nilai & Predikat A/B/C/D)
- * Fitur:
- * - Reactive real-time calculation
- * - Cetak PDF A4 Resmi (Kop Sekolah SMP Terpadu Al-Ittihadiyah)
- * - Ekspor Excel (.xlsx)
+ * SMART ABSENSI GURU - MODAL PENILAIAN UJIAN LISAN (MOBILE-FIRST & RAMAH GURU)
+ * Memisahkan secara tegas 2 jalur penilaian:
+ * 1. Ujian Bahasa (Checklist 15 Soal Bahasa Inggris / Bahasa Arab)
+ * 2. Ujian BTQ & Hafalan (Skala Angka 0–100 + Tombol Nilai Cepat)
+ *
+ * Arsitektur Infinix Note 8 Full-Screen 3-Zone (100dvh), zero horizontal overflow,
+ * dilengkapi Preset 12 Kelompok Penguji Resmi dan mode Nilai Satu per Satu.
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Plus,
-  Trash2,
-  Printer,
-  FileSpreadsheet,
-  Save,
-  BookOpen,
-  Languages,
-  Search,
   ArrowLeft,
+  BookOpen,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  FileSpreadsheet,
+  Languages,
+  Plus,
+  Printer,
+  RotateCcw,
+  Save,
+  Search,
+  Trash2,
+  UserCheck,
+  Users,
   X,
 } from 'lucide-react';
-import { Button } from '../../../components/ui/Button';
 import { useToastStore } from '../../../store/useToastStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { AdministrationRepository } from '../../../repositories/AdministrationRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { OralExamRepository } from '../../../repositories/OralExamRepository';
-import type {
-  OralExamSession,
-  OralExamTemplateType,
-  OralExamStudentRecord,
+import {
+  ORAL_EXAM_OFFICIAL_GROUPS,
+  findMatchingOfficialOralGroup,
+} from '../../../data/oral-exam-groups';
+import {
+  getEffectiveSubjectScope,
+  getOralExamSessionTrack,
+  type OralExamSession,
+  type OralExamStudentRecord,
+  type OralExamSubjectScope,
+  type OralExamTemplateType,
+  type OralExamTrack,
 } from '../../../types/oral-exam.types';
 import {
   calculateDirectScorePredicate,
@@ -40,8 +54,11 @@ import {
   getOralExamPredicateBadgeStyle,
   calculateOralExamSummaryStats,
   isChecklistTrackAssessed,
+  isStudentOralExamCompleted,
 } from '../../../utils/oral-exam-scoring.utils';
+import { areClassCodesEqual, normalizeClassCode } from '../../../utils/class.utils';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
+import type { StudentItem } from '../../../types/database.types';
 
 export interface OralExamAssessmentModalProps {
   isOpen: boolean;
@@ -49,7 +66,23 @@ export interface OralExamAssessmentModalProps {
   academicYear?: string;
 }
 
-const AVAILABLE_CLASSES = ['7', '8A', '8B', '9A', '9B', '10', '11', '12'];
+type ModalScreen = 'LIST' | 'CREATE' | 'ASSESS';
+type AssessViewMode = 'FOCUS' | 'ALL';
+type RosterSourceMode = 'OFFICIAL_GROUP' | 'CLASS_FULL';
+
+const AVAILABLE_CLASSES = ['7', '8A', '8B', '9A', '9B', 'SMA', '10', '11', '12'];
+const QUICK_BTQ_SCORES = [60, 70, 75, 80, 85, 90, 95, 100];
+
+const getScopeLabel = (templateType: OralExamTemplateType, scope: OralExamSubjectScope): string => {
+  if (templateType === 'BAHASA_INGGRIS_ARAB') {
+    if (scope === 'ENGLISH_ONLY') return 'Bahasa Inggris (15 Soal)';
+    if (scope === 'ARABIC_ONLY') return 'Bahasa Arab (15 Soal)';
+    return 'Bahasa Inggris & Arab';
+  }
+  if (scope === 'BTQ_ONLY') return 'BTQ Saja (0–100)';
+  if (scope === 'HAFALAN_ONLY') return 'Hafalan Saja (0–100)';
+  return 'BTQ & Hafalan';
+};
 
 export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = ({
   isOpen,
@@ -65,35 +98,50 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   );
   const activeSemester = useMemo(() => AdministrationRepository.getActiveSemester(), []);
 
-  // Sessions list & active session
+  // Navigation & track separation
+  const [activeTrack, setActiveTrack] = useState<OralExamTrack>('BAHASA');
+  const [screen, setScreen] = useState<ModalScreen>('LIST');
+  const [assessViewMode, setAssessViewMode] = useState<AssessViewMode>('FOCUS');
+
+  // Sessions & editing state
   const [sessions, setSessions] = useState<OralExamSession[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-
-  // Form New / Edit Session states
-  const [isCreatingNew, setIsCreatingNew] = useState(false);
-  const [templateType, setTemplateType] = useState<OralExamTemplateType>('BTQ_HAFALAN');
-  const [sessionTitle, setSessionTitle] = useState('');
-  const [examinerName, setExaminerName] = useState('');
-  const [roomNumber, setRoomNumber] = useState('Ruang 01');
-  const [selectedClass, setSelectedClass] = useState('7');
-  const [sessionDate, setSessionDate] = useState(() => getTodayDateInJakarta());
-
-  // Active editing session
   const [currentSession, setCurrentSession] = useState<OralExamSession | null>(null);
   const [isDirty, setIsDirty] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isExporting, setIsExporting] = useState(false);
+
+  // Create session wizard state
+  const [subjectScopeDraft, setSubjectScopeDraft] = useState<OralExamSubjectScope>('ENGLISH_ONLY');
+  const [rosterSourceMode, setRosterSourceMode] = useState<RosterSourceMode>('OFFICIAL_GROUP');
+  const [selectedGroupId, setSelectedGroupId] = useState<string>(ORAL_EXAM_OFFICIAL_GROUPS[0].id);
+  const [selectedClass, setSelectedClass] = useState<string>('7');
+  const [examinerName, setExaminerName] = useState<string>('');
+  const [roomNumber, setRoomNumber] = useState<string>('Ruang 01');
+  const [sessionTitle, setSessionTitle] = useState<string>('');
+  const [sessionDate, setSessionDate] = useState<string>(() => getTodayDateInJakarta());
+  const [isCreatingLoading, setIsCreatingLoading] = useState<boolean>(false);
+
+  // Assess screen controls
+  const [activeStudentIndex, setActiveStudentIndex] = useState<number>(0);
+  const [activeLanguageTab, setActiveLanguageTab] = useState<'english' | 'arabic'>('english');
+  const [showRubricGuide, setShowRubricGuide] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'UNASSESSED' | 'ASSESSED'>('ALL');
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  // Mobile bottom-sheet dialogs
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
     confirmLabel: string;
     tone?: 'danger' | 'primary';
     onConfirm: () => void;
+    secondaryLabel?: string;
+    onSecondary?: () => void;
   } | null>(null);
-  const [addStudentDialogOpen, setAddStudentDialogOpen] = useState(false);
-  const [newStudentNameDraft, setNewStudentNameDraft] = useState('');
+  const [addStudentDialogOpen, setAddStudentDialogOpen] = useState<boolean>(false);
+  const [newStudentNameDraft, setNewStudentNameDraft] = useState<string>('');
 
+  // Lock background scroll on open
   useEffect(() => {
     if (!isOpen || typeof document === 'undefined') return;
     const prevOverflow = document.body.style.overflow;
@@ -103,132 +151,186 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     };
   }, [isOpen]);
 
-  // Load all sessions from repository
   const loadSessions = useCallback(() => {
     const list = OralExamRepository.getAllSessions(activeAcademicYear);
     setSessions(list);
-    if (list.length > 0 && !selectedSessionId) {
-      setSelectedSessionId(list[0].id);
-      setCurrentSession(list[0]);
-    } else if (selectedSessionId) {
-      const match = list.find((s) => s.id === selectedSessionId);
-      if (match) setCurrentSession(match);
-      else if (list.length > 0) {
-        setSelectedSessionId(list[0].id);
-        setCurrentSession(list[0]);
-      } else {
-        setSelectedSessionId(null);
-        setCurrentSession(null);
-      }
-    }
-  }, [activeAcademicYear, selectedSessionId]);
+    return list;
+  }, [activeAcademicYear]);
 
+  // Reset modal entry state cleanly when opened
   useEffect(() => {
-    if (isOpen) {
-      loadSessions();
+    if (!isOpen) return;
+    loadSessions();
+    setScreen('LIST');
+    setIsDirty(false);
+    setScoreDrafts({});
+    const matchedGroup = findMatchingOfficialOralGroup(user?.full_name);
+    if (matchedGroup) {
+      setRosterSourceMode('OFFICIAL_GROUP');
+      setSelectedGroupId(matchedGroup.id);
+      setExaminerName(matchedGroup.examinerName);
+      setRoomNumber(matchedGroup.roomNumber);
+      setSelectedClass(matchedGroup.className);
+    } else {
       setExaminerName(user?.full_name || 'Guru Penguji');
     }
   }, [isOpen, loadSessions, user?.full_name]);
 
-  const applySelectSession = (id: string) => {
-    setSelectedSessionId(id);
-    const found = sessions.find((s) => s.id === id);
-    if (found) {
-      setCurrentSession(JSON.parse(JSON.stringify(found)));
-      setIsDirty(false);
-      setIsCreatingNew(false);
-      setScoreDrafts({});
+  // Sessions filtered STRICTLY by active track (Bahasa vs BTQ separated)
+  const trackSessions = useMemo(
+    () => sessions.filter((s) => getOralExamSessionTrack(s) === activeTrack),
+    [sessions, activeTrack]
+  );
+
+  const bahasaCount = useMemo(
+    () => sessions.filter((s) => getOralExamSessionTrack(s) === 'BAHASA').length,
+    [sessions]
+  );
+  const btqCount = useMemo(
+    () => sessions.filter((s) => getOralExamSessionTrack(s) === 'BTQ').length,
+    [sessions]
+  );
+
+  const selectedOfficialGroup = useMemo(
+    () => ORAL_EXAM_OFFICIAL_GROUPS.find((g) => g.id === selectedGroupId) || ORAL_EXAM_OFFICIAL_GROUPS[0],
+    [selectedGroupId]
+  );
+
+  const openCreateScreen = (track: OralExamTrack = activeTrack) => {
+    setActiveTrack(track);
+    setSubjectScopeDraft(track === 'BAHASA' ? 'ENGLISH_ONLY' : 'BOTH');
+    setSessionTitle('');
+    setSessionDate(getTodayDateInJakarta());
+    const matchedGroup = findMatchingOfficialOralGroup(user?.full_name);
+    if (matchedGroup) {
+      setRosterSourceMode('OFFICIAL_GROUP');
+      setSelectedGroupId(matchedGroup.id);
+      setExaminerName(matchedGroup.examinerName);
+      setRoomNumber(matchedGroup.roomNumber);
+      setSelectedClass(matchedGroup.className);
+    } else {
+      setExaminerName(user?.full_name || 'Guru Penguji');
+    }
+    setScreen('CREATE');
+  };
+
+  const handleGroupChange = (groupId: string) => {
+    setSelectedGroupId(groupId);
+    const grp = ORAL_EXAM_OFFICIAL_GROUPS.find((g) => g.id === groupId);
+    if (grp) {
+      setExaminerName(grp.examinerName);
+      setRoomNumber(grp.roomNumber);
+      setSelectedClass(grp.className);
     }
   };
 
-  // Handle switching active session
-  const handleSelectSession = (id: string) => {
-    if (isDirty) {
-      setConfirmDialog({
-        title: 'Perubahan Belum Disimpan',
-        message: 'Ada perubahan nilai ujian lisan yang belum disimpan. Tetap beralih ke sesi lain?',
-        confirmLabel: 'Ya, Beralih Sesi',
-        tone: 'danger',
-        onConfirm: () => {
-          setConfirmDialog(null);
-          applySelectSession(id);
-        },
-      });
-      return;
-    }
-    applySelectSession(id);
-  };
-
-  // Create new session flow
-  const handleCreateNewSession = async () => {
-    const defaultTitle =
-      templateType === 'BAHASA_INGGRIS_ARAB'
-        ? `Ujian Lisan Bahasa Inggris & Arab - Kelas ${selectedClass}`
-        : `Penilaian BTQ dan Hafalan - Kelas ${selectedClass}`;
-
-    // Load registered students for selected class
-    let classStudents: Array<{ studentId: string; studentName: string; nisn?: string; className?: string }> = [];
-    try {
-      const allStudents = await StudentRepository.getStudents();
-      classStudents = allStudents
-        .filter((st: any) => {
-          const rawClass = ((st.className || st.class_name || '') as string).trim().toUpperCase();
-          const targetClass = selectedClass.trim().toUpperCase();
-          if (rawClass === targetClass) return true;
-          if (targetClass === '7' && (rawClass === '7' || rawClass === '7A' || rawClass === '7B' || rawClass === 'VII')) {
-            return true;
-          }
-          return false;
-        })
-        .map((st: any) => ({
-          studentId: st.id,
-          studentName: st.fullName || st.full_name || 'Siswa',
-          nisn: st.nisn || undefined,
-          className: st.className || st.class_name || selectedClass,
-        }));
-    } catch (err) {
-      console.warn('Gagal memuat siswa dari master:', err);
-    }
-
-    // Fallback if no students found in DB
-    if (classStudents.length === 0) {
-      classStudents = [
-        { studentId: 'sample_1', studentName: 'Muhammad Nabiel Alqarani', className: selectedClass },
-        { studentId: 'sample_2', studentName: 'Sela Mutia Nur Azimah', className: selectedClass },
-        { studentId: 'sample_3', studentName: 'Shirin Fatina Jasmin', className: selectedClass },
-        { studentId: 'sample_4', studentName: 'Siti Nadipatul Mala', className: selectedClass },
-        { studentId: 'sample_5', studentName: 'Sya\'datun Nisa', className: selectedClass },
-        { studentId: 'sample_6', studentName: 'Tasya Nurasri Setiawan', className: selectedClass },
-        { studentId: 'sample_7', studentName: 'Viodora Shakila Nur Zafira', className: selectedClass },
-        { studentId: 'sample_8', studentName: 'Zahrofal Maula', className: selectedClass },
-        { studentId: 'sample_9', studentName: 'Ratu Siti Maghfiroh', className: selectedClass },
-        { studentId: 'sample_10', studentName: 'Siti Hana', className: selectedClass },
-      ];
-    }
-
-    const created = OralExamRepository.createNewSession({
-      templateType,
-      title: sessionTitle.trim() || defaultTitle,
-      academicYear: activeAcademicYear,
-      semester: activeSemester,
-      examinerName: examinerName.trim() || user?.full_name || 'Guru Penguji',
-      examinerNpp: user?.nip || null,
-      roomNumber: roomNumber.trim() || 'Ruang 01',
-      className: selectedClass,
-      date: sessionDate,
-      students: classStudents,
-    });
-
-    setSessions((prev) => [created, ...prev]);
-    setSelectedSessionId(created.id);
-    setCurrentSession(created);
-    setIsCreatingNew(false);
-    setIsDirty(false);
+  const handleOpenSession = (session: OralExamSession) => {
+    const cloned: OralExamSession = JSON.parse(JSON.stringify(session));
+    const scope = getEffectiveSubjectScope(cloned);
+    setActiveTrack(getOralExamSessionTrack(cloned));
+    setCurrentSession(cloned);
+    setActiveLanguageTab(scope === 'ARABIC_ONLY' ? 'arabic' : 'english');
+    setActiveStudentIndex(0);
+    setAssessViewMode('FOCUS');
+    setSearchQuery('');
+    setStatusFilter('ALL');
     setScoreDrafts({});
-    showToast('success', 'Sesi Berhasil Dibuat', `Daftar penilaian untuk kelas ${selectedClass} siap digunakan.`);
+    setIsDirty(false);
+    setScreen('ASSESS');
   };
 
-  // Score direct input handler (BTQ & Hafalan) — dukung desimal koma (, -> .) & tolak NaN
+  const handleCreateSessionSubmit = async () => {
+    setIsCreatingLoading(true);
+    try {
+      const templateType: OralExamTemplateType =
+        activeTrack === 'BAHASA' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN';
+
+      let targetClassName = selectedClass;
+      let targetRoomNumber = roomNumber.trim() || 'Ruang 01';
+      let targetExaminerName = examinerName.trim() || user?.full_name || 'Guru Penguji';
+      let groupId: string | null = null;
+      let classStudents: Array<{ studentId: string; studentName: string; nisn?: string; className?: string }> = [];
+
+      if (rosterSourceMode === 'OFFICIAL_GROUP' && selectedOfficialGroup) {
+        targetClassName = selectedOfficialGroup.className;
+        targetRoomNumber = roomNumber.trim() || selectedOfficialGroup.roomNumber;
+        targetExaminerName = examinerName.trim() || selectedOfficialGroup.examinerName;
+        groupId = selectedOfficialGroup.id;
+        classStudents = selectedOfficialGroup.students.map((s) => ({
+          studentId: s.studentId,
+          studentName: s.studentName,
+          className: selectedOfficialGroup.className,
+        }));
+      } else {
+        try {
+          const allStudents = await StudentRepository.getStudents();
+          const normTarget = normalizeClassCode(selectedClass);
+          classStudents = allStudents
+            .filter((st: StudentItem) => {
+              const rawCls = st.className || '';
+              if (areClassCodesEqual(rawCls, selectedClass)) return true;
+              const normCls = normalizeClassCode(rawCls);
+              if (normTarget === '7' && (normCls === '7' || normCls === '7A' || normCls === '7B')) {
+                return true;
+              }
+              return false;
+            })
+            .map((st: StudentItem) => ({
+              studentId: st.id,
+              studentName: st.fullName || 'Siswa',
+              nisn: st.nisn || undefined,
+              className: st.className || selectedClass,
+            }));
+        } catch (err) {
+          console.warn('Gagal memuat siswa dari master:', err);
+        }
+
+        if (classStudents.length === 0) {
+          classStudents = [
+            { studentId: `manual_${Date.now()}_1`, studentName: 'Siswa Contoh 1', className: selectedClass },
+            { studentId: `manual_${Date.now()}_2`, studentName: 'Siswa Contoh 2', className: selectedClass },
+          ];
+          showToast(
+            'info',
+            'Data Kelas Belum Tersedia di Master',
+            'Sesi dibuat dengan baris contoh. Anda dapat menambah nama siswa dengan tombol "+ Tambah Siswa".'
+          );
+        }
+      }
+
+      const defaultTitle =
+        templateType === 'BAHASA_INGGRIS_ARAB'
+          ? `Ujian Lisan ${getScopeLabel(templateType, subjectScopeDraft)} - ${targetClassName === 'SMA' ? 'SMA' : `Kelas ${targetClassName}`}`
+          : `Penilaian ${getScopeLabel(templateType, subjectScopeDraft)} - ${targetClassName === 'SMA' ? 'SMA' : `Kelas ${targetClassName}`}`;
+
+      const created = OralExamRepository.createNewSession({
+        templateType,
+        subjectScope: subjectScopeDraft,
+        groupId,
+        title: sessionTitle.trim() || defaultTitle,
+        academicYear: activeAcademicYear,
+        semester: activeSemester,
+        examinerName: targetExaminerName,
+        examinerNpp: user?.nip || null,
+        roomNumber: targetRoomNumber,
+        className: targetClassName,
+        date: sessionDate,
+        students: classStudents,
+      });
+
+      loadSessions();
+      handleOpenSession(created);
+      showToast(
+        'success',
+        'Sesi Siap Digunakan',
+        `${created.students.length} peserta (${targetRoomNumber}) siap dinilai.`
+      );
+    } finally {
+      setIsCreatingLoading(false);
+    }
+  };
+
+  // --- Scoring Handlers ---
   const handleDirectScoreChange = (
     studentIndex: number,
     field: 'btqScore' | 'hafalanScore',
@@ -261,14 +363,11 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     }
 
     const normalizedStr = trimmed.replace(/,/g, '.');
-    // Hanya terima karakter angka positif dengan maksimal satu pemisah desimal
     if (!/^\d*(?:\.\d*)?$/.test(normalizedStr)) {
       return;
     }
 
     setScoreDrafts((prev) => ({ ...prev, [draftKey]: valStr }));
-
-    // Jika sedang mengetik diakhiri koma/titik (misal "85,"), simpan draft sambil menunggu digit desimal
     if (normalizedStr === '.' || normalizedStr.endsWith('.')) {
       return;
     }
@@ -307,77 +406,97 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     });
   };
 
-  // Toggle single question checkbox (Bahasa Inggris / Arab)
+  const handleApplyQuickScore = (
+    studentIndex: number,
+    field: 'btqScore' | 'hafalanScore',
+    scoreValue: number
+  ) => {
+    if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
+    const student = currentSession.students[studentIndex];
+    const draftKey = `${student.studentId}:${field}`;
+    setScoreDrafts((prev) => {
+      if (!(draftKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[draftKey];
+      return next;
+    });
+
+    const predicate = calculateDirectScorePredicate(scoreValue);
+    const updatedStudents = [...currentSession.students];
+    const target = { ...updatedStudents[studentIndex] };
+    if (field === 'btqScore') {
+      target.btqScore = scoreValue;
+      target.btqPredicate = predicate;
+    } else {
+      target.hafalanScore = scoreValue;
+      target.hafalanPredicate = predicate;
+    }
+    updatedStudents[studentIndex] = target;
+    setCurrentSession({ ...currentSession, students: updatedStudents });
+    setIsDirty(true);
+  };
+
+  const handleNotesChange = (studentIndex: number, notes: string) => {
+    if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
+    const updatedStudents = [...currentSession.students];
+    updatedStudents[studentIndex] = { ...updatedStudents[studentIndex], notes };
+    setCurrentSession({ ...currentSession, students: updatedStudents });
+    setIsDirty(true);
+  };
+
+  const updateChecklistTrack = (
+    studentIndex: number,
+    subject: 'english' | 'arabic',
+    nextChecklist: boolean[],
+    assessedFlag: boolean
+  ) => {
+    if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
+    const calc = calculateChecklistScoreAndPredicate(nextChecklist, 15);
+    const updatedStudents = [...currentSession.students];
+    const target = { ...updatedStudents[studentIndex] };
+
+    if (subject === 'english') {
+      target.englishChecklist = nextChecklist;
+      target.englishCorrectCount = assessedFlag ? calc.correctCount : null;
+      target.englishScore = assessedFlag ? calc.score : null;
+      target.englishPredicate = assessedFlag ? calc.predicate : null;
+      target.englishAssessed = assessedFlag;
+    } else {
+      target.arabicChecklist = nextChecklist;
+      target.arabicCorrectCount = assessedFlag ? calc.correctCount : null;
+      target.arabicScore = assessedFlag ? calc.score : null;
+      target.arabicPredicate = assessedFlag ? calc.predicate : null;
+      target.arabicAssessed = assessedFlag;
+    }
+
+    updatedStudents[studentIndex] = target;
+    setCurrentSession({ ...currentSession, students: updatedStudents });
+    setIsDirty(true);
+  };
+
   const handleToggleChecklist = (
     studentIndex: number,
     subject: 'english' | 'arabic',
     qIndex: number
   ) => {
-    if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
-    const updatedStudents = [...currentSession.students];
-    const target = { ...updatedStudents[studentIndex] };
-
-    if (subject === 'english') {
-      const arr = target.englishChecklist ? [...target.englishChecklist] : new Array(15).fill(false);
-      arr[qIndex] = !arr[qIndex];
-      const calc = calculateChecklistScoreAndPredicate(arr, 15);
-      target.englishChecklist = arr;
-      target.englishCorrectCount = calc.correctCount;
-      target.englishScore = calc.score;
-      target.englishPredicate = calc.predicate;
-      target.englishAssessed = true;
-    } else {
-      const arr = target.arabicChecklist ? [...target.arabicChecklist] : new Array(15).fill(false);
-      arr[qIndex] = !arr[qIndex];
-      const calc = calculateChecklistScoreAndPredicate(arr, 15);
-      target.arabicChecklist = arr;
-      target.arabicCorrectCount = calc.correctCount;
-      target.arabicScore = calc.score;
-      target.arabicPredicate = calc.predicate;
-      target.arabicAssessed = true;
-    }
-
-    updatedStudents[studentIndex] = target;
-    setCurrentSession({ ...currentSession, students: updatedStudents });
-    setIsDirty(true);
+    if (!currentSession) return;
+    const target = currentSession.students[studentIndex];
+    if (!target) return;
+    const currentArr =
+      subject === 'english'
+        ? (target.englishChecklist ? [...target.englishChecklist] : new Array(15).fill(false))
+        : (target.arabicChecklist ? [...target.arabicChecklist] : new Array(15).fill(false));
+    currentArr[qIndex] = !currentArr[qIndex];
+    updateChecklistTrack(studentIndex, subject, currentArr, true);
   };
 
-  // Bulk check all / reset all for a student
   const handleBulkChecklist = (
     studentIndex: number,
     subject: 'english' | 'arabic',
-    state: boolean
+    fillAll: boolean
   ) => {
-    if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
-    const updatedStudents = [...currentSession.students];
-    const target = { ...updatedStudents[studentIndex] };
-    const arr = new Array(15).fill(state);
-    const calc = calculateChecklistScoreAndPredicate(arr, 15);
-
-    if (subject === 'english') {
-      target.englishChecklist = arr;
-      target.englishCorrectCount = calc.correctCount;
-      target.englishScore = calc.score;
-      target.englishPredicate = calc.predicate;
-      target.englishAssessed = true;
-    } else {
-      target.arabicChecklist = arr;
-      target.arabicCorrectCount = calc.correctCount;
-      target.arabicScore = calc.score;
-      target.arabicPredicate = calc.predicate;
-      target.arabicAssessed = true;
-    }
-
-    updatedStudents[studentIndex] = target;
-    setCurrentSession({ ...currentSession, students: updatedStudents });
-    setIsDirty(true);
-  };
-
-  // Add new student row via React dialog
-  const handleAddStudent = () => {
-    if (!currentSession) return;
-    setNewStudentNameDraft('');
-    setAddStudentDialogOpen(true);
+    const arr = new Array(15).fill(fillAll);
+    updateChecklistTrack(studentIndex, subject, arr, fillAll);
   };
 
   const handleConfirmAddStudent = (e?: React.FormEvent) => {
@@ -385,7 +504,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     if (!currentSession) return;
     const trimmed = newStudentNameDraft.trim();
     if (!trimmed) {
-      showToast('error', 'Nama Siswa Wajib Diisi', 'Masukkan nama siswa sebelum menambahkan.');
+      showToast('error', 'Nama Siswa Wajib Diisi', 'Masukkan nama lengkap siswa sebelum menambahkan.');
       return;
     }
 
@@ -417,25 +536,27 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
     const updated = [...currentSession.students, newRecord];
     setCurrentSession({ ...currentSession, students: updated });
+    setActiveStudentIndex(updated.length - 1);
     setIsDirty(true);
     setAddStudentDialogOpen(false);
     setNewStudentNameDraft('');
+    showToast('success', 'Siswa Ditambahkan', `${trimmed} berhasil ditambahkan ke daftar ujian.`);
   };
 
-  // Remove student row
   const handleRemoveStudent = (idx: number) => {
     if (!currentSession || idx < 0 || idx >= currentSession.students.length) return;
     const target = currentSession.students[idx];
     setConfirmDialog({
-      title: 'Hapus Peserta Ujian Lisan?',
-      message: `Hapus ${target.studentName} dari lembar penilaian ini?`,
+      title: 'Hapus Peserta Ujian?',
+      message: `Hapus ${target.studentName} dari sesi penilaian ini?`,
       confirmLabel: 'Ya, Hapus',
       tone: 'danger',
       onConfirm: () => {
         setConfirmDialog(null);
         setCurrentSession((prev) => {
           if (!prev) return prev;
-          const updated = prev.students.filter((st, i) => st.studentId !== target.studentId && i !== idx);
+          const updated = prev.students.filter((st, i) => !(st.studentId === target.studentId && i === idx));
+          setActiveStudentIndex((currIdx) => Math.max(0, Math.min(currIdx, updated.length - 1)));
           return { ...prev, students: updated };
         });
         setIsDirty(true);
@@ -443,44 +564,49 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     });
   };
 
-  // Save changes to repository
-  const handleSaveSession = () => {
+  const handleSaveSession = useCallback((silentToast = false) => {
     if (!currentSession) return;
-    OralExamRepository.saveSession(currentSession);
+    const saved = OralExamRepository.saveSession(currentSession);
+    setCurrentSession(saved);
     setIsDirty(false);
     setScoreDrafts({});
     loadSessions();
-    showToast('success', 'Nilai Tersimpan', 'Seluruh penilaian ujian lisan berhasil disimpan.');
-  };
+    if (!silentToast) {
+      showToast('success', 'Nilai Tersimpan', 'Seluruh nilai ujian lisan berhasil disimpan.');
+    }
+  }, [currentSession, loadSessions, showToast]);
 
-  // Delete active session
-  const handleDeleteCurrentSession = () => {
-    if (!currentSession) return;
-    const sessionToDelete = currentSession;
+  const handleDeleteSessionById = (sessionToDelete: OralExamSession) => {
     setConfirmDialog({
       title: 'Hapus Sesi Ujian Lisan?',
-      message: `Hapus seluruh sesi ujian lisan "${sessionToDelete.title}" beserta seluruh nilainya?`,
+      message: `Hapus sesi "${sessionToDelete.title}" beserta seluruh nilai siswanya?`,
       confirmLabel: 'Ya, Hapus Sesi',
       tone: 'danger',
       onConfirm: () => {
         setConfirmDialog(null);
         OralExamRepository.deleteSession(sessionToDelete.id);
+        if (currentSession?.id === sessionToDelete.id) {
+          setCurrentSession(null);
+          setScreen('LIST');
+        }
         setIsDirty(false);
         setScoreDrafts({});
-        showToast('info', 'Sesi Dihapus', 'Sesi penilaian lisan berhasil dihapus.');
         loadSessions();
+        showToast('info', 'Sesi Dihapus', 'Sesi penilaian lisan telah dihapus.');
       },
     });
   };
 
-  // Export PDF
   const handleExportPdf = async () => {
     if (!currentSession) return;
+    if (isDirty) {
+      handleSaveSession(true);
+    }
     try {
       setIsExporting(true);
       const { OralExamExportService } = await import('../../../lib/oral-exam-export.lib');
       await OralExamExportService.exportToPdf(currentSession);
-      showToast('success', 'PDF Siap!', 'Dokumen lembar penilaian resmi berhasil diunduh.');
+      showToast('success', 'PDF Berhasil Diunduh!', 'Dokumen lembar penilaian resmi siap dicetak.');
     } catch (err) {
       console.error('Failed to export PDF:', err);
       showToast('error', 'Gagal Cetak PDF', 'Terjadi kesalahan saat memproses dokumen PDF.');
@@ -489,55 +615,62 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     }
   };
 
-  // Export Excel
   const handleExportExcel = async () => {
     if (!currentSession) return;
+    if (isDirty) {
+      handleSaveSession(true);
+    }
     try {
       const { OralExamExportService } = await import('../../../lib/oral-exam-export.lib');
       OralExamExportService.exportToExcel(currentSession);
       showToast('success', 'Excel Berhasil Diunduh!', 'File rekap penilaian .xlsx telah disimpan.');
     } catch (err) {
       console.error('Failed to export Excel:', err);
-      showToast('error', 'Gagal Ekspor Excel', 'Terjadi kesalahan saat membuat file spreadsheet.');
+      showToast('error', 'Gagal Ekspor Excel', 'Terjadi kesalahan saat membuat file Excel.');
     }
   };
 
-  // Statistics
-  const summaryStats = useMemo(() => {
-    if (!currentSession) return null;
-    const isChecklist = currentSession.templateType === 'BAHASA_INGGRIS_ARAB';
-    return calculateOralExamSummaryStats(currentSession.students, isChecklist);
-  }, [currentSession]);
-
-  // Filtered students for search
-  const filteredStudents = useMemo(() => {
-    if (!currentSession) return [];
-    if (!searchQuery.trim()) return currentSession.students;
-    const q = searchQuery.toLowerCase();
-    return currentSession.students.filter(
-      (s) => s.studentName.toLowerCase().includes(q) || (s.nisn && s.nisn.includes(q))
-    );
-  }, [currentSession, searchQuery]);
-
-  const isChecklistMode = currentSession?.templateType === 'BAHASA_INGGRIS_ARAB';
-
-  const handleClose = useCallback(() => {
-    if (isDirty) {
+  const navigateWithDirtyGuard = useCallback((action: () => void) => {
+    if (isDirty && screen === 'ASSESS') {
       setConfirmDialog({
-        title: 'Keluar Tanpa Menyimpan?',
-        message: 'Ada perubahan nilai yang belum disimpan. Yakin ingin menutup lembar penilaian?',
-        confirmLabel: 'Ya, Keluar',
-        tone: 'danger',
+        title: 'Simpan Nilai Terlebih Dahulu?',
+        message: 'Ada nilai ujian yang belum disimpan. Pilih "Simpan & Keluar" agar data aman, atau "Buang Perubahan".',
+        confirmLabel: 'Simpan & Keluar',
+        tone: 'primary',
         onConfirm: () => {
+          handleSaveSession(false);
+          setConfirmDialog(null);
+          action();
+        },
+        secondaryLabel: 'Buang Perubahan',
+        onSecondary: () => {
           setConfirmDialog(null);
           setIsDirty(false);
-          onClose();
+          setScoreDrafts({});
+          action();
         },
       });
       return;
     }
-    onClose();
-  }, [isDirty, onClose]);
+    action();
+  }, [handleSaveSession, isDirty, screen]);
+
+  const handleBackNavigation = useCallback(() => {
+    if (screen === 'LIST') {
+      onClose();
+      return;
+    }
+    navigateWithDirtyGuard(() => {
+      setCurrentSession(null);
+      setScreen('LIST');
+    });
+  }, [navigateWithDirtyGuard, onClose, screen]);
+
+  const handleRequestCloseModal = useCallback(() => {
+    navigateWithDirtyGuard(() => {
+      onClose();
+    });
+  }, [navigateWithDirtyGuard, onClose]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -547,682 +680,1165 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
         } else if (addStudentDialogOpen) {
           setAddStudentDialogOpen(false);
         } else {
-          handleClose();
+          handleRequestCloseModal();
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, handleClose, confirmDialog, addStudentDialogOpen]);
+  }, [isOpen, confirmDialog, addStudentDialogOpen, handleRequestCloseModal]);
+
+  const effectiveScope = useMemo(
+    () => (currentSession ? getEffectiveSubjectScope(currentSession) : 'BOTH'),
+    [currentSession]
+  );
+
+  const isChecklistSession = currentSession?.templateType === 'BAHASA_INGGRIS_ARAB';
+
+  const summaryStats = useMemo(() => {
+    if (!currentSession) return null;
+    return calculateOralExamSummaryStats(
+      currentSession.students,
+      currentSession.templateType === 'BAHASA_INGGRIS_ARAB',
+      getEffectiveSubjectScope(currentSession)
+    );
+  }, [currentSession]);
+
+  const filteredStudentsWithIndex = useMemo(() => {
+    if (!currentSession) return [];
+    const q = searchQuery.trim().toLowerCase();
+    return currentSession.students
+      .map((student, originalIndex) => ({ student, originalIndex }))
+      .filter(({ student }) => {
+        if (q && !student.studentName.toLowerCase().includes(q) && !(student.nisn || '').includes(q)) {
+          return false;
+        }
+        if (statusFilter === 'ALL') return true;
+        const done = isStudentOralExamCompleted(student, currentSession.templateType, effectiveScope);
+        return statusFilter === 'ASSESSED' ? done : !done;
+      });
+  }, [currentSession, searchQuery, statusFilter, effectiveScope]);
+
+  const activeFocusStudent =
+    currentSession && currentSession.students[activeStudentIndex]
+      ? currentSession.students[activeStudentIndex]
+      : null;
 
   if (!isOpen || typeof document === 'undefined') return null;
+
+  const renderChecklistAssessmentBody = (student: OralExamStudentRecord, studentIdx: number) => {
+    const showEnglishTab = effectiveScope !== 'ARABIC_ONLY';
+    const showArabicTab = effectiveScope !== 'ENGLISH_ONLY';
+    const currentLang: 'english' | 'arabic' =
+      showEnglishTab && showArabicTab ? activeLanguageTab : showEnglishTab ? 'english' : 'arabic';
+
+    const checklistArr =
+      currentLang === 'english'
+        ? (student.englishChecklist || new Array(15).fill(false))
+        : (student.arabicChecklist || new Array(15).fill(false));
+    const isAssessed =
+      currentLang === 'english'
+        ? isChecklistTrackAssessed(student.englishScore, student.englishChecklist, student.englishAssessed)
+        : isChecklistTrackAssessed(student.arabicScore, student.arabicChecklist, student.arabicAssessed);
+    const correctCount =
+      currentLang === 'english' ? (student.englishCorrectCount ?? 0) : (student.arabicCorrectCount ?? 0);
+    const score = currentLang === 'english' ? student.englishScore : student.arabicScore;
+    const predicate = currentLang === 'english' ? student.englishPredicate : student.arabicPredicate;
+    const badge = getOralExamPredicateBadgeStyle(isAssessed ? predicate : null);
+
+    return (
+      <div className="space-y-4">
+        {showEnglishTab && showArabicTab && (
+          <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setActiveLanguageTab('english')}
+              className={`min-h-11 px-3 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                currentLang === 'english'
+                  ? 'bg-[#023246] text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-white'
+              }`}
+            >
+              <span>Bahasa Inggris</span>
+              {isChecklistTrackAssessed(student.englishScore, student.englishChecklist, student.englishAssessed) && (
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-[10px]">
+                  {student.englishScore} ({student.englishPredicate})
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveLanguageTab('arabic')}
+              className={`min-h-11 px-3 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                currentLang === 'arabic'
+                  ? 'bg-[#023246] text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-white'
+              }`}
+            >
+              <span>Bahasa Arab</span>
+              {isChecklistTrackAssessed(student.arabicScore, student.arabicChecklist, student.arabicAssessed) && (
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-[10px]">
+                  {student.arabicScore} ({student.arabicPredicate})
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
+        <div className="space-y-2.5">
+          <p className="text-xs font-semibold text-slate-600">
+            Sentuh nomor soal <strong className="text-slate-900">{currentLang === 'english' ? 'Bahasa Inggris' : 'Bahasa Arab'}</strong> yang dijawab <strong className="text-emerald-700">BENAR</strong> oleh siswa:
+          </p>
+
+          <div className="grid grid-cols-5 gap-2">
+            {Array.from({ length: 15 }, (_, qIdx) => {
+              const isTrue = Boolean(checklistArr[qIdx]);
+              return (
+                <button
+                  key={`${currentLang}_q_${qIdx}`}
+                  type="button"
+                  onClick={() => handleToggleChecklist(studentIdx, currentLang, qIdx)}
+                  className={`min-h-12 rounded-xl border text-base font-bold transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 ${
+                    isTrue
+                      ? 'bg-[#023246] border-[#023246] text-white shadow-xs'
+                      : 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100'
+                  }`}
+                  aria-pressed={isTrue}
+                  aria-label={`Soal ${qIdx + 1} ${isTrue ? 'Benar' : 'Belum Benar'}`}
+                >
+                  {isTrue && <Check className="w-3.5 h-3.5 text-emerald-300 shrink-0" />}
+                  <span>{qIdx + 1}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Instant Score Summary */}
+        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+          <div className="space-y-0.5">
+            <span className="text-[11px] font-semibold text-slate-500 block">Hasil Otomatis</span>
+            <p className="text-sm font-extrabold text-slate-900">
+              {isAssessed
+                ? `Benar ${correctCount}/15 Soal • Nilai ${score ?? 0}`
+                : 'Belum ada soal dicentang'}
+            </p>
+          </div>
+          <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${badge.bgClass} ${badge.textClass} ${badge.borderClass}`}>
+            {isAssessed ? badge.badgeLabel : 'Belum Dinilai'}
+          </span>
+        </div>
+
+        {/* Easy helper buttons */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => handleBulkChecklist(studentIdx, currentLang, true)}
+            className="min-h-11 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold cursor-pointer transition-colors"
+          >
+            Benar Semua (15)
+          </button>
+          <button
+            type="button"
+            onClick={() => handleBulkChecklist(studentIdx, currentLang, false)}
+            className="min-h-11 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold cursor-pointer transition-colors"
+          >
+            Kosongkan / Ulangi
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDirectScoreInputBlock = (
+    student: OralExamStudentRecord,
+    studentIdx: number,
+    field: 'btqScore' | 'hafalanScore',
+    label: string
+  ) => {
+    const draftKey = `${student.studentId}:${field}`;
+    const currentScore = field === 'btqScore' ? student.btqScore : student.hafalanScore;
+    const currentPred = field === 'btqScore' ? student.btqPredicate : student.hafalanPredicate;
+    const badge = getOralExamPredicateBadgeStyle(currentPred);
+    const displayValue =
+      draftKey in scoreDrafts
+        ? scoreDrafts[draftKey]
+        : currentScore !== null && currentScore !== undefined
+          ? String(currentScore)
+          : '';
+
+    return (
+      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs sm:text-sm font-bold text-slate-900">{label}</span>
+          <span className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold border ${badge.bgClass} ${badge.textClass} ${badge.borderClass}`}>
+            {currentPred ? badge.badgeLabel : 'Belum diisi'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            inputMode="decimal"
+            value={displayValue}
+            onChange={(e) => handleDirectScoreChange(studentIdx, field, e.target.value)}
+            onBlur={() => handleDirectScoreBlur(student.studentId, field)}
+            placeholder="Ketik nilai 0 – 100"
+            className="flex-1 h-12 px-3 bg-white border border-slate-300 rounded-xl text-center text-lg font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+          />
+          {displayValue !== '' && (
+            <button
+              type="button"
+              onClick={() => handleDirectScoreChange(studentIdx, field, '')}
+              className="h-12 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-600 cursor-pointer shrink-0"
+            >
+              Hapus
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <span className="text-[11px] font-semibold text-slate-500 block">
+            Atau sentuh cepat angka nilai:
+          </span>
+          <div className="grid grid-cols-4 gap-2">
+            {QUICK_BTQ_SCORES.map((val) => {
+              const isSelected = currentScore === val;
+              return (
+                <button
+                  key={`${field}_${val}`}
+                  type="button"
+                  onClick={() => handleApplyQuickScore(studentIdx, field, val)}
+                  className={`min-h-11 rounded-xl border text-sm font-bold transition-colors cursor-pointer active:scale-95 ${
+                    isSelected
+                      ? 'bg-[#023246] border-[#023246] text-white'
+                      : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-100'
+                  }`}
+                >
+                  {val}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderBtqAssessmentBody = (student: OralExamStudentRecord, studentIdx: number) => {
+    const showBtq = effectiveScope !== 'HAFALAN_ONLY';
+    const showHafalan = effectiveScope !== 'BTQ_ONLY';
+
+    return (
+      <div className="space-y-3.5">
+        {showBtq && renderDirectScoreInputBlock(student, studentIdx, 'btqScore', 'Nilai BTQ (Baca Tulis Qur\'an)')}
+        {showHafalan && renderDirectScoreInputBlock(student, studentIdx, 'hafalanScore', 'Nilai Hafalan (Tahfidz)')}
+        <div className="space-y-1">
+          <label className="text-xs font-bold text-slate-700 block">
+            Catatan Penguji (Opsional)
+          </label>
+          <input
+            type="text"
+            value={student.notes || ''}
+            onChange={(e) => handleNotesChange(studentIdx, e.target.value)}
+            placeholder="Contoh: Bacaan lancar, perbaiki makhraj..."
+            className="w-full h-11 px-3.5 bg-white border border-slate-200 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+          />
+        </div>
+      </div>
+    );
+  };
 
   return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="oral-exam-title"
-      className="fixed inset-0 z-100 w-full h-dvh flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans animate-fadeIn"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 md:p-4 md:backdrop-blur-xs"
     >
-      {/* Fullscreen Workspace Header */}
-      <header className="px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3 sm:px-6 sm:py-3.5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
-        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
-          <button
-            type="button"
-            onClick={handleClose}
-            className="p-2 -ml-1 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1.5 text-xs font-semibold shrink-0 cursor-pointer min-h-11"
-            title="Kembali ke Administrasi"
-          >
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
-            <span className="hidden sm:inline">Kembali</span>
-          </button>
-          <div className="h-6 w-px bg-slate-200 hidden sm:block shrink-0" />
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-linear-to-br from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs shrink-0">
-            <span className="text-xl">🗣️</span>
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 id="oral-exam-title" className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
-                Penilaian Ujian Lisan
+      <div className="w-full h-dvh md:h-auto md:max-h-[92dvh] md:max-w-3xl bg-[#F8FAFC] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-900 font-sans">
+        {/* 1. STICKY HEADER */}
+        <header className="h-14 sm:h-16 px-4 pt-[env(safe-area-inset-top)] bg-white border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 sticky top-0 z-20">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={handleBackNavigation}
+              aria-label={screen === 'LIST' ? 'Tutup' : 'Kembali ke daftar sesi'}
+              className="w-11 h-11 -ml-1.5 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="min-w-0">
+              <h2 id="oral-exam-title" className="text-sm sm:text-base font-extrabold text-slate-900 truncate">
+                {screen === 'LIST' && 'Penilaian Ujian Lisan'}
+                {screen === 'CREATE' && (activeTrack === 'BAHASA' ? 'Buat Sesi Ujian Bahasa' : 'Buat Sesi Ujian BTQ')}
+                {screen === 'ASSESS' && (currentSession?.title || 'Input Nilai Ujian Lisan')}
               </h2>
-              <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full shrink-0">
-                Resmi A4 &amp; Excel
-              </span>
+              <p className="text-[11px] text-slate-500 truncate">
+                {screen === 'LIST' && 'Ujian Bahasa dan Ujian BTQ dipisah agar mudah dinilai di HP'}
+                {screen === 'CREATE' && 'Pilih mata uji dan kelompok siswa dalam 3 langkah mudah'}
+                {screen === 'ASSESS' && currentSession && (
+                  `${currentSession.examinerName} • ${currentSession.className === 'SMA' ? 'SMA' : `Kelas ${currentSession.className}`} • ${currentSession.roomNumber || 'Ruang 01'}`
+                )}
+              </p>
             </div>
-            <p className="text-[11px] text-slate-500 truncate">
-              {currentSession
-                ? `${currentSession.title} • Penguji: ${currentSession.examinerName} • Kelas ${currentSession.className} • TA: ${currentSession.academicYear}`
-                : 'Pencatatan & lembar rekapitulasi nilai lisan BTQ, Hafalan, Bahasa Inggris, dan Bahasa Arab'}
-            </p>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 shrink-0 ml-2">
           <button
             type="button"
-            onClick={handleClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer min-h-11 min-w-11 flex items-center justify-center"
-            title="Tutup (Esc)"
+            onClick={handleRequestCloseModal}
+            aria-label="Tutup Penilaian Ujian Lisan"
+            className="w-11 h-11 rounded-xl hidden md:flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Fullscreen Scrollable Body Container */}
-      <div className="flex-1 overflow-y-auto p-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:p-6 bg-[#F8FAFC]">
-        <div className="max-w-7xl mx-auto w-full space-y-4">
-        {/* Top Header Controls: Sessions Bar & Add Button */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200">
-          <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1 sm:pb-0">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0">
-              Sesi Ujian:
-            </span>
-            {sessions.length === 0 ? (
-              <span className="text-xs text-slate-400 italic">Belum ada sesi ujian lisan.</span>
-            ) : (
-              sessions.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => handleSelectSession(s.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 border ${
-                    selectedSessionId === s.id && !isCreatingNew
-                      ? 'bg-[#023246] text-white border-[#023246] shadow-xs'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  <span>{s.templateType === 'BAHASA_INGGRIS_ARAB' ? '🇬🇧🇸🇦' : '📖'}</span>
-                  <span>{s.className}</span>
-                  <span className="opacity-75 text-[10px]">({s.templateType === 'BAHASA_INGGRIS_ARAB' ? 'Bahasa' : 'BTQ'})</span>
-                </button>
-              ))
+        {/* 2. SCROLLABLE WORKSPACE */}
+        <main className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+          <div className="w-full max-w-lg mx-auto space-y-4">
+            {/* ==================== SCREEN 1: LIST ==================== */}
+            {screen === 'LIST' && (
+              <>
+                {/* Tab Pemisah Ujian Bahasa vs BTQ */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTrack('BAHASA')}
+                    className={`p-3.5 rounded-xl border text-left transition-colors cursor-pointer min-h-14 ${
+                      activeTrack === 'BAHASA'
+                        ? 'bg-[#023246] border-[#023246] text-white shadow-sm'
+                        : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="text-xs sm:text-sm font-extrabold flex items-center gap-1.5">
+                        <Languages className="w-4 h-4 shrink-0" />
+                        <span>Ujian Bahasa</span>
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                        activeTrack === 'BAHASA' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {bahasaCount}
+                      </span>
+                    </div>
+                    <p className={`text-[11px] mt-1 ${activeTrack === 'BAHASA' ? 'text-slate-200' : 'text-slate-500'}`}>
+                      Inggris / Arab • 15 Soal
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTrack('BTQ')}
+                    className={`p-3.5 rounded-xl border text-left transition-colors cursor-pointer min-h-14 ${
+                      activeTrack === 'BTQ'
+                        ? 'bg-[#0D7A5F] border-[#0D7A5F] text-white shadow-sm'
+                        : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="text-xs sm:text-sm font-extrabold flex items-center gap-1.5">
+                        <BookOpen className="w-4 h-4 shrink-0" />
+                        <span>Ujian BTQ</span>
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                        activeTrack === 'BTQ' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {btqCount}
+                      </span>
+                    </div>
+                    <p className={`text-[11px] mt-1 ${activeTrack === 'BTQ' ? 'text-emerald-100' : 'text-slate-500'}`}>
+                      BTQ &amp; Hafalan • 0–100
+                    </p>
+                  </button>
+                </div>
+
+                {/* Daftar Sesi pada Tab Aktif */}
+                {trackSessions.length === 0 ? (
+                  <div className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 text-[#023246] flex items-center justify-center mx-auto">
+                      {activeTrack === 'BAHASA' ? <Languages className="w-6 h-6" /> : <BookOpen className="w-6 h-6" />}
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-extrabold text-slate-900">
+                        {activeTrack === 'BAHASA'
+                          ? 'Belum Ada Sesi Ujian Lisan Bahasa'
+                          : 'Belum Ada Sesi Ujian BTQ & Hafalan'}
+                      </h3>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Ketuk tombol di bawah untuk membuat lembar nilai. Kelompok siswa Anda dapat dipilih langsung tanpa perlu ketik manual.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        {activeTrack === 'BAHASA' ? 'Sesi Ujian Bahasa Tersimpan' : 'Sesi Ujian BTQ Tersimpan'}
+                      </h3>
+                      <span className="text-xs font-semibold text-slate-500">TA {activeAcademicYear}</span>
+                    </div>
+
+                    {trackSessions.map((sess) => {
+                      const scope = getEffectiveSubjectScope(sess);
+                      const stats = calculateOralExamSummaryStats(
+                        sess.students,
+                        sess.templateType === 'BAHASA_INGGRIS_ARAB',
+                        scope
+                      );
+                      const pct =
+                        stats.totalStudents > 0
+                          ? Math.round((stats.completedStudents / stats.totalStudents) * 100)
+                          : 0;
+
+                      return (
+                        <div
+                          key={sess.id}
+                          className="p-4 rounded-xl bg-white border border-slate-200 space-y-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-1 min-w-0">
+                              <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">
+                                {getScopeLabel(sess.templateType, scope)}
+                              </span>
+                              <h4 className="text-sm font-extrabold text-slate-900 leading-snug">
+                                {sess.title}
+                              </h4>
+                              <p className="text-xs text-slate-500">
+                                Penguji: <strong className="text-slate-700">{sess.examinerName}</strong>
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {sess.className === 'SMA' ? 'SMA' : `Kelas ${sess.className}`} • {sess.roomNumber || 'Ruang 01'} • {sess.date}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Progress bar */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                              <span>Progress Penilaian</span>
+                              <span className="text-slate-900 font-bold">
+                                {stats.completedStudents} dari {stats.totalStudents} siswa ({pct}%)
+                              </span>
+                            </div>
+                            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-600 transition-all"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenSession(sess)}
+                              className="flex-1 h-11 px-4 rounded-xl bg-[#023246] hover:bg-[#034560] text-white text-xs sm:text-sm font-bold cursor-pointer transition-colors"
+                            >
+                              Buka &amp; Nilai Siswa
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSessionById(sess)}
+                              aria-label={`Hapus sesi ${sess.title}`}
+                              className="w-11 h-11 rounded-xl border border-slate-200 hover:bg-rose-50 hover:border-rose-200 text-rose-600 flex items-center justify-center cursor-pointer shrink-0 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <p className="text-[11px] text-slate-500 text-center pt-1 leading-relaxed">
+                  Tip: Setelah menilai siswa di HP, gunakan tombol <strong>Unduh PDF</strong> atau <strong>Excel</strong> untuk arsip panitia ujian.
+                </p>
+              </>
+            )}
+
+            {/* ==================== SCREEN 2: CREATE ==================== */}
+            {screen === 'CREATE' && (
+              <div className="space-y-4">
+                {/* Langkah 1: Pilih Mata Uji */}
+                <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+                  <div className="space-y-0.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                      Langkah 1 dari 3
+                    </span>
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      {activeTrack === 'BAHASA' ? 'Pilih Mata Pelajaran Bahasa' : 'Pilih Aspek Mengaji (BTQ / Hafalan)'}
+                    </h3>
+                  </div>
+
+                  {activeTrack === 'BAHASA' ? (
+                    <div className="space-y-2">
+                      {[
+                        { scope: 'ENGLISH_ONLY' as const, title: 'Bahasa Inggris Saja (15 Soal)', desc: 'Fokus menilai 15 soal lisan Bahasa Inggris saja.' },
+                        { scope: 'ARABIC_ONLY' as const, title: 'Bahasa Arab Saja (15 Soal)', desc: 'Fokus menilai 15 soal lisan Bahasa Arab saja.' },
+                        { scope: 'BOTH' as const, title: 'Bahasa Inggris & Bahasa Arab', desc: 'Menguji keduanya dalam 1 sesi penilaian.' },
+                      ].map((opt) => (
+                        <label
+                          key={opt.scope}
+                          className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                            subjectScopeDraft === opt.scope
+                              ? 'border-[#023246] bg-sky-50/60'
+                              : 'border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="subjectScope"
+                            checked={subjectScopeDraft === opt.scope}
+                            onChange={() => setSubjectScopeDraft(opt.scope)}
+                            className="mt-1 accent-[#023246] w-4 h-4 shrink-0"
+                          />
+                          <div>
+                            <span className="text-xs sm:text-sm font-bold text-slate-900 block">{opt.title}</span>
+                            <span className="text-[11px] text-slate-500 block">{opt.desc}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {[
+                        { scope: 'BTQ_ONLY' as const, title: 'BTQ Saja (Nilai 0–100)', desc: 'Lebih ringkas bila hanya menguji Baca Tulis Qur\'an.' },
+                        { scope: 'BOTH' as const, title: 'BTQ & Hafalan (Keduanya)', desc: 'Menguji nilai BTQ sekaligus nilai Hafalan / Tahfidz.' },
+                        { scope: 'HAFALAN_ONLY' as const, title: 'Hafalan Saja (Nilai 0–100)', desc: 'Khusus menilai setoran hafalan / tahfidz siswa.' },
+                      ].map((opt) => (
+                        <label
+                          key={opt.scope}
+                          className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                            subjectScopeDraft === opt.scope
+                              ? 'border-[#0D7A5F] bg-emerald-50/60'
+                              : 'border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="subjectScope"
+                            checked={subjectScopeDraft === opt.scope}
+                            onChange={() => setSubjectScopeDraft(opt.scope)}
+                            className="mt-1 accent-[#0D7A5F] w-4 h-4 shrink-0"
+                          />
+                          <div>
+                            <span className="text-xs sm:text-sm font-bold text-slate-900 block">{opt.title}</span>
+                            <span className="text-[11px] text-slate-500 block">{opt.desc}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Langkah 2: Pilih Daftar Siswa / Penguji */}
+                <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+                  <div className="space-y-0.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                      Langkah 2 dari 3
+                    </span>
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      Pilih Daftar Peserta Ujian
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRosterSourceMode('OFFICIAL_GROUP');
+                        handleGroupChange(selectedGroupId);
+                      }}
+                      className={`min-h-11 px-3 py-2 rounded-xl border text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5 ${
+                        rosterSourceMode === 'OFFICIAL_GROUP'
+                          ? 'bg-[#023246] border-[#023246] text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <UserCheck className="w-4 h-4 shrink-0" />
+                      <span>Kelompok Penguji</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRosterSourceMode('CLASS_FULL')}
+                      className={`min-h-11 px-3 py-2 rounded-xl border text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5 ${
+                        rosterSourceMode === 'CLASS_FULL'
+                          ? 'bg-[#023246] border-[#023246] text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <Users className="w-4 h-4 shrink-0" />
+                      <span>Satu Kelas Penuh</span>
+                    </button>
+                  </div>
+
+                  {rosterSourceMode === 'OFFICIAL_GROUP' ? (
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 block">
+                        Pilih Nama Penguji / Ruangan (Otomatis isi daftar siswa):
+                      </label>
+                      <select
+                        value={selectedGroupId}
+                        onChange={(e) => handleGroupChange(e.target.value)}
+                        className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                      >
+                        {ORAL_EXAM_OFFICIAL_GROUPS.map((grp) => (
+                          <option key={grp.id} value={grp.id}>
+                            {grp.examinerName} — {grp.roomNumber} ({grp.className === 'SMA' ? 'SMA' : `Kls ${grp.className}`}, {grp.students.length} siswa)
+                          </option>
+                        ))}
+                      </select>
+                      {selectedOfficialGroup && (
+                        <p className="text-[11px] text-emerald-700 font-semibold">
+                          Terpilih {selectedOfficialGroup.students.length} siswa resmi di {selectedOfficialGroup.roomNumber} ({selectedOfficialGroup.className === 'SMA' ? 'SMA' : `Kelas ${selectedOfficialGroup.className}`}).
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 block">
+                        Pilih Kelas:
+                      </label>
+                      <select
+                        value={selectedClass}
+                        onChange={(e) => setSelectedClass(e.target.value)}
+                        className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                      >
+                        {AVAILABLE_CLASSES.map((cls) => (
+                          <option key={cls} value={cls}>
+                            {cls === 'SMA' ? 'Jenjang SMA (Gabungan)' : `Kelas ${cls}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Langkah 3: Identitas Penguji, Ruang, Tanggal */}
+                <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+                  <div className="space-y-0.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                      Langkah 3 dari 3
+                    </span>
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      Cek Nama Penguji &amp; Ruang
+                    </h3>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Nama Penguji</label>
+                      <input
+                        type="text"
+                        value={examinerName}
+                        onChange={(e) => setExaminerName(e.target.value)}
+                        placeholder="Nama lengkap penguji"
+                        className="w-full h-11 px-3.5 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Ruangan</label>
+                        <input
+                          type="text"
+                          value={roomNumber}
+                          onChange={(e) => setRoomNumber(e.target.value)}
+                          placeholder="Ruang 01"
+                          className="w-full h-11 px-3.5 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Tanggal</label>
+                        <input
+                          type="date"
+                          value={sessionDate}
+                          onChange={(e) => setSessionDate(e.target.value)}
+                          className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Judul Lembar Ujian (Opsional)
+                      </label>
+                      <input
+                        type="text"
+                        value={sessionTitle}
+                        onChange={(e) => setSessionTitle(e.target.value)}
+                        placeholder="Otomatis terisi bila dikosongkan"
+                        className="w-full h-11 px-3.5 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ==================== SCREEN 3: ASSESS ==================== */}
+            {screen === 'ASSESS' && currentSession && (
+              <div className="space-y-3.5">
+                {/* Summary & Collapsible Guide */}
+                <div className="p-3.5 rounded-xl bg-white border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold ${
+                      isChecklistSession ? 'bg-[#023246] text-white' : 'bg-[#0D7A5F] text-white'
+                    }`}>
+                      {getScopeLabel(currentSession.templateType, effectiveScope)}
+                    </span>
+                    <span className="text-xs font-bold text-slate-700">
+                      Sudah dinilai: <strong className="text-emerald-700">{summaryStats?.completedStudents ?? 0}</strong> / {summaryStats?.totalStudents ?? 0} siswa
+                    </span>
+                  </div>
+
+                  {/* Rubric Accordion Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setShowRubricGuide((prev) => !prev)}
+                    className="w-full py-1.5 px-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 flex items-center justify-between cursor-pointer"
+                  >
+                    <span>Panduan Kategori Nilai (A / B / C / D)</span>
+                    {showRubricGuide ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+
+                  {showRubricGuide && (
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                      <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 font-bold">
+                        A ({isChecklistSession ? '14–15 Benar' : '91–100'}) • Sangat Baik
+                      </div>
+                      <div className="p-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 font-bold">
+                        B ({isChecklistSession ? '11–13 Benar' : '81–90'}) • Baik
+                      </div>
+                      <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 font-bold">
+                        C ({isChecklistSession ? '6–10 Benar' : '61–80'}) • Cukup
+                      </div>
+                      <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 font-bold">
+                        D ({isChecklistSession ? '0–5 Benar' : '0–60'}) • Perlu Bimbingan
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* View Switcher: Satu per Satu vs Semua Siswa */}
+                <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-200/70 border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setAssessViewMode('FOCUS')}
+                    className={`min-h-11 px-3 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      assessViewMode === 'FOCUS'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Nilai Satu per Satu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAssessViewMode('ALL')}
+                    className={`min-h-11 px-3 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      assessViewMode === 'ALL'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Lihat Semua ({currentSession.students.length})
+                  </button>
+                </div>
+
+                {/* Mode 1: Nilai Satu per Satu (Mobile Guided Flow) */}
+                {assessViewMode === 'FOCUS' && (
+                  <>
+                    {currentSession.students.length === 0 ? (
+                      <div className="p-6 rounded-xl bg-white border border-slate-200 text-center space-y-3">
+                        <p className="text-sm font-bold text-slate-800">Daftar siswa kosong</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewStudentNameDraft('');
+                            setAddStudentDialogOpen(true);
+                          }}
+                          className="h-11 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Tambah Siswa Pertama</span>
+                        </button>
+                      </div>
+                    ) : activeFocusStudent ? (
+                      <div className="space-y-3">
+                        {/* Quick Student Selector */}
+                        <div className="flex items-center gap-2">
+                          <select
+                            aria-label="Pilih siswa yang akan dinilai"
+                            value={activeStudentIndex}
+                            onChange={(e) => setActiveStudentIndex(Number(e.target.value))}
+                            className="flex-1 h-11 px-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                          >
+                            {currentSession.students.map((st, idx) => {
+                              const done = isStudentOralExamCompleted(st, currentSession.templateType, effectiveScope);
+                              return (
+                                <option key={`${st.studentId}_${idx}`} value={idx}>
+                                  {idx + 1}. {st.studentName} {done ? '✓' : ''}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewStudentNameDraft('');
+                              setAddStudentDialogOpen(true);
+                            }}
+                            aria-label="Tambah Siswa Baru"
+                            title="Tambah Siswa Baru"
+                            className="w-11 h-11 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 flex items-center justify-center cursor-pointer shrink-0"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Active Student Assessment Card */}
+                        <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-4">
+                          <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+                            <div className="min-w-0">
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                                Siswa {activeStudentIndex + 1} dari {currentSession.students.length}
+                              </span>
+                              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 wrap-break-word">
+                                {activeFocusStudent.studentName}
+                              </h3>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
+                                  isStudentOralExamCompleted(
+                                    activeFocusStudent,
+                                    currentSession.templateType,
+                                    effectiveScope
+                                  )
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                    : 'bg-slate-100 text-slate-600'
+                                }`}
+                              >
+                                {isStudentOralExamCompleted(
+                                  activeFocusStudent,
+                                  currentSession.templateType,
+                                  effectiveScope
+                                )
+                                  ? 'Sudah Dinilai'
+                                  : 'Belum Dinilai'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveStudent(activeStudentIndex)}
+                                aria-label="Hapus siswa ini"
+                                className="w-9 h-9 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {isChecklistSession
+                            ? renderChecklistAssessmentBody(activeFocusStudent, activeStudentIndex)
+                            : renderBtqAssessmentBody(activeFocusStudent, activeStudentIndex)}
+                        </div>
+
+                        {/* Secondary Export Buttons (Cleanly accessible without crowding bottom thumb bar) */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <button
+                            type="button"
+                            onClick={handleExportPdf}
+                            disabled={isExporting}
+                            className="h-11 px-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Printer className="w-4 h-4 text-[#023246]" />
+                            <span>{isExporting ? 'Membuat PDF...' : 'Unduh PDF Resmi'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleExportExcel}
+                            className="h-11 px-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                            <span>Unduh Excel</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+
+                {/* Mode 2: Daftar Semua Siswa (Mobile Cards — Zero Horizontal Scroll) */}
+                {assessViewMode === 'ALL' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Cari nama siswa..."
+                          className="w-full h-11 pl-9 pr-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewStudentNameDraft('');
+                          setAddStudentDialogOpen(true);
+                        }}
+                        className="h-11 px-3 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 text-xs font-bold inline-flex items-center gap-1 cursor-pointer shrink-0"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Siswa</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { key: 'ALL' as const, label: `Semua (${currentSession.students.length})` },
+                        {
+                          key: 'UNASSESSED' as const,
+                          label: `Belum (${currentSession.students.length - (summaryStats?.completedStudents ?? 0)})`,
+                        },
+                        { key: 'ASSESSED' as const, label: `Sudah (${summaryStats?.completedStudents ?? 0})` },
+                      ].map((tab) => (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          onClick={() => setStatusFilter(tab.key)}
+                          className={`min-h-10 px-2 rounded-xl border text-xs font-bold cursor-pointer ${
+                            statusFilter === tab.key
+                              ? 'bg-[#023246] border-[#023246] text-white'
+                              : 'bg-white border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {filteredStudentsWithIndex.length === 0 ? (
+                      <div className="p-6 rounded-xl bg-white border border-slate-200 text-center space-y-2">
+                        <p className="text-xs font-bold text-slate-700">Tidak ada siswa yang sesuai filter.</p>
+                        {(searchQuery || statusFilter !== 'ALL') && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSearchQuery('');
+                              setStatusFilter('ALL');
+                            }}
+                            className="h-10 px-3 rounded-xl bg-slate-100 text-xs font-bold text-slate-700 inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Tampilkan Semua</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredStudentsWithIndex.map(({ student, originalIndex }) => {
+                          const done = isStudentOralExamCompleted(student, currentSession.templateType, effectiveScope);
+                          const summaryText = isChecklistSession
+                            ? [
+                                effectiveScope !== 'ARABIC_ONLY'
+                                  ? `Inggris: ${isChecklistTrackAssessed(student.englishScore, student.englishChecklist, student.englishAssessed) ? `${student.englishScore} (${student.englishPredicate})` : '-'}`
+                                  : '',
+                                effectiveScope !== 'ENGLISH_ONLY'
+                                  ? `Arab: ${isChecklistTrackAssessed(student.arabicScore, student.arabicChecklist, student.arabicAssessed) ? `${student.arabicScore} (${student.arabicPredicate})` : '-'}`
+                                  : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' • ')
+                            : [
+                                effectiveScope !== 'HAFALAN_ONLY'
+                                  ? `BTQ: ${student.btqScore !== null && student.btqScore !== undefined ? `${student.btqScore} (${student.btqPredicate})` : '-'}`
+                                  : '',
+                                effectiveScope !== 'BTQ_ONLY'
+                                  ? `Hafalan: ${student.hafalanScore !== null && student.hafalanScore !== undefined ? `${student.hafalanScore} (${student.hafalanPredicate})` : '-'}`
+                                  : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' • ');
+
+                          return (
+                            <div
+                              key={`${student.studentId}_${originalIndex}`}
+                              className="p-3.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2.5"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                                  {originalIndex + 1}. {student.studentName}
+                                </p>
+                                <p className={`text-[11px] mt-0.5 ${done ? 'text-emerald-700 font-semibold' : 'text-slate-500'}`}>
+                                  {done ? summaryText : 'Belum dinilai'}
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveStudentIndex(originalIndex);
+                                  setAssessViewMode('FOCUS');
+                                }}
+                                className={`h-11 px-3.5 rounded-xl text-xs font-bold shrink-0 cursor-pointer transition-colors ${
+                                  done
+                                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+                                    : 'bg-[#023246] hover:bg-[#034560] text-white'
+                                }`}
+                              >
+                                {done ? 'Ubah' : 'Nilai'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
+        </main>
 
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => {
-              setIsCreatingNew(true);
-              setSessionTitle('');
-            }}
-            className="text-xs font-black bg-emerald-600 hover:bg-emerald-700 min-h-9 px-3"
-          >
-            <Plus className="w-3.5 h-3.5 mr-1" /> Buat Sesi Baru
-          </Button>
-        </div>
-
-        {/* Form Modal / Collapsible: Buat Sesi Baru */}
-        {isCreatingNew && (
-          <div className="p-4 rounded-3xl bg-emerald-50/70 border border-emerald-200 space-y-3.5 animate-fadeIn">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">✨</span>
-                <h4 className="text-sm font-black text-emerald-950">Buat Sesi Penilaian Ujian Lisan Baru</h4>
-              </div>
+        {/* 3. STICKY BOTTOM ACTION BAR (THUMB ZONE) */}
+        <footer className="sticky bottom-0 z-20 bg-white border-t border-slate-200 p-3 pb-[max(12px,env(safe-area-inset-bottom))] shrink-0">
+          <div className="w-full max-w-lg mx-auto">
+            {screen === 'LIST' && (
               <button
                 type="button"
-                onClick={() => setIsCreatingNew(false)}
-                className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer"
+                onClick={() => openCreateScreen(activeTrack)}
+                className="w-full h-12 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
               >
-                ✕ Batal
+                <Plus className="w-4 h-4" />
+                <span>
+                  {activeTrack === 'BAHASA' ? 'Buat Sesi Ujian Bahasa' : 'Buat Sesi Ujian BTQ'}
+                </span>
               </button>
-            </div>
+            )}
 
-            {/* Template Selector */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">Pilih Format Template Penilaian:</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {screen === 'CREATE' && (
+              <div className="flex items-center gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setTemplateType('BTQ_HAFALAN')}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                    templateType === 'BTQ_HAFALAN'
-                      ? 'bg-white border-emerald-600 ring-2 ring-emerald-500/30 shadow-xs'
-                      : 'bg-white/60 border-slate-200 hover:bg-white'
-                  }`}
+                  onClick={() => setScreen('LIST')}
+                  className="h-12 px-4 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-bold cursor-pointer"
                 >
-                  <div className="flex items-center gap-2 font-black text-xs text-slate-900">
-                    <BookOpen className="w-4 h-4 text-emerald-600" />
-                    <span>Format 1: BTQ &amp; Hafalan</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1 leading-snug">
-                    Model input skor langsung (0–100) untuk aspek BTQ dan Hafalan dengan auto-predikat A/B/C/D.
-                  </p>
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isCreatingLoading}
+                  onClick={handleCreateSessionSubmit}
+                  className="flex-1 h-12 px-4 rounded-xl bg-[#023246] hover:bg-[#034560] disabled:opacity-50 text-white text-xs sm:text-sm font-bold cursor-pointer transition-colors"
+                >
+                  {isCreatingLoading ? 'Menyiapkan...' : 'Mulai Menilai Sekarang'}
+                </button>
+              </div>
+            )}
+
+            {screen === 'ASSESS' && currentSession && assessViewMode === 'FOCUS' && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={activeStudentIndex <= 0}
+                  onClick={() => setActiveStudentIndex((idx) => Math.max(0, idx - 1))}
+                  className="h-12 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 text-slate-700 text-xs font-bold inline-flex items-center gap-1 cursor-pointer shrink-0"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Sblm</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setTemplateType('BAHASA_INGGRIS_ARAB')}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                    templateType === 'BAHASA_INGGRIS_ARAB'
-                      ? 'bg-white border-emerald-600 ring-2 ring-emerald-500/30 shadow-xs'
-                      : 'bg-white/60 border-slate-200 hover:bg-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 font-black text-xs text-slate-900">
-                    <Languages className="w-4 h-4 text-blue-600" />
-                    <span>Format 2: Bahasa Inggris &amp; Bahasa Arab</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1 leading-snug">
-                    Model interaktif checklist 15 butir soal lisan. Jumlah benar, nilai 0–100, dan predikat otomatis.
-                  </p>
-                </button>
-              </div>
-            </div>
-
-            {/* Fields Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-              <div className="sm:col-span-2 space-y-1">
-                <label className="text-[11px] font-bold text-slate-700">Nama Penguji</label>
-                <input
-                  type="text"
-                  value={examinerName}
-                  onChange={(e) => setExaminerName(e.target.value)}
-                  placeholder="Nama Penguji (misal: Ibu Mira Nurdianti, S.Pd)"
-                  className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-200 rounded-xl px-3 py-2 text-base sm:text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700">Pilih Kelas</label>
-                <select
-                  value={selectedClass}
-                  onChange={(e) => setSelectedClass(e.target.value)}
-                  className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-base sm:text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                >
-                  {AVAILABLE_CLASSES.map((cls) => (
-                    <option key={cls} value={cls}>
-                      Kelas {cls}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700">Nomor Ruang</label>
-                <input
-                  type="text"
-                  value={roomNumber}
-                  onChange={(e) => setRoomNumber(e.target.value)}
-                  placeholder="Contoh: Ruang 01"
-                  className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-200 rounded-xl px-3 py-2 text-base sm:text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700">Tanggal Ujian</label>
-                <input
-                  type="date"
-                  value={sessionDate}
-                  onChange={(e) => setSessionDate(e.target.value)}
-                  className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-base sm:text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <Button type="button" variant="secondary" onClick={() => setIsCreatingNew(false)} className="text-xs min-h-9">
-                Batal
-              </Button>
-              <Button type="button" variant="primary" onClick={handleCreateNewSession} className="text-xs font-black min-h-9 bg-[#023246] hover:bg-[#0D7A5F]">
-                Mulai Penilaian
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Active Session Content */}
-        {currentSession ? (
-          <div className="space-y-3.5">
-            {/* Active Session Info Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-white border border-slate-200 shadow-3xs">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-base">{isChecklistMode ? '🗣️' : '📖'}</span>
-                  <h3 className="text-xs sm:text-sm font-black text-slate-900">{currentSession.title}</h3>
-                  <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    {isChecklistMode ? 'Checklist 15 Soal' : 'Nilai Langsung'}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Penguji: <strong>{currentSession.examinerName}</strong> • Kelas: <strong>{currentSession.className}</strong>
-                  {currentSession.roomNumber && ` • Ruang: ${currentSession.roomNumber}`} • TA: <strong>{currentSession.academicYear}</strong>
-                </p>
-              </div>
-
-              {/* Action Buttons: Save, PDF, Excel, Delete */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  type="button"
-                  onClick={handleSaveSession}
                   disabled={!isDirty}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-xs ${
+                  onClick={() => handleSaveSession(false)}
+                  className={`flex-1 h-12 px-3 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
                     isDirty
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
-                      : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-slate-100 text-slate-500 border border-slate-200'
                   }`}
-                  title="Simpan perubahan nilai ke sistem"
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{isDirty ? 'Simpan Perubahan' : 'Tersimpan'}</span>
+                  <Save className="w-4 h-4" />
+                  <span>{isDirty ? 'Simpan Nilai' : 'Tersimpan'}</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={handleExportPdf}
-                  disabled={isExporting}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#023246] hover:bg-[#0D7A5F] text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
-                  title="Cetak lembar penilaian fisik format resmi A4"
+                  onClick={() => {
+                    if (activeStudentIndex < currentSession.students.length - 1) {
+                      setActiveStudentIndex((idx) => idx + 1);
+                    } else {
+                      setAssessViewMode('ALL');
+                    }
+                  }}
+                  className="h-12 px-3 rounded-xl bg-[#023246] hover:bg-[#034560] text-white text-xs font-bold inline-flex items-center gap-1 cursor-pointer shrink-0"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Cetak PDF</span>
+                  <span>
+                    {activeStudentIndex < currentSession.students.length - 1 ? 'Lanjut' : 'Daftar'}
+                  </span>
+                  <ChevronRight className="w-4 h-4" />
                 </button>
+              </div>
+            )}
 
+            {screen === 'ASSESS' && currentSession && assessViewMode === 'ALL' && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!isDirty}
+                  onClick={() => handleSaveSession(false)}
+                  className={`flex-1 h-12 px-3 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                    isDirty
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-slate-100 text-slate-500 border border-slate-200'
+                  }`}
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isDirty ? 'Simpan Nilai' : 'Tersimpan'}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={handleExportPdf}
+                  className="h-12 px-3.5 rounded-xl bg-[#023246] hover:bg-[#034560] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>PDF</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleExportExcel}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-all cursor-pointer flex items-center gap-1.5"
-                  title="Unduh format spreadsheet .xlsx"
+                  className="h-12 px-3.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shrink-0"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Ekspor Excel</span>
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  <span>Excel</span>
                 </button>
-
-                <button
-                  type="button"
-                  onClick={handleDeleteCurrentSession}
-                  className="p-1.5 rounded-xl text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-all cursor-pointer"
-                  title="Hapus sesi ini"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Rubric Criteria Legend Bar */}
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
-              <div className="flex items-center justify-between text-[11px] font-black text-slate-700 uppercase tracking-wider">
-                <span>📋 Kriteria Penilaian Resmi:</span>
-                <span className="text-[10px] text-slate-500 font-normal">
-                  {isChecklistMode ? 'Berdasarkan Total Jawaban Benar (15 Butir Soal)' : 'Berdasarkan Nilai Skala 0–100'}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
-                <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-300 font-bold text-emerald-900">
-                  <span className="font-black text-sm">A</span>: {isChecklistMode ? '14 – 15 Benar' : '91 – 100'}
-                  <span className="block text-[10px] font-normal text-emerald-700">Sangat Baik</span>
-                </div>
-                <div className="p-2 rounded-xl bg-blue-50 border border-blue-300 font-bold text-blue-900">
-                  <span className="font-black text-sm">B</span>: {isChecklistMode ? '11 – 13 Benar' : '81 – 90'}
-                  <span className="block text-[10px] font-normal text-blue-700">Baik</span>
-                </div>
-                <div className="p-2 rounded-xl bg-amber-50 border border-amber-300 font-bold text-amber-900">
-                  <span className="font-black text-sm">C</span>: {isChecklistMode ? '6 – 10 Benar' : '61 – 80'}
-                  <span className="block text-[10px] font-normal text-amber-700">Cukup</span>
-                </div>
-                <div className="p-2 rounded-xl bg-rose-50 border border-rose-300 font-bold text-rose-900">
-                  <span className="font-black text-sm">D</span>: {isChecklistMode ? '0 – 5 Benar' : '0 – 60'}
-                  <span className="block text-[10px] font-normal text-rose-700">Perlu Bimbingan</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Table Search & Add Student */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="relative flex-1 max-w-xs">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-3.5 sm:top-2.5 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari nama siswa..."
-                  className="w-full min-h-11 sm:min-h-0 bg-white border border-slate-200 rounded-xl pl-8 pr-3 py-2 sm:py-1.5 text-base sm:text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleAddStudent}
-                className="min-h-11 sm:min-h-0 px-3 py-2 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" /> Tambah Siswa
-              </button>
-            </div>
-
-            {/* The Main Interactive Assessment Table */}
-            <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-2xs">
-              <div className="overflow-x-auto max-h-115 relative">
-                {isChecklistMode ? (
-                  /* ========================================================= */
-                  /* TEMPLATE 2: CHECKLIST BAHASA INGGRIS & ARAB (15 SOAL)     */
-                  /* ========================================================= */
-                  <table className="w-full border-collapse text-left text-xs">
-                    <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200 text-slate-700">
-                      <tr>
-                        <th rowSpan={2} className="p-2 text-center w-10 border-r border-slate-200">
-                          No
-                        </th>
-                        <th rowSpan={2} className="p-2.5 min-w-37.5 border-r border-slate-200 sticky left-0 bg-slate-50 z-20 shadow-xs">
-                          Nama Peserta
-                        </th>
-                        <th colSpan={18} className="p-2 text-center font-black bg-blue-50/80 text-blue-950 border-r border-slate-200">
-                          🇬🇧 BAHASA INGGRIS (15 SOAL)
-                        </th>
-                        <th colSpan={18} className="p-2 text-center font-black bg-emerald-50/80 text-emerald-950">
-                          🇸🇦 BAHASA ARAB (15 SOAL)
-                        </th>
-                      </tr>
-                      <tr className="text-[10px] bg-slate-100/70 border-t border-slate-200">
-                        {/* 15 soal Inggris */}
-                        {Array.from({ length: 15 }, (_, i) => (
-                          <th key={`h_eng_${i}`} className="p-1 text-center w-6 font-bold text-slate-600">
-                            {i + 1}
-                          </th>
-                        ))}
-                        <th className="p-1 text-center font-black text-blue-900 bg-blue-100/70 w-8">Jml</th>
-                        <th className="p-1 text-center font-black text-blue-900 bg-blue-100/70 w-10">Nilai</th>
-                        <th className="p-1 text-center font-black text-blue-900 bg-blue-100/70 w-8 border-r border-slate-200">Pred</th>
-
-                        {/* 15 soal Arab */}
-                        {Array.from({ length: 15 }, (_, i) => (
-                          <th key={`h_ara_${i}`} className="p-1 text-center w-6 font-bold text-slate-600">
-                            {i + 1}
-                          </th>
-                        ))}
-                        <th className="p-1 text-center font-black text-emerald-900 bg-emerald-100/70 w-8">Jml</th>
-                        <th className="p-1 text-center font-black text-emerald-900 bg-emerald-100/70 w-10">Nilai</th>
-                        <th className="p-1 text-center font-black text-emerald-900 bg-emerald-100/70 w-8">Pred</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredStudents.map((s, idx) => {
-                        const originalIndex = currentSession.students.findIndex((st) => st.studentId === s.studentId);
-                        if (originalIndex < 0) return null;
-                        const engDone = isChecklistTrackAssessed(s.englishScore, s.englishChecklist, s.englishAssessed);
-                        const araDone = isChecklistTrackAssessed(s.arabicScore, s.arabicChecklist, s.arabicAssessed);
-                        const engP = getOralExamPredicateBadgeStyle(engDone ? s.englishPredicate : null);
-                        const araP = getOralExamPredicateBadgeStyle(araDone ? s.arabicPredicate : null);
-
-                        return (
-                          <tr key={s.studentId} className="hover:bg-slate-50/80 transition-colors text-[11px]">
-                            <td className="p-1.5 text-center font-semibold text-slate-400 border-r border-slate-200">
-                              {idx + 1}
-                            </td>
-                            <td className="p-2 font-bold text-slate-900 border-r border-slate-200 sticky left-0 bg-white z-10 shadow-xs truncate max-w-40">
-                              <span>{s.studentName}</span>
-                              <div className="flex items-center gap-1.5 pt-0.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleBulkChecklist(originalIndex, 'english', true)}
-                                  className="text-[9px] text-blue-600 hover:underline"
-                                  title="Centang semua soal Bahasa Inggris"
-                                >
-                                  +Eng All
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleBulkChecklist(originalIndex, 'arabic', true)}
-                                  className="text-[9px] text-emerald-600 hover:underline"
-                                  title="Centang semua soal Bahasa Arab"
-                                >
-                                  +Arab All
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveStudent(originalIndex)}
-                                  className="text-[9px] text-rose-500 hover:underline ml-auto"
-                                >
-                                  Hapus
-                                </button>
-                              </div>
-                            </td>
-
-                            {/* Checkbox Soal 1-15 Inggris */}
-                            {Array.from({ length: 15 }, (_, qI) => {
-                              const checked = Boolean(s.englishChecklist?.[qI]);
-                              return (
-                                <td key={`q_eng_${qI}`} className="p-0.5 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleChecklist(originalIndex, 'english', qI)}
-                                    className={`w-5 h-5 rounded cursor-pointer transition-all flex items-center justify-center text-[10px] font-bold mx-auto ${
-                                      checked
-                                        ? 'bg-blue-600 text-white shadow-2xs'
-                                        : 'bg-slate-100 hover:bg-slate-200 text-transparent border border-slate-300'
-                                    }`}
-                                    title={`Soal ${qI + 1} Bahasa Inggris: ${checked ? 'Benar' : 'Salah'}`}
-                                  >
-                                    ✓
-                                  </button>
-                                </td>
-                              );
-                            })}
-
-                            <td className="p-1 text-center font-black text-blue-950 bg-blue-50/50">
-                              {engDone ? (s.englishCorrectCount ?? 0) : '-'}
-                            </td>
-                            <td className="p-1 text-center font-black text-blue-900 bg-blue-50/50">
-                              {engDone && s.englishScore !== null && s.englishScore !== undefined ? s.englishScore : '-'}
-                            </td>
-                            <td className="p-1 text-center border-r border-slate-200">
-                              <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-black border ${engP.bgClass} ${engP.textClass} ${engP.borderClass}`}>
-                                {engDone ? (s.englishPredicate || '-') : '-'}
-                              </span>
-                            </td>
-
-                            {/* Checkbox Soal 1-15 Arab */}
-                            {Array.from({ length: 15 }, (_, qI) => {
-                              const checked = Boolean(s.arabicChecklist?.[qI]);
-                              return (
-                                <td key={`q_ara_${qI}`} className="p-0.5 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleChecklist(originalIndex, 'arabic', qI)}
-                                    className={`w-5 h-5 rounded cursor-pointer transition-all flex items-center justify-center text-[10px] font-bold mx-auto ${
-                                      checked
-                                        ? 'bg-emerald-600 text-white shadow-2xs'
-                                        : 'bg-slate-100 hover:bg-slate-200 text-transparent border border-slate-300'
-                                    }`}
-                                    title={`Soal ${qI + 1} Bahasa Arab: ${checked ? 'Benar' : 'Salah'}`}
-                                  >
-                                    ✓
-                                  </button>
-                                </td>
-                              );
-                            })}
-
-                            <td className="p-1 text-center font-black text-emerald-950 bg-emerald-50/50">
-                              {araDone ? (s.arabicCorrectCount ?? 0) : '-'}
-                            </td>
-                            <td className="p-1 text-center font-black text-emerald-900 bg-emerald-50/50">
-                              {araDone && s.arabicScore !== null && s.arabicScore !== undefined ? s.arabicScore : '-'}
-                            </td>
-                            <td className="p-1 text-center">
-                              <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-black border ${araP.bgClass} ${araP.textClass} ${araP.borderClass}`}>
-                                {araDone ? (s.arabicPredicate || '-') : '-'}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                ) : (
-                  /* ========================================================= */
-                  /* TEMPLATE 1: NILAI LANGSUNG BTQ & HAFALAN (SKALA 0-100)    */
-                  /* ========================================================= */
-                  <table className="w-full border-collapse text-left text-xs">
-                    <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200 text-slate-700">
-                      <tr>
-                        <th rowSpan={2} className="p-2.5 text-center w-12 border-r border-slate-200">
-                          No
-                        </th>
-                        <th rowSpan={2} className="p-2.5 min-w-50 border-r border-slate-200 sticky left-0 bg-slate-50 z-20 shadow-xs">
-                          Nama Siswa
-                        </th>
-                        <th colSpan={2} className="p-2 text-center font-black bg-emerald-50/80 text-emerald-950 border-r border-slate-200">
-                          📖 BTQ (BACA TULIS QUR'AN)
-                        </th>
-                        <th colSpan={2} className="p-2 text-center font-black bg-blue-50/80 text-blue-950 border-r border-slate-200">
-                          📖 HAFALAN (TAHFIDZ)
-                        </th>
-                        <th rowSpan={2} className="p-2.5 text-center w-24">
-                          Aksi
-                        </th>
-                      </tr>
-                      <tr className="text-[10px] bg-slate-100/70 border-t border-slate-200">
-                        <th className="p-1.5 text-center w-24 border-r border-slate-200">Nilai (0–100)</th>
-                        <th className="p-1.5 text-center w-24 border-r border-slate-200">Predikat</th>
-                        <th className="p-1.5 text-center w-24 border-r border-slate-200">Nilai (0–100)</th>
-                        <th className="p-1.5 text-center w-24 border-r border-slate-200">Predikat</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredStudents.map((s, idx) => {
-                        const originalIndex = currentSession.students.findIndex((st) => st.studentId === s.studentId);
-                        if (originalIndex < 0) return null;
-                        const btqP = getOralExamPredicateBadgeStyle(s.btqPredicate);
-                        const hafP = getOralExamPredicateBadgeStyle(s.hafalanPredicate);
-                        const btqDraftKey = `${s.studentId}:btqScore`;
-                        const hafDraftKey = `${s.studentId}:hafalanScore`;
-
-                        return (
-                          <tr key={s.studentId} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="p-2 text-center font-semibold text-slate-400 border-r border-slate-200">
-                              {idx + 1}
-                            </td>
-                            <td className="p-2.5 font-bold text-slate-900 border-r border-slate-200 sticky left-0 bg-white z-10 shadow-xs">
-                              {s.studentName}
-                            </td>
-
-                            {/* BTQ Input & Predikat */}
-                            <td className="p-1.5 border-r border-slate-200">
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={
-                                  btqDraftKey in scoreDrafts
-                                    ? scoreDrafts[btqDraftKey]
-                                    : (s.btqScore !== null && s.btqScore !== undefined ? String(s.btqScore) : '')
-                                }
-                                onChange={(e) => handleDirectScoreChange(originalIndex, 'btqScore', e.target.value)}
-                                onBlur={() => handleDirectScoreBlur(s.studentId, 'btqScore')}
-                                placeholder="0–100"
-                                className="w-full min-h-10 sm:min-h-0 text-center font-black text-base sm:text-xs p-1.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                              />
-                            </td>
-                            <td className="p-1.5 text-center border-r border-slate-200">
-                              <span className={`px-2 py-1 rounded-md text-[10px] font-black border ${btqP.bgClass} ${btqP.textClass} ${btqP.borderClass}`}>
-                                {s.btqPredicate || '-'}
-                              </span>
-                            </td>
-
-                            {/* Hafalan Input & Predikat */}
-                            <td className="p-1.5 border-r border-slate-200">
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={
-                                  hafDraftKey in scoreDrafts
-                                    ? scoreDrafts[hafDraftKey]
-                                    : (s.hafalanScore !== null && s.hafalanScore !== undefined ? String(s.hafalanScore) : '')
-                                }
-                                onChange={(e) => handleDirectScoreChange(originalIndex, 'hafalanScore', e.target.value)}
-                                onBlur={() => handleDirectScoreBlur(s.studentId, 'hafalanScore')}
-                                placeholder="0–100"
-                                className="w-full min-h-10 sm:min-h-0 text-center font-black text-base sm:text-xs p-1.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                              />
-                            </td>
-                            <td className="p-1.5 text-center border-r border-slate-200">
-                              <span className={`px-2 py-1 rounded-md text-[10px] font-black border ${hafP.bgClass} ${hafP.textClass} ${hafP.borderClass}`}>
-                                {s.hafalanPredicate || '-'}
-                              </span>
-                            </td>
-
-                            <td className="p-1.5 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveStudent(originalIndex)}
-                                className="min-h-10 min-w-10 sm:min-h-0 sm:min-w-0 text-xs text-rose-500 hover:text-rose-700 font-bold p-1 cursor-pointer"
-                                title="Hapus baris siswa"
-                              >
-                                ✕
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom Summary Footer */}
-            {summaryStats && (
-              <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
-                <div className="flex items-center gap-4 text-slate-700 font-semibold">
-                  <span>
-                    Total: <strong>{summaryStats.totalStudents} Siswa</strong>
-                  </span>
-                  <span>
-                    Dinilai: <strong>{summaryStats.completedStudents} Siswa</strong>
-                  </span>
-                  <span>
-                    Rata-rata 1: <strong>{summaryStats.averageScore1}</strong>
-                  </span>
-                  <span>
-                    Rata-rata 2: <strong>{summaryStats.averageScore2}</strong>
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase">Distribusi:</span>
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                    A: {summaryStats.gradeDistribution.A}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">
-                    B: {summaryStats.gradeDistribution.B}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
-                    C: {summaryStats.gradeDistribution.C}
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">
-                    D: {summaryStats.gradeDistribution.D}
-                  </span>
-                </div>
               </div>
             )}
           </div>
-        ) : (
-          !isCreatingNew && (
-            <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-300 rounded-3xl space-y-3">
-              <span className="text-3xl">🗣️</span>
-              <h4 className="text-sm font-black text-slate-800">Belum Ada Sesi Penilaian Lisan</h4>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Silakan buat sesi penilaian baru untuk memulai penginputan nilai lisan BTQ &amp; Hafalan atau Bahasa Inggris &amp; Arab.
-              </p>
-              <Button type="button" variant="primary" onClick={() => setIsCreatingNew(true)} className="text-xs font-black bg-emerald-600 hover:bg-emerald-700 min-h-10">
-                + Buat Sesi Ujian Lisan Baru
-              </Button>
-            </div>
-          )
-        )}
-        </div>
+        </footer>
       </div>
 
-      {/* Dialog Tambah Siswa Baru (Pengganti window.prompt) */}
+      {/* Bottom-sheet Mobile / Clean Modal Desktop: Tambah Siswa Baru */}
       {addStudentDialogOpen && (
-        <div className="fixed inset-0 z-120 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+        <div className="fixed inset-0 z-120 flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-900/60 backdrop-blur-xs">
           <form
             onSubmit={handleConfirmAddStudent}
-            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-4"
+            className="bg-white rounded-t-2xl md:rounded-2xl md:max-w-md w-full p-5 pb-[max(20px,env(safe-area-inset-bottom))] shadow-2xl border border-slate-200 space-y-4"
           >
             <div className="space-y-1">
-              <h3 className="text-base font-bold text-slate-900">Tambah Siswa ke Sesi Ujian Lisan</h3>
-              <p className="text-xs text-slate-500">Masukkan nama lengkap siswa yang akan ditambahkan ke daftar penilaian ini.</p>
+              <h3 className="text-base font-bold text-slate-900">Tambah Siswa ke Sesi Ujian</h3>
+              <p className="text-xs text-slate-500">
+                Ketik nama lengkap siswa untuk dimasukkan ke daftar ujian ini.
+              </p>
             </div>
             <input
               type="text"
@@ -1230,19 +1846,19 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
               value={newStudentNameDraft}
               onChange={(e) => setNewStudentNameDraft(e.target.value)}
               placeholder="Contoh: Ahmad Fauzan"
-              className="w-full min-h-11 bg-white border border-slate-300 rounded-xl px-3 py-2 text-base sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              className="w-full h-12 bg-white border border-slate-300 rounded-xl px-3.5 text-base font-medium focus:ring-2 focus:ring-[#023246] focus:outline-none"
             />
             <div className="flex items-center gap-2.5 pt-1">
               <button
                 type="button"
                 onClick={() => setAddStudentDialogOpen(false)}
-                className="flex-1 min-h-11 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                className="flex-1 h-12 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="submit"
-                className="flex-1 min-h-11 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-sm cursor-pointer"
+                className="flex-1 h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold cursor-pointer"
               >
                 Tambah Siswa
               </button>
@@ -1251,29 +1867,38 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
         </div>
       )}
 
-      {/* Dialog Konfirmasi Aksi (Pengganti window.confirm) */}
+      {/* Bottom-sheet Mobile / Clean Modal Desktop: Konfirmasi Aksi */}
       {confirmDialog && (
-        <div className="fixed inset-0 z-120 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+        <div className="fixed inset-0 z-120 flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-t-2xl md:rounded-2xl md:max-w-md w-full p-5 pb-[max(20px,env(safe-area-inset-bottom))] shadow-2xl border border-slate-200 space-y-4">
             <div className="space-y-1.5">
               <h3 className="text-base font-bold text-slate-900">{confirmDialog.title}</h3>
               <p className="text-xs text-slate-600 leading-relaxed">{confirmDialog.message}</p>
             </div>
-            <div className="flex items-center gap-2.5 pt-1">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => setConfirmDialog(null)}
-                className="flex-1 min-h-11 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                className="sm:flex-1 h-12 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold cursor-pointer"
               >
                 Batal
               </button>
+              {confirmDialog.secondaryLabel && confirmDialog.onSecondary && (
+                <button
+                  type="button"
+                  onClick={confirmDialog.onSecondary}
+                  className="sm:flex-1 h-12 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs sm:text-sm font-bold cursor-pointer"
+                >
+                  {confirmDialog.secondaryLabel}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={confirmDialog.onConfirm}
-                className={`flex-1 min-h-11 py-2.5 rounded-xl text-white text-xs font-bold transition-colors shadow-sm cursor-pointer ${
+                className={`sm:flex-1 h-12 rounded-xl text-white text-xs sm:text-sm font-bold cursor-pointer ${
                   confirmDialog.tone === 'danger'
                     ? 'bg-rose-600 hover:bg-rose-700'
-                    : 'bg-[#023246] hover:bg-[#0D7A5F]'
+                    : 'bg-[#023246] hover:bg-[#034560]'
                 }`}
               >
                 {confirmDialog.confirmLabel}

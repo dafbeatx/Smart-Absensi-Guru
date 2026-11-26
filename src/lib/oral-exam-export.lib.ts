@@ -9,7 +9,7 @@ const XLSX: any = (XLSXModule as any).default || XLSXModule;
 import { exportHtmlToPdf } from './pdf-export.lib';
 import { resolveSchoolLevel } from '../utils/class.utils';
 import { escapeHtml, formatNppHtmlLine, getLevelSchoolBranding } from '../utils/html.utils';
-import type { OralExamSession } from '../types/oral-exam.types';
+import { getEffectiveSubjectScope, type OralExamSession } from '../types/oral-exam.types';
 
 export class OralExamExportService {
   /**
@@ -17,6 +17,12 @@ export class OralExamExportService {
    */
   public static generatePrintHtml(session: OralExamSession): string {
     const isChecklist = session.templateType === 'BAHASA_INGGRIS_ARAB';
+    const scope = getEffectiveSubjectScope(session);
+    const showEnglish = isChecklist && scope !== 'ARABIC_ONLY';
+    const showArabic = isChecklist && scope !== 'ENGLISH_ONLY';
+    const showBtq = !isChecklist && scope !== 'HAFALAN_ONLY';
+    const showHafalan = !isChecklist && scope !== 'BTQ_ONLY';
+
     const level = resolveSchoolLevel(session.className);
     const levelBranding = getLevelSchoolBranding(level);
     const parsedDate = session.date ? new Date(`${session.date}T12:00:00+07:00`) : new Date();
@@ -71,7 +77,6 @@ export class OralExamExportService {
     // Table Header & Rows
     let tableHtml = '';
     if (isChecklist) {
-      // Model Checklist: Bahasa Inggris & Bahasa Arab
       let rowsHtml = '';
       session.students.forEach((s, idx) => {
         const engDone = s.englishAssessed ?? (s.englishScore !== null && s.englishScore !== undefined && (s.englishScore > 0 || (s.englishChecklist || []).some(Boolean)));
@@ -83,42 +88,50 @@ export class OralExamExportService {
           .map((c) => `<td style="border: 1px solid #000; text-align: center; font-size: 10px; width: 14px;">${c ? '✓' : ''}</td>`)
           .join('');
 
+        const engCells = showEnglish
+          ? `${engChecks}
+             <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold; background: #f9fafb;">${engDone ? (s.englishCorrectCount ?? 0) : '-'}</td>
+             <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold; background: #f9fafb;">${engDone && s.englishScore !== null && s.englishScore !== undefined ? s.englishScore : '-'}</td>
+             <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold;">${engDone ? escapeHtml(s.englishPredicate || '-') : '-'}</td>`
+          : '';
+
+        const arabCells = showArabic
+          ? `${arabChecks}
+             <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold; background: #f9fafb;">${arabDone ? (s.arabicCorrectCount ?? 0) : '-'}</td>
+             <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold; background: #f9fafb;">${arabDone && s.arabicScore !== null && s.arabicScore !== undefined ? s.arabicScore : '-'}</td>
+             <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold;">${arabDone ? escapeHtml(s.arabicPredicate || '-') : '-'}</td>`
+          : '';
+
         rowsHtml += `
           <tr style="height: 22px;">
             <td style="border: 1px solid #000; text-align: center; font-size: 10px;">${idx + 1}</td>
-            <td style="border: 1px solid #000; padding: 2px 6px; font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">${escapeHtml(s.studentName)}</td>
-            ${engChecks}
-            <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold; background: #f9fafb;">${engDone ? (s.englishCorrectCount ?? 0) : '-'}</td>
-            <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold; background: #f9fafb;">${engDone && s.englishScore !== null && s.englishScore !== undefined ? s.englishScore : '-'}</td>
-            <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold;">${engDone ? escapeHtml(s.englishPredicate || '-') : '-'}</td>
-            ${arabChecks}
-            <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold; background: #f9fafb;">${arabDone ? (s.arabicCorrectCount ?? 0) : '-'}</td>
-            <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold; background: #f9fafb;">${arabDone && s.arabicScore !== null && s.arabicScore !== undefined ? s.arabicScore : '-'}</td>
-            <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold;">${arabDone ? escapeHtml(s.arabicPredicate || '-') : '-'}</td>
+            <td style="border: 1px solid #000; padding: 2px 6px; font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">${escapeHtml(s.studentName)}</td>
+            ${engCells}
+            ${arabCells}
           </tr>
         `;
       });
 
       const qHeaders = Array.from({ length: 15 }, (_, i) => `<th style="border: 1px solid #000; font-size: 8.5px; width: 14px; text-align: center; padding: 2px 0;">${i + 1}</th>`).join('');
+      const trackMetricHeaders = `
+        ${qHeaders}
+        <th style="border: 1px solid #000; font-size: 9px; width: 22px; padding: 2px;">Jml</th>
+        <th style="border: 1px solid #000; font-size: 9px; width: 26px; padding: 2px;">Nilai</th>
+        <th style="border: 1px solid #000; font-size: 9px; width: 22px; padding: 2px;">Pred</th>
+      `;
 
       tableHtml = `
         <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 10px; border: 1px solid #000;">
           <thead>
             <tr style="background-color: #f3f4f6; text-align: center;">
               <th rowspan="2" style="border: 1px solid #000; width: 24px; padding: 4px;">No</th>
-              <th rowspan="2" style="border: 1px solid #000; padding: 4px; min-width: 120px;">Nama Peserta</th>
-              <th colspan="18" style="border: 1px solid #000; padding: 2px; background: #eff6ff;">🇬🇧 BAHASA INGGRIS</th>
-              <th colspan="18" style="border: 1px solid #000; padding: 2px; background: #f0fdf4;">🇸🇦 BAHASA ARAB</th>
+              <th rowspan="2" style="border: 1px solid #000; padding: 4px; min-width: 130px;">Nama Peserta</th>
+              ${showEnglish ? '<th colspan="18" style="border: 1px solid #000; padding: 3px; background: #eff6ff;">🇬🇧 BAHASA INGGRIS</th>' : ''}
+              ${showArabic ? '<th colspan="18" style="border: 1px solid #000; padding: 3px; background: #f0fdf4;">🇸🇦 BAHASA ARAB</th>' : ''}
             </tr>
             <tr style="background-color: #f9fafb; text-align: center;">
-              ${qHeaders}
-              <th style="border: 1px solid #000; font-size: 9px; width: 22px; padding: 2px;">Jml</th>
-              <th style="border: 1px solid #000; font-size: 9px; width: 26px; padding: 2px;">Nilai</th>
-              <th style="border: 1px solid #000; font-size: 9px; width: 20px; padding: 2px;">Pred</th>
-              ${qHeaders}
-              <th style="border: 1px solid #000; font-size: 9px; width: 22px; padding: 2px;">Jml</th>
-              <th style="border: 1px solid #000; font-size: 9px; width: 26px; padding: 2px;">Nilai</th>
-              <th style="border: 1px solid #000; font-size: 9px; width: 20px; padding: 2px;">Pred</th>
+              ${showEnglish ? trackMetricHeaders : ''}
+              ${showArabic ? trackMetricHeaders : ''}
             </tr>
           </thead>
           <tbody>
@@ -127,17 +140,14 @@ export class OralExamExportService {
         </table>
       `;
     } else {
-      // Model Direct: BTQ & Hafalan
       let rowsHtml = '';
       session.students.forEach((s, idx) => {
         rowsHtml += `
           <tr style="height: 24px;">
             <td style="border: 1px solid #000; text-align: center; font-size: 11px;">${idx + 1}</td>
             <td style="border: 1px solid #000; padding: 4px 8px; font-size: 11px; font-weight: 600;">${escapeHtml(s.studentName)}</td>
-            <td style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${s.btqScore ?? '-'}</td>
-            <td style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${escapeHtml(s.btqPredicate ?? '-')}</td>
-            <td style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${s.hafalanScore ?? '-'}</td>
-            <td style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${escapeHtml(s.hafalanPredicate ?? '-')}</td>
+            ${showBtq ? `<td style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${s.btqScore ?? '-'}</td><td style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${escapeHtml(s.btqPredicate ?? '-')}</td>` : ''}
+            ${showHafalan ? `<td style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${s.hafalanScore ?? '-'}</td><td style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${escapeHtml(s.hafalanPredicate ?? '-')}</td>` : ''}
             <td style="border: 1px solid #000; padding: 4px 8px; font-size: 10px; font-style: italic; color: #4b5563;">${escapeHtml(s.notes || '-')}</td>
           </tr>
         `;
@@ -149,15 +159,13 @@ export class OralExamExportService {
             <tr style="background-color: #f3f4f6; text-align: center;">
               <th rowspan="2" style="border: 1px solid #000; width: 32px; padding: 6px;">No</th>
               <th rowspan="2" style="border: 1px solid #000; padding: 6px; min-width: 180px;">Nama Siswa</th>
-              <th colspan="2" style="border: 1px solid #000; padding: 4px; background: #ecfdf5;">📖 BTQ</th>
-              <th colspan="2" style="border: 1px solid #000; padding: 4px; background: #eff6ff;">📖 HAFALAN</th>
+              ${showBtq ? '<th colspan="2" style="border: 1px solid #000; padding: 4px; background: #ecfdf5;">📖 BTQ</th>' : ''}
+              ${showHafalan ? '<th colspan="2" style="border: 1px solid #000; padding: 4px; background: #eff6ff;">📖 HAFALAN</th>' : ''}
               <th rowspan="2" style="border: 1px solid #000; padding: 6px; width: 140px;">Keterangan</th>
             </tr>
             <tr style="background-color: #f9fafb; text-align: center;">
-              <th style="border: 1px solid #000; width: 60px; padding: 4px;">Nilai</th>
-              <th style="border: 1px solid #000; width: 60px; padding: 4px;">Predikat</th>
-              <th style="border: 1px solid #000; width: 60px; padding: 4px;">Nilai</th>
-              <th style="border: 1px solid #000; width: 60px; padding: 4px;">Predikat</th>
+              ${showBtq ? '<th style="border: 1px solid #000; width: 60px; padding: 4px;">Nilai</th><th style="border: 1px solid #000; width: 60px; padding: 4px;">Predikat</th>' : ''}
+              ${showHafalan ? '<th style="border: 1px solid #000; width: 60px; padding: 4px;">Nilai</th><th style="border: 1px solid #000; width: 60px; padding: 4px;">Predikat</th>' : ''}
             </tr>
           </thead>
           <tbody>
@@ -166,6 +174,18 @@ export class OralExamExportService {
         </table>
       `;
     }
+
+    const defaultDocTitle = isChecklist
+      ? (showEnglish && showArabic
+        ? 'DAFTAR PENILAIAN UJIAN LISAN BAHASA INGGRIS & BAHASA ARAB'
+        : showEnglish
+          ? 'DAFTAR PENILAIAN UJIAN LISAN BAHASA INGGRIS'
+          : 'DAFTAR PENILAIAN UJIAN LISAN BAHASA ARAB')
+      : (showBtq && showHafalan
+        ? 'DAFTAR PENILAIAN BTQ DAN HAFALAN'
+        : showBtq
+          ? 'DAFTAR PENILAIAN UJIAN BTQ'
+          : 'DAFTAR PENILAIAN UJIAN HAFALAN');
 
     const examinerNppHtml = formatNppHtmlLine(session.examinerNpp, {
       style: 'margin: 2px 0 0 0; font-size: 10px; color: #6b7280;',
@@ -182,7 +202,7 @@ export class OralExamExportService {
         <!-- JUDUL DOKUMEN -->
         <div style="text-align: center; margin-bottom: 14px;">
           <h1 style="margin: 0; font-size: 15px; font-weight: 900; text-transform: uppercase; text-decoration: underline;">
-            ${escapeHtml(session.title || (isChecklist ? 'DAFTAR PENILAIAN UJIAN LISAN BAHASA INGGRIS & BAHASA ARAB' : 'DAFTAR PENILAIAN BTQ DAN HAFALAN'))}
+            ${escapeHtml(session.title || defaultDocTitle)}
           </h1>
           <p style="margin: 3px 0 0 0; font-size: 11px; font-weight: 600; color: #4b5563;">
             Tahun Ajaran ${escapeHtml(session.academicYear)} • Semester ${escapeHtml(session.semester)}
@@ -227,12 +247,13 @@ export class OralExamExportService {
    */
   public static async exportToPdf(session: OralExamSession): Promise<void> {
     const isChecklist = session.templateType === 'BAHASA_INGGRIS_ARAB';
+    const scope = getEffectiveSubjectScope(session);
     const html = this.generatePrintHtml(session);
-    const filename = `Penilaian_Lisan_${session.className}_${session.templateType}_${session.academicYear.replace('/', '-')}`;
+    const filename = `Penilaian_Lisan_${session.className}_${session.templateType}_${scope}_${session.academicYear.replace('/', '-')}`;
 
     await exportHtmlToPdf(html, {
       filename,
-      orientation: isChecklist ? 'landscape' : 'portrait',
+      orientation: isChecklist && scope === 'BOTH' ? 'landscape' : 'portrait',
       format: 'a4',
       scale: 2,
     });
@@ -243,6 +264,12 @@ export class OralExamExportService {
    */
   public static exportToExcel(session: OralExamSession): void {
     const isChecklist = session.templateType === 'BAHASA_INGGRIS_ARAB';
+    const scope = getEffectiveSubjectScope(session);
+    const showEnglish = isChecklist && scope !== 'ARABIC_ONLY';
+    const showArabic = isChecklist && scope !== 'ENGLISH_ONLY';
+    const showBtq = !isChecklist && scope !== 'HAFALAN_ONLY';
+    const showHafalan = !isChecklist && scope !== 'BTQ_ONLY';
+
     const level = resolveSchoolLevel(session.className);
     const levelBranding = getLevelSchoolBranding(level);
     const headerSchoolLine = level === 'SMA'
@@ -250,17 +277,15 @@ export class OralExamExportService {
       : `${levelBranding.institutionName} CIAMPEA - BOGOR`;
     const wb = XLSX.utils.book_new();
 
-    let rows: any[] = [];
+    const rows: any[] = [];
 
     if (isChecklist) {
-      // Header Info
       rows.push([headerSchoolLine]);
-      rows.push(['DAFTAR PENILAIAN UJIAN LISAN BAHASA INGGRIS & BAHASA ARAB']);
+      rows.push([session.title || 'DAFTAR PENILAIAN UJIAN LISAN BAHASA']);
       rows.push([`Tahun Ajaran: ${session.academicYear}`, `Semester: ${session.semester}`, `Kelas: ${session.className}`, `Ruang: ${session.roomNumber || '-'}`]);
       rows.push([`Penguji: ${session.examinerName}`, `Tanggal: ${session.date}`]);
       rows.push([]);
 
-      // Column Headers
       const qColsEng = Array.from({ length: 15 }, (_, i) => `ENG_Q${i + 1}`);
       const qColsArab = Array.from({ length: 15 }, (_, i) => `ARB_Q${i + 1}`);
 
@@ -269,14 +294,8 @@ export class OralExamExportService {
         'Nama Siswa',
         'NISN',
         'Kelas',
-        ...qColsEng,
-        'ENG_Benar',
-        'ENG_Nilai',
-        'ENG_Predikat',
-        ...qColsArab,
-        'ARB_Benar',
-        'ARB_Nilai',
-        'ARB_Predikat',
+        ...(showEnglish ? [...qColsEng, 'ENG_Benar', 'ENG_Nilai', 'ENG_Predikat'] : []),
+        ...(showArabic ? [...qColsArab, 'ARB_Benar', 'ARB_Nilai', 'ARB_Predikat'] : []),
       ]);
 
       session.students.forEach((s, idx) => {
@@ -290,21 +309,14 @@ export class OralExamExportService {
           s.studentName,
           s.nisn || '-',
           s.className || session.className,
-          ...engChecks,
-          engDone ? (s.englishCorrectCount ?? 0) : '-',
-          engDone && s.englishScore !== null && s.englishScore !== undefined ? s.englishScore : '-',
-          engDone ? (s.englishPredicate || '-') : '-',
-          ...arabChecks,
-          arabDone ? (s.arabicCorrectCount ?? 0) : '-',
-          arabDone && s.arabicScore !== null && s.arabicScore !== undefined ? s.arabicScore : '-',
-          arabDone ? (s.arabicPredicate || '-') : '-',
+          ...(showEnglish ? [...engChecks, engDone ? (s.englishCorrectCount ?? 0) : '-', engDone && s.englishScore !== null && s.englishScore !== undefined ? s.englishScore : '-', engDone ? (s.englishPredicate || '-') : '-'] : []),
+          ...(showArabic ? [...arabChecks, arabDone ? (s.arabicCorrectCount ?? 0) : '-', arabDone && s.arabicScore !== null && s.arabicScore !== undefined ? s.arabicScore : '-', arabDone ? (s.arabicPredicate || '-') : '-'] : []),
         ]);
       });
     } else {
-      // BTQ & Hafalan
       rows.push([headerSchoolLine]);
-      rows.push(['DAFTAR PENILAIAN BTQ DAN HAFALAN']);
-      rows.push([`Tahun Ajaran: ${session.academicYear}`, `Semester: ${session.semester}`, `Kelas: ${session.className}`]);
+      rows.push([session.title || 'DAFTAR PENILAIAN BTQ DAN HAFALAN']);
+      rows.push([`Tahun Ajaran: ${session.academicYear}`, `Semester: ${session.semester}`, `Kelas: ${session.className}`, `Ruang: ${session.roomNumber || '-'}`]);
       rows.push([`Penguji: ${session.examinerName}`, `Tanggal: ${session.date}`]);
       rows.push([]);
 
@@ -313,10 +325,8 @@ export class OralExamExportService {
         'Nama Siswa',
         'NISN',
         'Kelas',
-        'BTQ_Nilai',
-        'BTQ_Predikat',
-        'Hafalan_Nilai',
-        'Hafalan_Predikat',
+        ...(showBtq ? ['BTQ_Nilai', 'BTQ_Predikat'] : []),
+        ...(showHafalan ? ['Hafalan_Nilai', 'Hafalan_Predikat'] : []),
         'Keterangan',
       ]);
 
@@ -326,10 +336,8 @@ export class OralExamExportService {
           s.studentName,
           s.nisn || '-',
           s.className || session.className,
-          s.btqScore ?? '-',
-          s.btqPredicate ?? '-',
-          s.hafalanScore ?? '-',
-          s.hafalanPredicate ?? '-',
+          ...(showBtq ? [s.btqScore ?? '-', s.btqPredicate ?? '-'] : []),
+          ...(showHafalan ? [s.hafalanScore ?? '-', s.hafalanPredicate ?? '-'] : []),
           s.notes || '',
         ]);
       });
@@ -338,7 +346,7 @@ export class OralExamExportService {
     const ws = XLSX.utils.aoa_to_sheet(rows);
     XLSX.utils.book_append_sheet(wb, ws, 'Penilaian_Lisan');
 
-    const cleanFilename = `Rekap_Ujian_Lisan_${session.className}_${session.templateType}_${session.academicYear.replace('/', '-')}.xlsx`;
+    const cleanFilename = `Rekap_Ujian_Lisan_${session.className}_${session.templateType}_${scope}_${session.academicYear.replace('/', '-')}.xlsx`;
     XLSX.writeFile(wb, cleanFilename);
   }
 }

@@ -8,11 +8,20 @@ import {
   calculateDirectScorePredicate,
   calculateChecklistScoreAndPredicate,
   calculateOralExamSummaryStats,
+  isStudentOralExamCompleted,
 } from '../../utils/oral-exam-scoring.utils';
 import { OralExamRepository } from '../../repositories/OralExamRepository';
 import { OralExamExportService } from '../../lib/oral-exam-export.lib';
+import {
+  ORAL_EXAM_OFFICIAL_GROUPS,
+  findMatchingOfficialOralGroup,
+} from '../../data/oral-exam-groups';
+import {
+  getEffectiveSubjectScope,
+  getOralExamSessionTrack,
+  type OralExamSession,
+} from '../../types/oral-exam.types';
 import type { TestResultItem } from '../test-runner.service';
-import type { OralExamSession } from '../../types/oral-exam.types';
 
 export const runOralExamAssessmentTestSuite = async (): Promise<{
   passed: number;
@@ -262,6 +271,111 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
     'Repository: Berhasil menghapus sesi pengujian secara bersih',
     OralExamRepository.getSessionById(testSession.id) === null,
     'Session cleanup verified'
+  );
+
+  // =========================================================================
+  // Test 6: 12 Kelompok Penguji Resmi (144 Peserta) & Auto-Matching Penguji
+  // =========================================================================
+  const totalOfficialGroupStudents = ORAL_EXAM_OFFICIAL_GROUPS.reduce(
+    (acc, grp) => acc + grp.students.length,
+    0
+  );
+  const matchAdi = findMatchingOfficialOralGroup('Adi Prastyo, S.Pd');
+  const matchAsrof = findMatchingOfficialOralGroup('Qodiatul Asrof Ramadhoni, S.E., G.r');
+  const matchFarhan = findMatchingOfficialOralGroup('Farhan Sopian Sahid, S.Pd.I');
+
+  assert(
+    'Official Groups: 12 kelompok penguji memuat total tepat 144 siswa (termasuk Ruang SMA) dan mencocokkan penguji login',
+    ORAL_EXAM_OFFICIAL_GROUPS.length === 12 &&
+      totalOfficialGroupStudents === 144 &&
+      Boolean(matchAdi && matchAdi.roomNumber === 'Ruang 01' && matchAdi.students.length === 11) &&
+      Boolean(matchAsrof && matchAsrof.className === 'SMA' && matchAsrof.students.length === 13) &&
+      Boolean(matchFarhan && matchFarhan.className === 'SMA' && matchFarhan.students.length === 11),
+    `Groups=${ORAL_EXAM_OFFICIAL_GROUPS.length}, Total=${totalOfficialGroupStudents}, Adi=${matchAdi?.students.length}, Asrof=${matchAsrof?.className}`
+  );
+
+  // =========================================================================
+  // Test 7: Pemisahan Track BAHASA vs BTQ & Scope Terpisah (ENGLISH_ONLY / BTQ_ONLY)
+  // =========================================================================
+  const englishOnlySession = OralExamRepository.createNewSession({
+    templateType: 'BAHASA_INGGRIS_ARAB',
+    subjectScope: 'ENGLISH_ONLY',
+    groupId: 'oral_grp_11_asrof',
+    title: 'Ujian Lisan Bahasa Inggris - SMA',
+    academicYear: '2026/2027',
+    semester: 'GANJIL',
+    examinerName: 'Qodiatul Asrof Ramadoni, S.E',
+    roomNumber: 'Ruang SMA',
+    className: 'SMA',
+    date: '2026-11-27',
+    students: [
+      { studentId: 'sma_1', studentName: 'Arnesta Hadiwinata', className: 'SMA' },
+      { studentId: 'sma_2', studentName: 'Muhamad Tahfidz', className: 'SMA' },
+    ],
+  });
+
+  // Nilai hanya Bahasa Inggris pada siswa 1
+  englishOnlySession.students[0].englishChecklist = new Array(15).fill(true);
+  englishOnlySession.students[0].englishCorrectCount = 15;
+  englishOnlySession.students[0].englishScore = 100;
+  englishOnlySession.students[0].englishPredicate = 'A';
+  englishOnlySession.students[0].englishAssessed = true;
+  // Walaupun siswa 2 memiliki arabicAssessed, di scope ENGLISH_ONLY tidak dihitung selesai
+  englishOnlySession.students[1].arabicAssessed = true;
+  englishOnlySession.students[1].arabicScore = 80;
+  OralExamRepository.saveSession(englishOnlySession);
+
+  const engScopeStats = calculateOralExamSummaryStats(
+    englishOnlySession.students,
+    true,
+    getEffectiveSubjectScope(englishOnlySession)
+  );
+  const btqOnlySession = OralExamRepository.createNewSession({
+    templateType: 'BTQ_HAFALAN',
+    subjectScope: 'BTQ_ONLY',
+    title: 'Ujian Lisan BTQ - Kelas 7',
+    academicYear: '2026/2027',
+    semester: 'GANJIL',
+    examinerName: 'Adi Prastyo, S.Pd',
+    roomNumber: 'Ruang 01',
+    className: '7',
+    date: '2026-11-27',
+    students: [{ studentId: 'k7_1', studentName: 'Afhtar Shakil', className: '7' }],
+  });
+  btqOnlySession.students[0].btqScore = 94;
+  btqOnlySession.students[0].btqPredicate = 'A';
+  OralExamRepository.saveSession(btqOnlySession);
+
+  assert(
+    'Track Separation: BAHASA vs BTQ terpisah tegas, dan ENGLISH_ONLY / BTQ_ONLY menghitung penyelesaian & statistik secara akurat',
+    getOralExamSessionTrack(englishOnlySession) === 'BAHASA' &&
+      getOralExamSessionTrack(btqOnlySession) === 'BTQ' &&
+      isStudentOralExamCompleted(englishOnlySession.students[0], 'BAHASA_INGGRIS_ARAB', 'ENGLISH_ONLY') === true &&
+      isStudentOralExamCompleted(englishOnlySession.students[1], 'BAHASA_INGGRIS_ARAB', 'ENGLISH_ONLY') === false &&
+      engScopeStats.completedStudents === 1 &&
+      engScopeStats.averageScore1 === 100 &&
+      isStudentOralExamCompleted(btqOnlySession.students[0], 'BTQ_HAFALAN', 'BTQ_ONLY') === true,
+    `TrackEng=${getOralExamSessionTrack(englishOnlySession)}, TrackBtq=${getOralExamSessionTrack(btqOnlySession)}, Completed=${engScopeStats.completedStudents}`
+  );
+
+  // =========================================================================
+  // Test 8: Ekspor HTML Fokus Scope & Dukungan Kelas SMA
+  // =========================================================================
+  const engOnlyHtml = OralExamExportService.generatePrintHtml(englishOnlySession);
+  const btqOnlyHtml = OralExamExportService.generatePrintHtml(btqOnlySession);
+
+  OralExamRepository.deleteSession(englishOnlySession.id);
+  OralExamRepository.deleteSession(btqOnlySession.id);
+
+  assert(
+    'Export Focused Scope & SMA: HTML ENGLISH_ONLY tidak memuat kolom Arab + memakai Ruang SMA; HTML BTQ_ONLY tidak memuat kolom Hafalan',
+    engOnlyHtml.includes('BAHASA INGGRIS') &&
+      !engOnlyHtml.includes('BAHASA ARAB') &&
+      engOnlyHtml.includes('Ruang SMA') &&
+      engOnlyHtml.includes('SMA TERPADU AS SALAAM') &&
+      btqOnlyHtml.includes('BTQ') &&
+      !btqOnlyHtml.includes('HAFALAN'),
+    `HasEng=${engOnlyHtml.includes('BAHASA INGGRIS')}, NoArab=${!engOnlyHtml.includes('BAHASA ARAB')}, HasSma=${engOnlyHtml.includes('SMA TERPADU AS SALAAM')}, NoHaf=${!btqOnlyHtml.includes('HAFALAN')}`
   );
 
   return { passed, failed, results };

@@ -7,6 +7,7 @@ import type {
   OralExamSession,
   OralExamTemplateType,
   OralExamStudentRecord,
+  OralExamSubjectScope,
 } from '../types/oral-exam.types';
 
 export const ORAL_EXAM_STORAGE_KEY = 'smart_absensi_oral_exam_sessions_v1';
@@ -118,6 +119,8 @@ export class OralExamRepository {
    */
   public static createNewSession(params: {
     templateType: OralExamTemplateType;
+    subjectScope?: OralExamSubjectScope;
+    groupId?: string | null;
     title: string;
     academicYear: string;
     semester: 'GANJIL' | 'GENAP';
@@ -170,6 +173,8 @@ export class OralExamRepository {
     const newSession: OralExamSession = {
       id,
       templateType: params.templateType,
+      ...(params.subjectScope ? { subjectScope: params.subjectScope } : {}),
+      ...(params.groupId !== undefined ? { groupId: params.groupId } : {}),
       title: params.title,
       academicYear: params.academicYear,
       semester: params.semester,

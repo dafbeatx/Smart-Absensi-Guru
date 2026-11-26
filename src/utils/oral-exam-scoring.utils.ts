@@ -3,9 +3,12 @@
  * Berisi kalkulator skor, konversi checklist ke skala 100, dan pemetaan predikat resmi A/B/C/D.
  */
 
-import type {
-  OralExamGrade,
-  OralExamStudentRecord,
+import {
+  getEffectiveSubjectScope,
+  type OralExamGrade,
+  type OralExamStudentRecord,
+  type OralExamSubjectScope,
+  type OralExamTemplateType,
 } from '../types/oral-exam.types';
 
 /**
@@ -135,11 +138,40 @@ export function isChecklistTrackAssessed(
 }
 
 /**
+ * Memeriksa apakah siswa sudah dinilai sesuai template dan cakupan mata uji sesi.
+ */
+export function isStudentOralExamCompleted(
+  student: OralExamStudentRecord,
+  templateType: OralExamTemplateType,
+  subjectScope?: OralExamSubjectScope
+): boolean {
+  const scope = getEffectiveSubjectScope({ templateType, subjectScope });
+  if (templateType === 'BAHASA_INGGRIS_ARAB') {
+    const checkEng = scope !== 'ARABIC_ONLY';
+    const checkAra = scope !== 'ENGLISH_ONLY';
+    const engDone = checkEng && isChecklistTrackAssessed(student.englishScore, student.englishChecklist, student.englishAssessed);
+    const araDone = checkAra && isChecklistTrackAssessed(student.arabicScore, student.arabicChecklist, student.arabicAssessed);
+    if (scope === 'ENGLISH_ONLY') return engDone;
+    if (scope === 'ARABIC_ONLY') return araDone;
+    return engDone || araDone;
+  }
+
+  const checkBtq = scope !== 'HAFALAN_ONLY';
+  const checkHaf = scope !== 'BTQ_ONLY';
+  const hasBtq = checkBtq && student.btqScore !== null && student.btqScore !== undefined && !Number.isNaN(student.btqScore);
+  const hasHaf = checkHaf && student.hafalanScore !== null && student.hafalanScore !== undefined && !Number.isNaN(student.hafalanScore);
+  if (scope === 'BTQ_ONLY') return hasBtq;
+  if (scope === 'HAFALAN_ONLY') return hasHaf;
+  return hasBtq || hasHaf;
+}
+
+/**
  * Menghitung ringkasan statistik sesi ujian lisan (rata-rata, persentase kelulusan/kategori)
  */
 export function calculateOralExamSummaryStats(
   students: OralExamStudentRecord[],
-  isChecklistMode: boolean
+  isChecklistMode: boolean,
+  subjectScope: OralExamSubjectScope = 'BOTH'
 ) {
   const totalStudents = students.length;
   if (totalStudents === 0) {
@@ -159,10 +191,13 @@ export function calculateOralExamSummaryStats(
   let countScore2 = 0;
   const gradeDistribution: Record<OralExamGrade, number> = { A: 0, B: 0, C: 0, D: 0 };
 
+  const includeFirst = isChecklistMode ? subjectScope !== 'ARABIC_ONLY' : subjectScope !== 'HAFALAN_ONLY';
+  const includeSecond = isChecklistMode ? subjectScope !== 'ENGLISH_ONLY' : subjectScope !== 'BTQ_ONLY';
+
   for (const s of students) {
     if (isChecklistMode) {
-      const engDone = isChecklistTrackAssessed(s.englishScore, s.englishChecklist, s.englishAssessed);
-      const arabDone = isChecklistTrackAssessed(s.arabicScore, s.arabicChecklist, s.arabicAssessed);
+      const engDone = includeFirst && isChecklistTrackAssessed(s.englishScore, s.englishChecklist, s.englishAssessed);
+      const arabDone = includeSecond && isChecklistTrackAssessed(s.arabicScore, s.arabicChecklist, s.arabicAssessed);
 
       if (engDone || arabDone) {
         completedStudents++;
@@ -178,8 +213,8 @@ export function calculateOralExamSummaryStats(
         if (s.arabicPredicate) gradeDistribution[s.arabicPredicate]++;
       }
     } else {
-      const hasBtq = s.btqScore !== null && s.btqScore !== undefined && !Number.isNaN(s.btqScore);
-      const hasHaf = s.hafalanScore !== null && s.hafalanScore !== undefined && !Number.isNaN(s.hafalanScore);
+      const hasBtq = includeFirst && s.btqScore !== null && s.btqScore !== undefined && !Number.isNaN(s.btqScore);
+      const hasHaf = includeSecond && s.hafalanScore !== null && s.hafalanScore !== undefined && !Number.isNaN(s.hafalanScore);
       if (hasBtq || hasHaf) {
         completedStudents++;
       }

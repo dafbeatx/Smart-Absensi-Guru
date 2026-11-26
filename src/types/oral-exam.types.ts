@@ -7,6 +7,15 @@
 
 export type OralExamTemplateType = 'BTQ_HAFALAN' | 'BAHASA_INGGRIS_ARAB' | 'CUSTOM';
 
+export type OralExamTrack = 'BAHASA' | 'BTQ';
+
+export type OralExamSubjectScope =
+  | 'BOTH'
+  | 'ENGLISH_ONLY'
+  | 'ARABIC_ONLY'
+  | 'BTQ_ONLY'
+  | 'HAFALAN_ONLY';
+
 export type OralExamGrade = 'A' | 'B' | 'C' | 'D';
 
 export interface OralExamGradeKriteria {
@@ -48,18 +57,48 @@ export interface OralExamStudentRecord {
 export interface OralExamSession {
   id: string;
   templateType: OralExamTemplateType;
+  subjectScope?: OralExamSubjectScope;
+  groupId?: string | null;
   title: string;
   academicYear: string; // e.g. '2026/2027'
   semester: 'GANJIL' | 'GENAP';
   examinerName: string; // e.g. 'Ibu Mira Nurdianti, S.Pd' / 'Ibu Septi Nur Aeni, S.E'
   examinerNpp?: string | null;
   roomNumber?: string; // e.g. 'Ruang 01'
-  className: string; // e.g. '7A', '7B', '8A', '9A'
+  className: string; // e.g. '7A', '7B', '8A', '9A', 'SMA'
   date: string; // YYYY-MM-DD
   totalQuestions: number; // Default 15 untuk model bahasa
   students: OralExamStudentRecord[];
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Mengelompokkan sesi menjadi dua kategori terpisah: Ujian Bahasa vs Ujian BTQ & Hafalan.
+ */
+export function getOralExamSessionTrack(
+  templateOrSession: OralExamTemplateType | Pick<OralExamSession, 'templateType'>
+): OralExamTrack {
+  const tpl = typeof templateOrSession === 'string' ? templateOrSession : templateOrSession.templateType;
+  return tpl === 'BAHASA_INGGRIS_ARAB' ? 'BAHASA' : 'BTQ';
+}
+
+/**
+ * Menormalkan cakupan mata uji aktif dari sesi ujian lisan.
+ */
+export function getEffectiveSubjectScope(
+  session: Pick<OralExamSession, 'templateType' | 'subjectScope'>
+): OralExamSubjectScope {
+  if (session.templateType === 'BAHASA_INGGRIS_ARAB') {
+    if (session.subjectScope === 'ENGLISH_ONLY' || session.subjectScope === 'ARABIC_ONLY') {
+      return session.subjectScope;
+    }
+    return 'BOTH';
+  }
+  if (session.subjectScope === 'BTQ_ONLY' || session.subjectScope === 'HAFALAN_ONLY') {
+    return session.subjectScope;
+  }
+  return 'BOTH';
 }
 
 /**
