@@ -738,7 +738,7 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                   </div>
 
                   {/* Assigned students list */}
-                  <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl max-h-60 overflow-y-auto">
+                  <div className="border border-slate-200 rounded-xl max-h-60 overflow-y-auto">
                     {editingGroup.students.length === 0 ? (
                       <p className="p-4 text-xs text-slate-500 text-center">
                         Belum ada siswa di kelompok ini.
@@ -747,7 +747,7 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                       editingGroup.students.map((st, idx) => (
                         <div
                           key={`${st.studentId}_${idx}`}
-                          className="px-3 py-2 flex items-center justify-between gap-2 text-xs bg-white"
+                          className="px-3 py-2 flex items-center justify-between gap-2 text-xs bg-white border-b border-slate-100 last:border-b-0"
                         >
                           <span className="font-semibold text-slate-800 truncate">
                             {idx + 1}. {st.studentName}
