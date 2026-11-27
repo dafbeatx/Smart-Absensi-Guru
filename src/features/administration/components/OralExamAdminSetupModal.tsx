@@ -94,7 +94,7 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
     if (!preserveEditing) setIsLoading(true);
     try {
       const [loadedAssignments, loadedStaff, loadedStudents] = await Promise.all([
-        OralExamAssignmentRepository.getAssignments(activeAcademicYear),
+        OralExamAssignmentRepository.getAssignments(activeAcademicYear, token || undefined),
         OralExamAssignmentRepository.getStaffDirectory(token || ''),
         StudentRepository.getStudents(token || '').catch(() => []),
       ]);

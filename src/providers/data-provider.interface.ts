@@ -67,7 +67,7 @@ import type {
   ExamScheduleData,
   ExamPeriodSettings,
 } from '../types/exam-schedule.types';
-import type { OralExamAssignment } from '../types/oral-exam.types';
+import type { OralExamAssignment, OralExamSession } from '../types/oral-exam.types';
 import type { MeetingMinute } from '../types/meeting-minutes.types';
 import type {
   BimtekRecord,
@@ -318,9 +318,12 @@ export interface IDataProvider {
   verifyBimtekRecord(id: string, dto: VerifyBimtekDTO, token?: string): Promise<boolean>;
   deleteBimtekRecord(id: string, token?: string): Promise<boolean>;
 
-  // Oral Exam Examiner Placements (Admin Setup -> Teacher Ready-to-Use)
+  // Oral Exam Examiner Placements & Cloud Sessions (100% Cloud Supabase, Zero localStorage)
   getOralExamAssignments?(academicYear?: string, token?: string): Promise<OralExamAssignment[] | null>;
   saveOralExamAssignments?(assignments: OralExamAssignment[], academicYear?: string, token?: string): Promise<boolean>;
+  getOralExamSessions?(academicYear?: string, token?: string): Promise<OralExamSession[]>;
+  saveOralExamSession?(session: OralExamSession, token?: string): Promise<OralExamSession>;
+  deleteOralExamSession?(sessionId: string, token?: string): Promise<boolean>;
 
   // Student Counseling & Guidance (Catatan Bimbingan Konseling - BK) API
   // Terkoneksi ke Nawasena Platform Siswa (https://nawasena-platform-siswa.vercel.app)

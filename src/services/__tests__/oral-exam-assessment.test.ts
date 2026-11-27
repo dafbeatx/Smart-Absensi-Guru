@@ -26,6 +26,11 @@ import { MockProvider } from '../../providers/mock-provider.service';
 import { setServerSupabaseClient, resetServerSupabaseClient } from '../../../api/_shared/session-auth';
 import { handleSaveOralExamAssignments } from '../../../api/_shared/exam-admin-settings';
 import {
+  handleListOralExamSessions,
+  handleSaveOralExamSession,
+  handleDeleteOralExamSession,
+} from '../../../api/_shared/oral-exam-cloud';
+import {
   getEffectiveSubjectScope,
   getOralExamSessionTrack,
   type OralExamSession,
@@ -152,251 +157,254 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
   );
 
   // =========================================================================
-  // Test 3: Repository Persistence & Session Management
-  // =========================================================================
-  const testSession: OralExamSession = {
-    id: `session_test_${Date.now()}`,
-    templateType: 'BTQ_HAFALAN',
-    title: 'Ujian Lisan BTQ & Tahfidz Terpadu',
-    academicYear: '2026/2027',
-    semester: 'GANJIL',
-    examinerName: 'Ibu Mira Nurdianti, S.Pd',
-    roomNumber: 'Ruang 01',
-    className: '7A',
-    date: '2026-10-12',
-    totalQuestions: 15,
-    students: [
-      {
-        studentId: 'st_1',
-        studentName: 'Muhammad Nabiel Alqarani',
-        className: '7A',
-        btqScore: 92,
-        btqPredicate: 'A',
-        hafalanScore: 85,
-        hafalanPredicate: 'B',
-      },
-      {
-        studentId: 'st_2',
-        studentName: 'Sela Mutia Nur Azimah',
-        className: '7A',
-        btqScore: 78,
-        btqPredicate: 'C',
-        hafalanScore: 60,
-        hafalanPredicate: 'D',
-      },
-    ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  const saved = OralExamRepository.saveSession(testSession);
-  assert(
-    'Repository: Berhasil menyimpan sesi penilaian ujian lisan ke penyimpanan lokal',
-    saved.id === testSession.id,
-    `Saved ID: ${saved.id}`
-  );
-
-  const found = OralExamRepository.getSessionById(testSession.id);
-  assert(
-    'Repository: Berhasil mengambil sesi berdasarkan ID secara akurat',
-    found !== null && found.students.length === 2 && found.students[0].btqScore === 92,
-    `Found student count: ${found?.students.length}`
-  );
-
-  const allFiltered = OralExamRepository.getAllSessions('2026/2027');
-  assert(
-    'Repository: Filter berdasarkan tahun ajaran 2026/2027 berfungsi',
-    allFiltered.some((s) => s.id === testSession.id),
-    `Count 2026/2027: ${allFiltered.length}`
-  );
-
-  // =========================================================================
-  // Test 4: Kalkulasi Statistik Ringkasan Sesi
-  // =========================================================================
-  const stats = calculateOralExamSummaryStats(testSession.students, false);
-  assert(
-    'Statistik: Menghitung total siswa, rata-rata BTQ (85) dan Hafalan (73) serta distribusi predikat',
-    stats.totalStudents === 2 &&
-      stats.completedStudents === 2 &&
-      stats.averageScore1 === 85 && // (92 + 78) / 2 = 85
-      stats.averageScore2 === 73 && // (85 + 60) / 2 = 72.5 -> 73
-      stats.gradeDistribution.A === 1 &&
-      stats.gradeDistribution.B === 1 &&
-      stats.gradeDistribution.C === 1 &&
-      stats.gradeDistribution.D === 1,
-    `Avg1: ${stats.averageScore1}, Avg2: ${stats.averageScore2}`
-  );
-
-  // =========================================================================
-  // Test 5: Generator HTML Cetak Resmi Berstandar Sekolah
-  // =========================================================================
-  const printHtmlBtq = OralExamExportService.generatePrintHtml(testSession);
-  assert(
-    'Generator HTML: Memuat Kop Resmi SMP Terpadu Al-Ittihadiyah, Nama Penguji, Kriteria, dan Siswa',
-    printHtmlBtq.includes('SMP TERPADU AL-ITTIHADIYAH') &&
-      printHtmlBtq.includes('Ibu Mira Nurdianti, S.Pd') &&
-      printHtmlBtq.includes('Muhammad Nabiel Alqarani') &&
-      printHtmlBtq.includes('KRITERIA PENILAIAN (SKALA 0 – 100)') &&
-      printHtmlBtq.includes('Mengetahui'),
-    'Template HTML BTQ terverifikasi'
-  );
-
-  const checklistSession: OralExamSession = {
-    ...testSession,
-    id: `session_check_${Date.now()}`,
-    templateType: 'BAHASA_INGGRIS_ARAB',
-    examinerName: 'Ibu Septi Nur Aeni, S.E',
-    students: [
-      {
-        studentId: 'st_1',
-        studentName: 'Adiba Khansa Az-Zahra',
-        className: '7A',
-        englishChecklist: new Array(15).fill(true),
-        englishCorrectCount: 15,
-        englishScore: 100,
-        englishPredicate: 'A',
-        arabicChecklist: [...new Array(11).fill(true), ...new Array(4).fill(false)],
-        arabicCorrectCount: 11,
-        arabicScore: 73,
-        arabicPredicate: 'B',
-      },
-    ],
-  };
-
-  const printHtmlChecklist = OralExamExportService.generatePrintHtml(checklistSession);
-  assert(
-    'Generator HTML Checklist: Memuat 15 Butir Kolom Soal Bahasa Inggris & Arab serta Kriteria 14-15 Benar',
-    printHtmlChecklist.includes('BAHASA INGGRIS') &&
-      printHtmlChecklist.includes('BAHASA ARAB') &&
-      printHtmlChecklist.includes('KRITERIA PENILAIAN (DARI 15 BUTIR SOAL)') &&
-      printHtmlChecklist.includes('A (14 – 15 Benar)') &&
-      printHtmlChecklist.includes('Ibu Septi Nur Aeni, S.E'),
-    'Template HTML Checklist Bahasa terverifikasi'
-  );
-
-  // Cleanup test session
-  OralExamRepository.deleteSession(testSession.id);
-  OralExamRepository.deleteSession(checklistSession.id);
-
-  assert(
-    'Repository: Berhasil menghapus sesi pengujian secara bersih',
-    OralExamRepository.getSessionById(testSession.id) === null,
-    'Session cleanup verified'
-  );
-
-  // =========================================================================
-  // Test 6: 12 Kelompok Penguji Resmi (144 Peserta) & Auto-Matching Penguji
-  // =========================================================================
-  const totalOfficialGroupStudents = ORAL_EXAM_OFFICIAL_GROUPS.reduce(
-    (acc, grp) => acc + grp.students.length,
-    0
-  );
-  const matchAdi = findMatchingOfficialOralGroup('Adi Prastyo, S.Pd');
-  const matchAsrof = findMatchingOfficialOralGroup('Qodiatul Asrof Ramadhoni, S.E., G.r');
-  const matchFarhan = findMatchingOfficialOralGroup('Farhan Sopian Sahid, S.Pd.I');
-
-  assert(
-    'Official Groups: 12 kelompok penguji memuat total tepat 144 siswa (termasuk Ruang SMA) dan mencocokkan penguji login',
-    ORAL_EXAM_OFFICIAL_GROUPS.length === 12 &&
-      totalOfficialGroupStudents === 144 &&
-      Boolean(matchAdi && matchAdi.roomNumber === 'Ruang 01' && matchAdi.students.length === 11) &&
-      Boolean(matchAsrof && matchAsrof.className === 'SMA' && matchAsrof.students.length === 13) &&
-      Boolean(matchFarhan && matchFarhan.className === 'SMA' && matchFarhan.students.length === 11),
-    `Groups=${ORAL_EXAM_OFFICIAL_GROUPS.length}, Total=${totalOfficialGroupStudents}, Adi=${matchAdi?.students.length}, Asrof=${matchAsrof?.className}`
-  );
-
-  // =========================================================================
-  // Test 7: Pemisahan Track BAHASA vs BTQ & Scope Terpisah (ENGLISH_ONLY / BTQ_ONLY)
-  // =========================================================================
-  const englishOnlySession = OralExamRepository.createNewSession({
-    templateType: 'BAHASA_INGGRIS_ARAB',
-    subjectScope: 'ENGLISH_ONLY',
-    groupId: 'oral_grp_11_asrof',
-    title: 'Ujian Lisan Bahasa Inggris - SMA',
-    academicYear: '2026/2027',
-    semester: 'GANJIL',
-    examinerName: 'Qodiatul Asrof Ramadoni, S.E',
-    roomNumber: 'Ruang SMA',
-    className: 'SMA',
-    date: '2026-11-27',
-    students: [
-      { studentId: 'sma_1', studentName: 'Arnesta Hadiwinata', className: 'SMA' },
-      { studentId: 'sma_2', studentName: 'Muhamad Tahfidz', className: 'SMA' },
-    ],
-  });
-
-  // Nilai hanya Bahasa Inggris pada siswa 1
-  englishOnlySession.students[0].englishChecklist = new Array(15).fill(true);
-  englishOnlySession.students[0].englishCorrectCount = 15;
-  englishOnlySession.students[0].englishScore = 100;
-  englishOnlySession.students[0].englishPredicate = 'A';
-  englishOnlySession.students[0].englishAssessed = true;
-  // Walaupun siswa 2 memiliki arabicAssessed, di scope ENGLISH_ONLY tidak dihitung selesai
-  englishOnlySession.students[1].arabicAssessed = true;
-  englishOnlySession.students[1].arabicScore = 80;
-  OralExamRepository.saveSession(englishOnlySession);
-
-  const engScopeStats = calculateOralExamSummaryStats(
-    englishOnlySession.students,
-    true,
-    getEffectiveSubjectScope(englishOnlySession)
-  );
-  const btqOnlySession = OralExamRepository.createNewSession({
-    templateType: 'BTQ_HAFALAN',
-    subjectScope: 'BTQ_ONLY',
-    title: 'Ujian Lisan BTQ - Kelas 7',
-    academicYear: '2026/2027',
-    semester: 'GANJIL',
-    examinerName: 'Adi Prastyo, S.Pd',
-    roomNumber: 'Ruang 01',
-    className: '7',
-    date: '2026-11-27',
-    students: [{ studentId: 'k7_1', studentName: 'Afhtar Shakil', className: '7' }],
-  });
-  btqOnlySession.students[0].btqScore = 94;
-  btqOnlySession.students[0].btqPredicate = 'A';
-  OralExamRepository.saveSession(btqOnlySession);
-
-  assert(
-    'Track Separation: BAHASA vs BTQ terpisah tegas, dan ENGLISH_ONLY / BTQ_ONLY menghitung penyelesaian & statistik secara akurat',
-    getOralExamSessionTrack(englishOnlySession) === 'BAHASA' &&
-      getOralExamSessionTrack(btqOnlySession) === 'BTQ' &&
-      isStudentOralExamCompleted(englishOnlySession.students[0], 'BAHASA_INGGRIS_ARAB', 'ENGLISH_ONLY') === true &&
-      isStudentOralExamCompleted(englishOnlySession.students[1], 'BAHASA_INGGRIS_ARAB', 'ENGLISH_ONLY') === false &&
-      engScopeStats.completedStudents === 1 &&
-      engScopeStats.averageScore1 === 100 &&
-      isStudentOralExamCompleted(btqOnlySession.students[0], 'BTQ_HAFALAN', 'BTQ_ONLY') === true,
-    `TrackEng=${getOralExamSessionTrack(englishOnlySession)}, TrackBtq=${getOralExamSessionTrack(btqOnlySession)}, Completed=${engScopeStats.completedStudents}`
-  );
-
-  // =========================================================================
-  // Test 8: Ekspor HTML Fokus Scope & Dukungan Kelas SMA
-  // =========================================================================
-  const engOnlyHtml = OralExamExportService.generatePrintHtml(englishOnlySession);
-  const btqOnlyHtml = OralExamExportService.generatePrintHtml(btqOnlySession);
-
-  OralExamRepository.deleteSession(englishOnlySession.id);
-  OralExamRepository.deleteSession(btqOnlySession.id);
-
-  assert(
-    'Export Focused Scope & SMA: HTML ENGLISH_ONLY tidak memuat kolom Arab + memakai Ruang SMA; HTML BTQ_ONLY tidak memuat kolom Hafalan',
-    engOnlyHtml.includes('BAHASA INGGRIS') &&
-      !engOnlyHtml.includes('BAHASA ARAB') &&
-      engOnlyHtml.includes('Ruang SMA') &&
-      engOnlyHtml.includes('SMA TERPADU AS SALAAM') &&
-      btqOnlyHtml.includes('BTQ') &&
-      !btqOnlyHtml.includes('HAFALAN'),
-    `HasEng=${engOnlyHtml.includes('BAHASA INGGRIS')}, NoArab=${!engOnlyHtml.includes('BAHASA ARAB')}, HasSma=${engOnlyHtml.includes('SMA TERPADU AS SALAAM')}, NoHaf=${!btqOnlyHtml.includes('HAFALAN')}`
-  );
-
-  // =========================================================================
-  // Test 9–11: Admin Placement Setup, Security Auth, & Guru Ready-to-Use Sync
+  // Test 3–13: Repository Cloud Persistence via ProviderFactory, Admin Setup,
+  // Guru Siap Pakai, Staff Sync, & Supabase API RBAC Verification
   // =========================================================================
   const prevProvider = ProviderFactory.getProvider();
   const mockProv = new MockProvider();
   ProviderFactory.setProvider(mockProv);
 
   try {
+    const testSession: OralExamSession = {
+      id: `session_test_${Date.now()}`,
+      templateType: 'BTQ_HAFALAN',
+      title: 'Ujian Lisan BTQ & Tahfidz Terpadu',
+      academicYear: '2026/2027',
+      semester: 'GANJIL',
+      examinerName: 'Ibu Mira Nurdianti, S.Pd',
+      roomNumber: 'Ruang 01',
+      className: '7A',
+      date: '2026-10-12',
+      totalQuestions: 15,
+      students: [
+        {
+          studentId: 'st_1',
+          studentName: 'Muhammad Nabiel Alqarani',
+          className: '7A',
+          btqScore: 92,
+          btqPredicate: 'A',
+          hafalanScore: 85,
+          hafalanPredicate: 'B',
+        },
+        {
+          studentId: 'st_2',
+          studentName: 'Sela Mutia Nur Azimah',
+          className: '7A',
+          btqScore: 78,
+          btqPredicate: 'C',
+          hafalanScore: 60,
+          hafalanPredicate: 'D',
+        },
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const saved = await OralExamRepository.saveSession(testSession, 'MOCK_TOKEN');
+    assert(
+      'Repository: Berhasil menyimpan sesi penilaian ujian lisan melalui Provider Cloud',
+      saved.id === testSession.id,
+      `Saved ID: ${saved.id}`
+    );
+
+    const found = await OralExamRepository.getSessionById(testSession.id, '2026/2027', 'MOCK_TOKEN');
+    assert(
+      'Repository: Berhasil mengambil sesi berdasarkan ID secara akurat',
+      found !== null && found.students.length === 2 && found.students[0].btqScore === 92,
+      `Found student count: ${found?.students.length}`
+    );
+
+    const allFiltered = await OralExamRepository.getAllSessions('2026/2027', 'MOCK_TOKEN');
+    assert(
+      'Repository: Filter berdasarkan tahun ajaran 2026/2027 berfungsi',
+      allFiltered.some((s) => s.id === testSession.id),
+      `Count 2026/2027: ${allFiltered.length}`
+    );
+
+    // =========================================================================
+    // Test 4: Kalkulasi Statistik Ringkasan Sesi
+    // =========================================================================
+    const stats = calculateOralExamSummaryStats(testSession.students, false);
+    assert(
+      'Statistik: Menghitung total siswa, rata-rata BTQ (85) dan Hafalan (73) serta distribusi predikat',
+      stats.totalStudents === 2 &&
+        stats.completedStudents === 2 &&
+        stats.averageScore1 === 85 && // (92 + 78) / 2 = 85
+        stats.averageScore2 === 73 && // (85 + 60) / 2 = 72.5 -> 73
+        stats.gradeDistribution.A === 1 &&
+        stats.gradeDistribution.B === 1 &&
+        stats.gradeDistribution.C === 1 &&
+        stats.gradeDistribution.D === 1,
+      `Avg1: ${stats.averageScore1}, Avg2: ${stats.averageScore2}`
+    );
+
+    // =========================================================================
+    // Test 5: Generator HTML Cetak Resmi Berstandar Sekolah
+    // =========================================================================
+    const printHtmlBtq = OralExamExportService.generatePrintHtml(testSession);
+    assert(
+      'Generator HTML: Memuat Kop Resmi SMP Terpadu Al-Ittihadiyah, Nama Penguji, Kriteria, dan Siswa',
+      printHtmlBtq.includes('SMP TERPADU AL-ITTIHADIYAH') &&
+        printHtmlBtq.includes('Ibu Mira Nurdianti, S.Pd') &&
+        printHtmlBtq.includes('Muhammad Nabiel Alqarani') &&
+        printHtmlBtq.includes('KRITERIA PENILAIAN (SKALA 0 – 100)') &&
+        printHtmlBtq.includes('Mengetahui'),
+      'Template HTML BTQ terverifikasi'
+    );
+
+    const checklistSession: OralExamSession = {
+      ...testSession,
+      id: `session_check_${Date.now()}`,
+      templateType: 'BAHASA_INGGRIS_ARAB',
+      examinerName: 'Ibu Septi Nur Aeni, S.E',
+      students: [
+        {
+          studentId: 'st_1',
+          studentName: 'Adiba Khansa Az-Zahra',
+          className: '7A',
+          englishChecklist: new Array(15).fill(true),
+          englishCorrectCount: 15,
+          englishScore: 100,
+          englishPredicate: 'A',
+          arabicChecklist: [...new Array(11).fill(true), ...new Array(4).fill(false)],
+          arabicCorrectCount: 11,
+          arabicScore: 73,
+          arabicPredicate: 'B',
+        },
+      ],
+    };
+
+    const printHtmlChecklist = OralExamExportService.generatePrintHtml(checklistSession);
+    assert(
+      'Generator HTML Checklist: Memuat 15 Butir Kolom Soal Bahasa Inggris & Arab serta Kriteria 14-15 Benar',
+      printHtmlChecklist.includes('BAHASA INGGRIS') &&
+        printHtmlChecklist.includes('BAHASA ARAB') &&
+        printHtmlChecklist.includes('KRITERIA PENILAIAN (DARI 15 BUTIR SOAL)') &&
+        printHtmlChecklist.includes('A (14 – 15 Benar)') &&
+        printHtmlChecklist.includes('Ibu Septi Nur Aeni, S.E'),
+      'Template HTML Checklist Bahasa terverifikasi'
+    );
+
+    // Cleanup test session
+    await OralExamRepository.deleteSession(testSession.id, 'MOCK_TOKEN');
+    await OralExamRepository.deleteSession(checklistSession.id, 'MOCK_TOKEN');
+
+    assert(
+      'Repository: Berhasil menghapus sesi pengujian secara bersih',
+      (await OralExamRepository.getSessionById(testSession.id, '2026/2027', 'MOCK_TOKEN')) === null,
+      'Session cleanup verified'
+    );
+
+    // =========================================================================
+    // Test 6: 12 Kelompok Penguji Resmi (144 Peserta) & Auto-Matching Penguji
+    // =========================================================================
+    const totalOfficialGroupStudents = ORAL_EXAM_OFFICIAL_GROUPS.reduce(
+      (acc, grp) => acc + grp.students.length,
+      0
+    );
+    const matchAdi = findMatchingOfficialOralGroup('Adi Prastyo, S.Pd');
+    const matchAsrof = findMatchingOfficialOralGroup('Qodiatul Asrof Ramadhoni, S.E., G.r');
+    const matchFarhan = findMatchingOfficialOralGroup('Farhan Sopian Sahid, S.Pd.I');
+
+    assert(
+      'Official Groups: 12 kelompok penguji memuat total tepat 144 siswa (termasuk Ruang SMA) dan mencocokkan penguji login',
+      ORAL_EXAM_OFFICIAL_GROUPS.length === 12 &&
+        totalOfficialGroupStudents === 144 &&
+        Boolean(matchAdi && matchAdi.roomNumber === 'Ruang 01' && matchAdi.students.length === 11) &&
+        Boolean(matchAsrof && matchAsrof.className === 'SMA' && matchAsrof.students.length === 13) &&
+        Boolean(matchFarhan && matchFarhan.className === 'SMA' && matchFarhan.students.length === 11),
+      `Groups=${ORAL_EXAM_OFFICIAL_GROUPS.length}, Total=${totalOfficialGroupStudents}, Adi=${matchAdi?.students.length}, Asrof=${matchAsrof?.className}`
+    );
+
+    // =========================================================================
+    // Test 7: Pemisahan Track BAHASA vs BTQ & Scope Terpisah (ENGLISH_ONLY / BTQ_ONLY)
+    // =========================================================================
+    const englishOnlySession = await OralExamRepository.createNewSession(
+      {
+        templateType: 'BAHASA_INGGRIS_ARAB',
+        subjectScope: 'ENGLISH_ONLY',
+        groupId: 'oral_grp_11_asrof',
+        title: 'Ujian Lisan Bahasa Inggris - SMA',
+        academicYear: '2026/2027',
+        semester: 'GANJIL',
+        examinerName: 'Qodiatul Asrof Ramadoni, S.E',
+        roomNumber: 'Ruang SMA',
+        className: 'SMA',
+        date: '2026-11-27',
+        students: [
+          { studentId: 'sma_1', studentName: 'Arnesta Hadiwinata', className: 'SMA' },
+          { studentId: 'sma_2', studentName: 'Muhamad Tahfidz', className: 'SMA' },
+        ],
+      },
+      'MOCK_TOKEN'
+    );
+
+    // Nilai hanya Bahasa Inggris pada siswa 1
+    englishOnlySession.students[0].englishChecklist = new Array(15).fill(true);
+    englishOnlySession.students[0].englishCorrectCount = 15;
+    englishOnlySession.students[0].englishScore = 100;
+    englishOnlySession.students[0].englishPredicate = 'A';
+    englishOnlySession.students[0].englishAssessed = true;
+    // Walaupun siswa 2 memiliki arabicAssessed, di scope ENGLISH_ONLY tidak dihitung selesai
+    englishOnlySession.students[1].arabicAssessed = true;
+    englishOnlySession.students[1].arabicScore = 80;
+    await OralExamRepository.saveSession(englishOnlySession, 'MOCK_TOKEN');
+
+    const engScopeStats = calculateOralExamSummaryStats(
+      englishOnlySession.students,
+      true,
+      getEffectiveSubjectScope(englishOnlySession)
+    );
+    const btqOnlySession = await OralExamRepository.createNewSession(
+      {
+        templateType: 'BTQ_HAFALAN',
+        subjectScope: 'BTQ_ONLY',
+        title: 'Ujian Lisan BTQ - Kelas 7',
+        academicYear: '2026/2027',
+        semester: 'GANJIL',
+        examinerName: 'Adi Prastyo, S.Pd',
+        roomNumber: 'Ruang 01',
+        className: '7',
+        date: '2026-11-27',
+        students: [{ studentId: 'k7_1', studentName: 'Afhtar Shakil', className: '7' }],
+      },
+      'MOCK_TOKEN'
+    );
+    btqOnlySession.students[0].btqScore = 94;
+    btqOnlySession.students[0].btqPredicate = 'A';
+    await OralExamRepository.saveSession(btqOnlySession, 'MOCK_TOKEN');
+
+    assert(
+      'Track Separation: BAHASA vs BTQ terpisah tegas, dan ENGLISH_ONLY / BTQ_ONLY menghitung penyelesaian & statistik secara akurat',
+      getOralExamSessionTrack(englishOnlySession) === 'BAHASA' &&
+        getOralExamSessionTrack(btqOnlySession) === 'BTQ' &&
+        isStudentOralExamCompleted(englishOnlySession.students[0], 'BAHASA_INGGRIS_ARAB', 'ENGLISH_ONLY') === true &&
+        isStudentOralExamCompleted(englishOnlySession.students[1], 'BAHASA_INGGRIS_ARAB', 'ENGLISH_ONLY') === false &&
+        engScopeStats.completedStudents === 1 &&
+        engScopeStats.averageScore1 === 100 &&
+        isStudentOralExamCompleted(btqOnlySession.students[0], 'BTQ_HAFALAN', 'BTQ_ONLY') === true,
+      `TrackEng=${getOralExamSessionTrack(englishOnlySession)}, TrackBtq=${getOralExamSessionTrack(btqOnlySession)}, Completed=${engScopeStats.completedStudents}`
+    );
+
+    // =========================================================================
+    // Test 8: Ekspor HTML Fokus Scope & Dukungan Kelas SMA
+    // =========================================================================
+    const engOnlyHtml = OralExamExportService.generatePrintHtml(englishOnlySession);
+    const btqOnlyHtml = OralExamExportService.generatePrintHtml(btqOnlySession);
+
+    await OralExamRepository.deleteSession(englishOnlySession.id, 'MOCK_TOKEN');
+    await OralExamRepository.deleteSession(btqOnlySession.id, 'MOCK_TOKEN');
+
+    assert(
+      'Export Focused Scope & SMA: HTML ENGLISH_ONLY tidak memuat kolom Arab + memakai Ruang SMA; HTML BTQ_ONLY tidak memuat kolom Hafalan',
+      engOnlyHtml.includes('BAHASA INGGRIS') &&
+        !engOnlyHtml.includes('BAHASA ARAB') &&
+        engOnlyHtml.includes('Ruang SMA') &&
+        engOnlyHtml.includes('SMA TERPADU AS SALAAM') &&
+        btqOnlyHtml.includes('BTQ') &&
+        !btqOnlyHtml.includes('HAFALAN'),
+      `HasEng=${engOnlyHtml.includes('BAHASA INGGRIS')}, NoArab=${!engOnlyHtml.includes('BAHASA ARAB')}, HasSma=${engOnlyHtml.includes('SMA TERPADU AS SALAAM')}, NoHaf=${!btqOnlyHtml.includes('HAFALAN')}`
+    );
     // 9a: Default 12 assignments from official groups
     const defaultAssignments = getDefaultOralExamAssignments('2026/2027');
 
@@ -540,14 +548,17 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
     );
 
     // Test 11: Siap Pakai Guru (openOrSyncAssignedSession) membuat sesi instan & menjaga nilai lama saat Admin tambah siswa
-    const firstReady = OralExamRepository.openOrSyncAssignedSession({
-      assignment: customAssignment,
-      track: 'BAHASA',
-      academicYear: '2026/2027',
-      semester: 'GANJIL',
-      examinerNpp: '19880101',
-      date: '2026-11-27',
-    });
+    const firstReady = await OralExamRepository.openOrSyncAssignedSession(
+      {
+        assignment: customAssignment,
+        track: 'BAHASA',
+        academicYear: '2026/2027',
+        semester: 'GANJIL',
+        examinerNpp: '19880101',
+        date: '2026-11-27',
+      },
+      'MOCK_TOKEN'
+    );
 
     // Simulasi guru menilai siswa pertama sebelum Admin mengedit penempatan
     firstReady.students[0].englishChecklist = new Array(15).fill(true);
@@ -555,7 +566,7 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
     firstReady.students[0].englishScore = 100;
     firstReady.students[0].englishPredicate = 'A';
     firstReady.students[0].englishAssessed = true;
-    OralExamRepository.saveSession(firstReady);
+    await OralExamRepository.saveSession(firstReady, 'MOCK_TOKEN');
 
     const updatedByAdmin: OralExamAssignment = {
       ...customAssignment,
@@ -566,16 +577,19 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
         { studentId: 'st_a3', studentName: 'Siswa Tambahan Admin', className: '8B' },
       ],
     };
-    const resyncedSession = OralExamRepository.openOrSyncAssignedSession({
-      assignment: updatedByAdmin,
-      track: 'BAHASA',
-      academicYear: '2026/2027',
-      semester: 'GANJIL',
-      examinerNpp: '19880101',
-      date: '2026-11-27',
-    });
+    const resyncedSession = await OralExamRepository.openOrSyncAssignedSession(
+      {
+        assignment: updatedByAdmin,
+        track: 'BAHASA',
+        academicYear: '2026/2027',
+        semester: 'GANJIL',
+        examinerNpp: '19880101',
+        date: '2026-11-27',
+      },
+      'MOCK_TOKEN'
+    );
 
-    OralExamRepository.deleteSession(resyncedSession.id);
+    await OralExamRepository.deleteSession(resyncedSession.id, 'MOCK_TOKEN');
 
     assert(
       'Guru Siap Pakai Sync: openOrSyncAssignedSession langsung siap menilai & menjaga nilai lama saat Admin update ruang/scope/siswa',
@@ -669,6 +683,229 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
         guruDisplayResolved.examinerName === 'Nurul Farhiyah, S.Pd., Gr' &&
         guruDisplayResolved.examinerNpp === '1993050503',
       `staff=${staffDir.length}, adiId=${grpAdi?.examinerUserId}, renamed=${grpDafaRenamed?.examinerName}, resolved=${guruDisplayResolved.examinerName}`
+    );
+
+    // Test 13: Supabase Cloud Oral Exam Sessions Endpoint (RBAC, Relational + Pre-Migration Fallback, Zero localStorage)
+    const relationalRows = new Map<string, any>();
+    const kvRows = new Map<string, any>();
+    let simulateMissingTable = true;
+
+    const fakeCloudDb = {
+      from: (table: string) => {
+        const filters: Record<string, any> = {};
+        let likePattern = '';
+        const makeResult = () => {
+          if (table === 'oral_exam_sessions') {
+            if (simulateMissingTable) {
+              return { data: null, error: { code: '42P01', message: 'relation "public.oral_exam_sessions" does not exist' } };
+            }
+            let arr = Array.from(relationalRows.values());
+            if (filters.academic_year) arr = arr.filter((r) => r.academic_year === filters.academic_year);
+            return { data: arr, error: null };
+          }
+          if (table === 'system_settings') {
+            let arr = Array.from(kvRows.values());
+            if (filters.key) arr = arr.filter((r) => r.key === filters.key);
+            if (likePattern) {
+              const prefix = likePattern.replace(/%$/g, '');
+              arr = arr.filter((r) => String(r.key).startsWith(prefix));
+            }
+            return { data: arr, error: null };
+          }
+          return { data: [], error: null };
+        };
+
+        const chain: any = {
+          select: () => chain,
+          eq: (col: string, val: any) => {
+            filters[col] = val;
+            return chain;
+          },
+          like: (_col: string, pat: string) => {
+            likePattern = pat;
+            return chain;
+          },
+          in: () => chain,
+          order: () => chain,
+          limit: () => Promise.resolve(makeResult()),
+          maybeSingle: () => {
+            const res = makeResult();
+            return Promise.resolve({ data: res.data?.[0] ?? null, error: res.error });
+          },
+          upsert: (row: any) => {
+            if (table === 'oral_exam_sessions') {
+              if (simulateMissingTable) {
+                return Promise.resolve({
+                  error: { code: '42P01', message: 'relation "public.oral_exam_sessions" does not exist' },
+                });
+              }
+              relationalRows.set(row.id, row);
+              return Promise.resolve({ error: null });
+            }
+            if (table === 'system_settings') {
+              kvRows.set(row.key, row);
+              return Promise.resolve({ error: null });
+            }
+            return Promise.resolve({ error: null });
+          },
+          delete: () => ({
+            eq: (_col: string, val: any) => {
+              if (table === 'oral_exam_sessions') relationalRows.delete(val);
+              if (table === 'system_settings') kvRows.delete(val);
+              return Promise.resolve({ error: null });
+            },
+          }),
+          then: (resolve: any, reject?: any) => Promise.resolve(makeResult()).then(resolve, reject),
+        };
+        return chain;
+      },
+    };
+
+    const guruAdiAuth = {
+      ok: true as const,
+      userId: 'usr_adi_cloud',
+      role: 'GURU',
+      sessionId: 'sess_adi_1',
+      user: {
+        id: 'usr_adi_cloud',
+        nip: '1991041201',
+        full_name: 'Adi Prastyo, S.Pd',
+        role: 'GURU',
+        position: 'Guru',
+        avatar_url: null,
+        phone_number: null,
+      },
+    };
+    const guruOtherAuth = {
+      ok: true as const,
+      userId: 'usr_other_99',
+      role: 'GURU',
+      sessionId: 'sess_other_1',
+      user: {
+        id: 'usr_other_99',
+        nip: null,
+        full_name: 'Guru Lain Bukan Penguji',
+        role: 'GURU',
+        position: 'Guru',
+        avatar_url: null,
+        phone_number: null,
+      },
+    };
+    const kepsekAuth = {
+      ok: true as const,
+      userId: 'usr_kepsek_ro',
+      role: 'KEPSEK',
+      sessionId: 'sess_kepsek_1',
+      user: {
+        id: 'usr_kepsek_ro',
+        nip: null,
+        full_name: 'Kepala Sekolah',
+        role: 'KEPSEK',
+        position: 'Kepsek',
+        avatar_url: null,
+        phone_number: null,
+      },
+    };
+    const adminAuth = {
+      ok: true as const,
+      userId: 'usr_admin_cloud',
+      role: 'ADMIN',
+      sessionId: 'sess_admin_1',
+      user: {
+        id: 'usr_admin_cloud',
+        nip: null,
+        full_name: 'Administrator',
+        role: 'ADMIN',
+        position: 'Admin',
+        avatar_url: null,
+        phone_number: null,
+      },
+    };
+
+    const cloudSessionPayload = {
+      id: 'oral_session_cloud_test_1',
+      templateType: 'BTQ_HAFALAN',
+      subjectScope: 'BTQ_ONLY',
+      groupId: 'oral_grp_01_adi',
+      title: 'Ujian Lisan BTQ - Kelas 7',
+      academicYear: '2026/2027',
+      semester: 'GANJIL',
+      examinerUserId: 'usr_adi_cloud',
+      examinerName: 'Adi Prastyo, S.Pd',
+      examinerNpp: '1991041201',
+      roomNumber: 'Ruang 01',
+      className: '7',
+      date: '2026-11-27',
+      totalQuestions: 15,
+      students: [
+        { studentId: 'k7_1', studentName: 'Afhtar Shakil', btqScore: 95, btqPredicate: 'A' },
+      ],
+    };
+
+    let kvSaveStatus = 0;
+    let kvSavedBeforeMigration = false;
+    let relSaveStatus = 0;
+    let relCleanedLegacyKv = false;
+    let otherGuruForbidden = 0;
+    let kepsekForbidden = 0;
+    let guruDeleteForbidden = 0;
+    let adiVisibleCount = 0;
+    let otherVisibleCount = 0;
+    let adminVisibleCount = 0;
+    let adminDeleteStatus = 0;
+
+    try {
+      setServerSupabaseClient(fakeCloudDb);
+      // 13a: Sebelum migrasi 73 dijalankan (42P01), nilai tetap tersimpan di Supabase system_settings
+      const kvRes = await handleSaveOralExamSession({ session: cloudSessionPayload }, guruAdiAuth);
+      kvSaveStatus = kvRes.status;
+      kvSavedBeforeMigration = kvRows.has(`oral_exam_session_${cloudSessionPayload.id}`);
+
+      // 13b: Setelah migrasi 73 dijalankan, nilai tersimpan langsung di tabel relational oral_exam_sessions
+      simulateMissingTable = false;
+      const relRes = await handleSaveOralExamSession(
+        {
+          session: {
+            ...cloudSessionPayload,
+            students: [{ studentId: 'k7_1', studentName: 'Afhtar Shakil', btqScore: 98, btqPredicate: 'A' }],
+          },
+        },
+        guruAdiAuth
+      );
+      relSaveStatus = relRes.status;
+      relCleanedLegacyKv = !kvRows.has(`oral_exam_session_${cloudSessionPayload.id}`);
+
+      // 13c: RBAC enforcement (Guru lain & Kepsek ditolak mutasi)
+      otherGuruForbidden = (await handleSaveOralExamSession({ session: cloudSessionPayload }, guruOtherAuth)).status;
+      kepsekForbidden = (await handleSaveOralExamSession({ session: cloudSessionPayload }, kepsekAuth)).status;
+      guruDeleteForbidden = (await handleDeleteOralExamSession({ sessionId: cloudSessionPayload.id }, guruAdiAuth)).status;
+
+      // 13d: Listing isolasi per penguji untuk GURU & terbuka untuk ADMIN
+      adiVisibleCount = (await handleListOralExamSessions('2026/2027', guruAdiAuth)).body.sessions?.length || 0;
+      otherVisibleCount = (await handleListOralExamSessions('2026/2027', guruOtherAuth)).body.sessions?.length || 0;
+      adminVisibleCount = (await handleListOralExamSessions('2026/2027', adminAuth)).body.sessions?.length || 0;
+
+      // 13e: Admin delete cleans relational & fallback
+      adminDeleteStatus = (await handleDeleteOralExamSession({ sessionId: cloudSessionPayload.id }, adminAuth)).status;
+    } finally {
+      resetServerSupabaseClient();
+    }
+
+    assert(
+      'Supabase Cloud Sessions: Simpan/muat jalan saat pre-migrasi (system_settings) & tabel relasional (oral_exam_sessions) dengan RBAC ketat',
+      kvSaveStatus === 200 &&
+        kvSavedBeforeMigration &&
+        relSaveStatus === 200 &&
+        relCleanedLegacyKv &&
+        otherGuruForbidden === 403 &&
+        kepsekForbidden === 403 &&
+        guruDeleteForbidden === 403 &&
+        adiVisibleCount === 1 &&
+        otherVisibleCount === 0 &&
+        adminVisibleCount === 1 &&
+        adminDeleteStatus === 200 &&
+        relationalRows.size === 0,
+      `kv=${kvSaveStatus}(${kvSavedBeforeMigration}), rel=${relSaveStatus}(clean=${relCleanedLegacyKv}), other403=${otherGuruForbidden}, ro403=${kepsekForbidden}, del403=${guruDeleteForbidden}, lists=${adiVisibleCount}/${otherVisibleCount}/${adminVisibleCount}`
     );
 
     await OralExamAssignmentRepository.resetToOfficialDefaults('2026/2027', 'MOCK_TOKEN');

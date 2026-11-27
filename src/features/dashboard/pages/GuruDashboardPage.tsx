@@ -574,7 +574,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     let mounted = true;
     const syncOralAssignments = async () => {
       try {
-        const list = await OralExamAssignmentRepository.getAssignments();
+        const list = await OralExamAssignmentRepository.getAssignments(undefined, token || undefined);
         if (mounted) {
           setGuruOralAssignments(findAssignmentsForTeacher(list, effectiveUser));
         }
@@ -588,7 +588,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       mounted = false;
       window.removeEventListener(ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT, syncOralAssignments);
     };
-  }, [effectiveUser?.id, effectiveUser?.full_name]);
+  }, [effectiveUser?.id, effectiveUser?.full_name, token]);
   const [isExamScheduleModalOpen, setIsExamScheduleModalOpen] = useState(false);
   const [isExamScheduleReadOnly, setIsExamScheduleReadOnly] = useState(false);
   const [examScheduleInitialTab, setExamScheduleInitialTab] = useState<'proctors' | 'subjects' | 'my_schedule' | 'ai_prompt' | 'form'>('proctors');

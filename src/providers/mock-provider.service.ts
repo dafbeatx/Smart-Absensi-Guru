@@ -89,7 +89,7 @@ import type {
   ExamScheduleData,
   ExamPeriodSettings,
 } from '../types/exam-schedule.types';
-import type { OralExamAssignment } from '../types/oral-exam.types';
+import type { OralExamAssignment, OralExamSession } from '../types/oral-exam.types';
 import type { MeetingMinute } from '../types/meeting-minutes.types';
 import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
@@ -4541,21 +4541,13 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
-  // ── Oral Exam Examiner Assignments API (Mock) ─────────────────────────────
+  // ── Oral Exam Examiner Assignments & Sessions API (Mock In-Memory, Zero localStorage) ──
   private mockOralExamAssignments = new Map<string, OralExamAssignment[]>();
+  private mockOralExamSessions = new Map<string, OralExamSession>();
 
   public async getOralExamAssignments(academicYear?: string, _token?: string): Promise<OralExamAssignment[] | null> {
     const targetYear = academicYear || '2026/2027';
     const cleanYear = targetYear.replace(/[^\w]/g, '_');
-    try {
-      if (typeof localStorage !== 'undefined') {
-        const raw = localStorage.getItem(`smart_absensi_oral_exam_assignments_${cleanYear}`);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) return parsed;
-        }
-      }
-    } catch {}
     return this.mockOralExamAssignments.get(cleanYear) || null;
   }
 
@@ -4567,12 +4559,23 @@ export class MockProvider implements IDataProvider {
     const targetYear = academicYear || '2026/2027';
     const cleanYear = targetYear.replace(/[^\w]/g, '_');
     this.mockOralExamAssignments.set(cleanYear, assignments);
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(`smart_absensi_oral_exam_assignments_${cleanYear}`, JSON.stringify(assignments));
-      }
-    } catch {}
     return true;
+  }
+
+  public async getOralExamSessions(academicYear?: string, _token?: string): Promise<OralExamSession[]> {
+    const list = Array.from(this.mockOralExamSessions.values());
+    const filtered = academicYear ? list.filter((s) => s.academicYear === academicYear) : list;
+    return filtered.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  }
+
+  public async saveOralExamSession(session: OralExamSession, _token?: string): Promise<OralExamSession> {
+    const clone: OralExamSession = JSON.parse(JSON.stringify(session));
+    this.mockOralExamSessions.set(clone.id, clone);
+    return clone;
+  }
+
+  public async deleteOralExamSession(sessionId: string, _token?: string): Promise<boolean> {
+    return this.mockOralExamSessions.delete(sessionId);
   }
 
   // ── Meeting Minutes & Notulen AI Persistence API (Mock) ───────────────────

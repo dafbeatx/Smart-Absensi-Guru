@@ -1,6 +1,7 @@
 /**
  * SMART ABSENSI GURU - ORAL EXAM (UJIAN LISAN) REPOSITORY
- * Menyimpan dan mengelola data sesi penilaian ujian lisan dengan persistensi lokal aman.
+ * Menyimpan dan mengelola seluruh data sesi & nilai penilaian ujian lisan
+ * langsung di Supabase Cloud melalui ProviderFactory (zero localStorage agar tidak pernah hilang).
  */
 
 import {
@@ -12,69 +13,40 @@ import {
   type OralExamSubjectScope,
   type OralExamTrack,
 } from '../types/oral-exam.types';
+import { ProviderFactory } from '../providers/provider-factory';
 
-export const ORAL_EXAM_STORAGE_KEY = 'smart_absensi_oral_exam_sessions_v1';
 export const ORAL_EXAM_CHANGED_EVENT = 'smart_absensi_oral_exam_changed';
-
-const memoryStore = new Map<string, string>();
-
-const safeGetStorage = (key: string): string | null => {
-  try {
-    if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function') {
-      const val = localStorage.getItem(key);
-      if (val !== null) return val;
-    }
-  } catch {
-    // Memory fallback
-  }
-  return memoryStore.get(key) || null;
-};
-
-const safeSetStorage = (key: string, value: string): void => {
-  memoryStore.set(key, value);
-  try {
-    if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.setItem === 'function') {
-      localStorage.setItem(key, value);
-    }
-  } catch {
-    // Memory fallback
-  }
-};
 
 export class OralExamRepository {
   /**
-   * Mengambil semua sesi ujian lisan, dengan opsi filter tahun ajaran.
+   * Mengambil semua sesi ujian lisan dari Supabase Cloud (atau MockProvider saat testing),
+   * dengan opsi filter tahun ajaran.
    */
-  public static getAllSessions(academicYear?: string): OralExamSession[] {
-    const raw = safeGetStorage(ORAL_EXAM_STORAGE_KEY);
-    if (!raw) return [];
-    try {
-      const parsed: OralExamSession[] = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      if (academicYear) {
-        return parsed.filter((s) => s.academicYear === academicYear);
-      }
-      return parsed;
-    } catch {
-      return [];
+  public static async getAllSessions(academicYear?: string, token?: string): Promise<OralExamSession[]> {
+    const provider = ProviderFactory.getProvider();
+    if (provider.getOralExamSessions) {
+      const sessions = await provider.getOralExamSessions(academicYear, token);
+      return Array.isArray(sessions) ? sessions : [];
     }
+    return [];
   }
 
   /**
-   * Mengambil sesi berdasarkan ID.
+   * Mengambil satu sesi berdasarkan ID secara akurat dari database cloud.
    */
-  public static getSessionById(id: string): OralExamSession | null {
-    const all = this.getAllSessions();
+  public static async getSessionById(
+    id: string,
+    academicYear?: string,
+    token?: string
+  ): Promise<OralExamSession | null> {
+    const all = await this.getAllSessions(academicYear, token);
     return all.find((s) => s.id === id) || null;
   }
 
   /**
-   * Menyimpan atau memperbarui sesi ujian lisan.
+   * Menyimpan atau memperbarui sesi & seluruh nilai ujian lisan ke Supabase Cloud.
    */
-  public static saveSession(session: OralExamSession): OralExamSession {
-    const all = this.getAllSessions();
-    const existingIndex = all.findIndex((s) => s.id === session.id);
-
+  public static async saveSession(session: OralExamSession, token?: string): Promise<OralExamSession> {
     const now = new Date().toISOString();
     const sessionToSave: OralExamSession = {
       ...session,
@@ -82,77 +54,77 @@ export class OralExamRepository {
       createdAt: session.createdAt || now,
     };
 
-    if (existingIndex >= 0) {
-      all[existingIndex] = sessionToSave;
-    } else {
-      all.unshift(sessionToSave);
+    const provider = ProviderFactory.getProvider();
+    if (!provider.saveOralExamSession) {
+      throw new Error('Penyedia penyimpanan Supabase Ujian Lisan belum tersedia.');
     }
 
-    safeSetStorage(ORAL_EXAM_STORAGE_KEY, JSON.stringify(all));
+    const saved = await provider.saveOralExamSession(sessionToSave, token);
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
-        new CustomEvent(ORAL_EXAM_CHANGED_EVENT, { detail: { sessionId: session.id } })
+        new CustomEvent(ORAL_EXAM_CHANGED_EVENT, { detail: { sessionId: saved.id } })
       );
     }
 
-    return sessionToSave;
+    return saved;
   }
 
   /**
-   * Menghapus sesi ujian lisan.
+   * Menghapus sesi ujian lisan dari Supabase Cloud.
    */
-  public static deleteSession(id: string): boolean {
-    const all = this.getAllSessions();
-    const filtered = all.filter((s) => s.id !== id);
-    if (filtered.length === all.length) return false;
+  public static async deleteSession(id: string, token?: string): Promise<boolean> {
+    const provider = ProviderFactory.getProvider();
+    if (!provider.deleteOralExamSession) {
+      return false;
+    }
 
-    safeSetStorage(ORAL_EXAM_STORAGE_KEY, JSON.stringify(filtered));
-
-    if (typeof window !== 'undefined') {
+    const ok = await provider.deleteOralExamSession(id, token);
+    if (ok && typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent(ORAL_EXAM_CHANGED_EVENT, { detail: { sessionId: id } })
       );
     }
-    return true;
+    return ok;
   }
 
   /**
-   * Helper pembuat sesi baru dengan siswa yang terdaftar.
+   * Helper pembuat sesi baru beserta peserta terdaftar lalu menyimpannya ke Supabase Cloud.
    */
-  public static createNewSession(params: {
-    templateType: OralExamTemplateType;
-    subjectScope?: OralExamSubjectScope;
-    groupId?: string | null;
-    title: string;
-    academicYear: string;
-    semester: 'GANJIL' | 'GENAP';
-    examinerName: string;
-    examinerNpp?: string | null;
-    roomNumber?: string;
-    className: string;
-    date: string;
-    students: Array<{ studentId: string; studentName: string; nisn?: string; className?: string }>;
-  }): OralExamSession {
+  public static async createNewSession(
+    params: {
+      templateType: OralExamTemplateType;
+      subjectScope?: OralExamSubjectScope;
+      groupId?: string | null;
+      title: string;
+      academicYear: string;
+      semester: 'GANJIL' | 'GENAP';
+      examinerUserId?: string | null;
+      examinerName: string;
+      examinerNpp?: string | null;
+      roomNumber?: string;
+      className: string;
+      date: string;
+      students: Array<{ studentId: string; studentName: string; nisn?: string; className?: string }>;
+    },
+    token?: string
+  ): Promise<OralExamSession> {
     const now = new Date().toISOString();
     const id = `oral_session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
     const initialStudents: OralExamStudentRecord[] = params.students.map((st) => {
       if (params.templateType === 'BAHASA_INGGRIS_ARAB') {
-        const defaultEnglishChecklist = new Array(15).fill(false);
-        const defaultArabicChecklist = new Array(15).fill(false);
-
         return {
           studentId: st.studentId,
           studentName: st.studentName,
           nisn: st.nisn,
           className: st.className || params.className,
-          englishChecklist: defaultEnglishChecklist,
+          englishChecklist: new Array(15).fill(false),
           englishCorrectCount: null,
           englishScore: null,
           englishPredicate: null,
           englishAssessed: false,
-          arabicChecklist: defaultArabicChecklist,
+          arabicChecklist: new Array(15).fill(false),
           arabicCorrectCount: null,
           arabicScore: null,
           arabicPredicate: null,
@@ -160,7 +132,6 @@ export class OralExamRepository {
         };
       }
 
-      // Default BTQ & Hafalan
       return {
         studentId: st.studentId,
         studentName: st.studentName,
@@ -181,6 +152,7 @@ export class OralExamRepository {
       title: params.title,
       academicYear: params.academicYear,
       semester: params.semester,
+      ...(params.examinerUserId !== undefined ? { examinerUserId: params.examinerUserId } : {}),
       examinerName: params.examinerName,
       examinerNpp: params.examinerNpp ?? null,
       roomNumber: params.roomNumber || 'Ruang 01',
@@ -192,29 +164,33 @@ export class OralExamRepository {
       updatedAt: now,
     };
 
-    return this.saveSession(newSession);
+    return this.saveSession(newSession, token);
   }
 
   /**
-   * Mencari sesi ujian lisan yang sesuai penugasan Admin untuk penguji & track (BAHASA / BTQ),
+   * Mencari sesi ujian lisan yang sesuai penugasan Admin di Supabase untuk penguji & track (BAHASA / BTQ),
    * atau langsung membuatnya secara otomatis tanpa langkah manual dari guru.
-   * Jika Admin memperbarui penugasan siswa/ruang/scope, nilai siswa yang sudah ada tetap dipertahankan.
+   * Jika Admin memperbarui penugasan siswa/ruang/scope, nilai siswa yang sudah tersimpan di cloud tetap dipertahankan.
    */
-  public static openOrSyncAssignedSession(params: {
-    assignment: OralExamAssignment;
-    track: OralExamTrack;
-    academicYear: string;
-    semester: 'GANJIL' | 'GENAP';
-    examinerNpp?: string | null;
-    date: string;
-  }): OralExamSession {
+  public static async openOrSyncAssignedSession(
+    params: {
+      assignment: OralExamAssignment;
+      track: OralExamTrack;
+      academicYear: string;
+      semester: 'GANJIL' | 'GENAP';
+      examinerNpp?: string | null;
+      date: string;
+    },
+    token?: string
+  ): Promise<OralExamSession> {
     const { assignment, track, academicYear, semester, examinerNpp, date } = params;
     const templateType: OralExamTemplateType =
       track === 'BAHASA' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN';
     const subjectScope: OralExamSubjectScope =
       track === 'BAHASA' ? assignment.bahasaScope : assignment.btqScope;
 
-    const existing = this.getAllSessions(academicYear).find(
+    const allSessions = await this.getAllSessions(academicYear, token);
+    const existing = allSessions.find(
       (s) => s.groupId === assignment.id && getOralExamSessionTrack(s) === track
     );
 
@@ -234,20 +210,24 @@ export class OralExamRepository {
     const defaultTitle = `Ujian Lisan ${scopeLabel} - ${classLabel}`;
 
     if (!existing) {
-      return this.createNewSession({
-        templateType,
-        subjectScope,
-        groupId: assignment.id,
-        title: defaultTitle,
-        academicYear,
-        semester,
-        examinerName: assignment.examinerName,
-        examinerNpp: examinerNpp ?? assignment.examinerNpp ?? null,
-        roomNumber: assignment.roomNumber,
-        className: assignment.className,
-        date,
-        students: assignment.students,
-      });
+      return this.createNewSession(
+        {
+          templateType,
+          subjectScope,
+          groupId: assignment.id,
+          title: defaultTitle,
+          academicYear,
+          semester,
+          examinerUserId: assignment.examinerUserId ?? null,
+          examinerName: assignment.examinerName,
+          examinerNpp: examinerNpp ?? assignment.examinerNpp ?? null,
+          roomNumber: assignment.roomNumber,
+          className: assignment.className,
+          date,
+          students: assignment.students,
+        },
+        token
+      );
     }
 
     const existingById = new Map(existing.students.map((st) => [st.studentId, st]));
@@ -304,12 +284,14 @@ export class OralExamRepository {
     const syncedSession: OralExamSession = {
       ...existing,
       subjectScope,
+      examinerUserId: assignment.examinerUserId ?? existing.examinerUserId ?? null,
       examinerName: assignment.examinerName,
+      examinerNpp: examinerNpp ?? assignment.examinerNpp ?? existing.examinerNpp ?? null,
       roomNumber: assignment.roomNumber,
       className: assignment.className,
       students: syncedStudents,
     };
 
-    return this.saveSession(syncedSession);
+    return this.saveSession(syncedSession, token);
   }
 }

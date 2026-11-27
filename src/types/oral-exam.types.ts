@@ -88,6 +88,7 @@ export interface OralExamSession {
   title: string;
   academicYear: string; // e.g. '2026/2027'
   semester: 'GANJIL' | 'GENAP';
+  examinerUserId?: string | null;
   examinerName: string; // e.g. 'Ibu Mira Nurdianti, S.Pd' / 'Ibu Septi Nur Aeni, S.E'
   examinerNpp?: string | null;
   roomNumber?: string; // e.g. 'Ruang 01'

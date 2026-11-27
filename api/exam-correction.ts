@@ -22,6 +22,11 @@ import {
   handleDeleteGradedStudentOnServer,
   handleSyncScoresOnServer,
 } from './_shared/exam-correction-helpers.js';
+import {
+  handleListOralExamSessions,
+  handleSaveOralExamSession,
+  handleDeleteOralExamSession,
+} from './_shared/oral-exam-cloud.js';
 
 export default async function handler(req: any, res: any) {
   // 1. Multi-platform Allowlist CORS Configuration
@@ -57,9 +62,18 @@ export default async function handler(req: any, res: any) {
     });
   }
 
-  // 3. Handle GET / Audit Logs (with mandatory ownership check!)
+  // 3. Handle GET / Oral Exam Cloud Listing OR Exam Correction Audit Logs
   if (req.method === 'GET') {
-    const { session_id, student_user_id } = req.query || {};
+    const { action: getAction, academicYear, session_id, student_user_id } = req.query || {};
+
+    if (getAction === 'list_oral_sessions') {
+      const oralListRes = await handleListOralExamSessions(
+        academicYear ? String(academicYear) : undefined,
+        auth
+      );
+      return res.status(oralListRes.status).json(oralListRes.body);
+    }
+
     if (!session_id) {
       return res.status(400).json({ success: false, message: 'Parameter session_id wajib diisi.' });
     }
@@ -107,6 +121,16 @@ export default async function handler(req: any, res: any) {
     }
 
     const { action, session_id, data, items, change_reason, source, student_id } = req.body || {};
+
+    if (action === 'save_oral_session') {
+      const oralSaveRes = await handleSaveOralExamSession(req.body || {}, auth);
+      return res.status(oralSaveRes.status).json(oralSaveRes.body);
+    }
+
+    if (action === 'delete_oral_session') {
+      const oralDelRes = await handleDeleteOralExamSession(req.body || {}, auth);
+      return res.status(oralDelRes.status).json(oralDelRes.body);
+    }
 
     if (action === 'sync_scores') {
       const syncResult = await handleSyncScoresOnServer(req.body || {}, callerUser);

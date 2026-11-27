@@ -36,7 +36,10 @@ import { useToastStore } from '../../../store/useToastStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { AdministrationRepository } from '../../../repositories/AdministrationRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
-import { OralExamRepository } from '../../../repositories/OralExamRepository';
+import {
+  OralExamRepository,
+  ORAL_EXAM_CHANGED_EVENT,
+} from '../../../repositories/OralExamRepository';
 import {
   OralExamAssignmentRepository,
   ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT,
@@ -127,6 +130,9 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
   // Sessions & editing state
   const [sessions, setSessions] = useState<OralExamSession[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(false);
+  const [isSavingSession, setIsSavingSession] = useState<boolean>(false);
+  const [isOpeningSession, setIsOpeningSession] = useState<boolean>(false);
   const [currentSession, setCurrentSession] = useState<OralExamSession | null>(null);
   const [isDirty, setIsDirty] = useState(false);
 
@@ -183,17 +189,25 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     }
   }, [displayMode, confirmDialog, addStudentDialogOpen]);
 
-  const loadSessions = useCallback(() => {
-    const list = OralExamRepository.getAllSessions(activeAcademicYear);
-    setSessions(list);
-    return list;
-  }, [activeAcademicYear]);
+  const loadSessions = useCallback(async () => {
+    setIsLoadingSessions(true);
+    try {
+      const list = await OralExamRepository.getAllSessions(activeAcademicYear, token || undefined);
+      setSessions(list);
+      return list;
+    } catch (err) {
+      console.warn('Gagal memuat sesi ujian lisan dari Supabase:', err);
+      return [];
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  }, [activeAcademicYear, token]);
 
   const loadAssignments = useCallback(async () => {
     setIsLoadingAssignments(true);
     try {
       const [list, loadedStaff] = await Promise.all([
-        OralExamAssignmentRepository.getAssignments(activeAcademicYear),
+        OralExamAssignmentRepository.getAssignments(activeAcademicYear, token || undefined),
         isAdminControl
           ? OralExamAssignmentRepository.getStaffDirectory(token || '')
           : Promise.resolve<UserProfile[]>([]),
@@ -210,7 +224,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     }
   }, [activeAcademicYear, isAdminControl, token]);
 
-  // Reset modal entry state cleanly when opened + listen for Admin assignment updates
+  // Reset modal entry state cleanly when opened + listen for cloud assignment & session updates
   useEffect(() => {
     if (!isOpen) return;
     loadSessions();
@@ -223,11 +237,26 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     const handleAssignmentsChanged = () => {
       loadAssignments();
     };
+    const handleSessionsChanged = () => {
+      loadSessions();
+    };
+    const handleVisibilityOrOnline = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      loadSessions();
+      loadAssignments();
+    };
+
     window.addEventListener(ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT, handleAssignmentsChanged);
+    window.addEventListener(ORAL_EXAM_CHANGED_EVENT, handleSessionsChanged);
     window.addEventListener('smart_absensi_teachers_updated', handleAssignmentsChanged);
+    window.addEventListener('online', handleVisibilityOrOnline);
+    document.addEventListener('visibilitychange', handleVisibilityOrOnline);
     return () => {
       window.removeEventListener(ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT, handleAssignmentsChanged);
+      window.removeEventListener(ORAL_EXAM_CHANGED_EVENT, handleSessionsChanged);
       window.removeEventListener('smart_absensi_teachers_updated', handleAssignmentsChanged);
+      window.removeEventListener('online', handleVisibilityOrOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityOrOnline);
     };
   }, [isOpen, loadSessions, loadAssignments]);
 
@@ -370,20 +399,35 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     setScreen('ASSESS');
   };
 
-  const handleLaunchReadyAssignmentSession = (
+  const handleLaunchReadyAssignmentSession = async (
     assignment: OralExamAssignment,
     track: OralExamTrack = activeTrack
   ) => {
-    const session = OralExamRepository.openOrSyncAssignedSession({
-      assignment,
-      track,
-      academicYear: activeAcademicYear,
-      semester: activeSemester,
-      examinerNpp: user?.nip ?? assignment.examinerNpp ?? null,
-      date: getTodayDateInJakarta(),
-    });
-    loadSessions();
-    handleOpenSession(session);
+    if (isOpeningSession) return;
+    setIsOpeningSession(true);
+    try {
+      const session = await OralExamRepository.openOrSyncAssignedSession(
+        {
+          assignment,
+          track,
+          academicYear: activeAcademicYear,
+          semester: activeSemester,
+          examinerNpp: user?.nip ?? assignment.examinerNpp ?? null,
+          date: getTodayDateInJakarta(),
+        },
+        token || undefined
+      );
+      await loadSessions();
+      handleOpenSession(session);
+    } catch (err: any) {
+      showToast(
+        'error',
+        'Gagal Memuat Sesi dari Supabase',
+        err?.message || 'Periksa koneksi internet Anda lalu coba kembali.'
+      );
+    } finally {
+      setIsOpeningSession(false);
+    }
   };
 
   const handleCreateSessionSubmit = async () => {
@@ -453,27 +497,40 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
           ? `Ujian Lisan ${getScopeLabel(templateType, subjectScopeDraft)} - ${targetClassName === 'SMA' ? 'SMA' : `Kelas ${targetClassName}`}`
           : `Penilaian ${getScopeLabel(templateType, subjectScopeDraft)} - ${targetClassName === 'SMA' ? 'SMA' : `Kelas ${targetClassName}`}`;
 
-      const created = OralExamRepository.createNewSession({
-        templateType,
-        subjectScope: subjectScopeDraft,
-        groupId,
-        title: sessionTitle.trim() || defaultTitle,
-        academicYear: activeAcademicYear,
-        semester: activeSemester,
-        examinerName: targetExaminerName,
-        examinerNpp: targetExaminerNpp,
-        roomNumber: targetRoomNumber,
-        className: targetClassName,
-        date: sessionDate,
-        students: classStudents,
-      });
+      const created = await OralExamRepository.createNewSession(
+        {
+          templateType,
+          subjectScope: subjectScopeDraft,
+          groupId,
+          title: sessionTitle.trim() || defaultTitle,
+          academicYear: activeAcademicYear,
+          semester: activeSemester,
+          examinerUserId:
+            selectedExaminerUserId ||
+            (rosterSourceMode === 'OFFICIAL_GROUP' ? selectedAdminAssignment?.examinerUserId : null) ||
+            null,
+          examinerName: targetExaminerName,
+          examinerNpp: targetExaminerNpp,
+          roomNumber: targetRoomNumber,
+          className: targetClassName,
+          date: sessionDate,
+          students: classStudents,
+        },
+        token || undefined
+      );
 
-      loadSessions();
+      await loadSessions();
       handleOpenSession(created);
       showToast(
         'success',
-        'Sesi Siap Digunakan',
+        'Sesi Tersimpan di Supabase',
         `${created.students.length} peserta (${targetRoomNumber}) siap dinilai.`
+      );
+    } catch (err: any) {
+      showToast(
+        'error',
+        'Gagal Membuat Sesi di Supabase',
+        err?.message || 'Pastikan Anda masih login dan koneksi internet aktif.'
       );
     } finally {
       setIsCreatingLoading(false);
@@ -714,35 +771,60 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     });
   };
 
-  const handleSaveSession = useCallback((silentToast = false) => {
-    if (!currentSession) return;
-    const saved = OralExamRepository.saveSession(currentSession);
-    setCurrentSession(saved);
-    setIsDirty(false);
-    setScoreDrafts({});
-    loadSessions();
-    if (!silentToast) {
-      showToast('success', 'Nilai Tersimpan', 'Seluruh nilai ujian lisan berhasil disimpan.');
+  const handleSaveSession = useCallback(async (silentToast = false): Promise<boolean> => {
+    if (!currentSession || isSavingSession) return false;
+    setIsSavingSession(true);
+    try {
+      const saved = await OralExamRepository.saveSession(currentSession, token || undefined);
+      setCurrentSession(saved);
+      setIsDirty(false);
+      setScoreDrafts({});
+      await loadSessions();
+      if (!silentToast) {
+        showToast(
+          'success',
+          'Tersimpan di Supabase Cloud',
+          'Seluruh nilai ujian lisan tersimpan permanen ke server Supabase.'
+        );
+      }
+      return true;
+    } catch (err: any) {
+      showToast(
+        'error',
+        'Gagal Menyimpan ke Supabase',
+        err?.message || 'Periksa koneksi internet Anda lalu tekan Simpan Nilai lagi.'
+      );
+      return false;
+    } finally {
+      setIsSavingSession(false);
     }
-  }, [currentSession, loadSessions, showToast]);
+  }, [currentSession, isSavingSession, loadSessions, showToast, token]);
 
   const handleDeleteSessionById = (sessionToDelete: OralExamSession) => {
     setConfirmDialog({
       title: 'Hapus Sesi Ujian Lisan?',
-      message: `Hapus sesi "${sessionToDelete.title}" beserta seluruh nilai siswanya?`,
+      message: `Hapus sesi "${sessionToDelete.title}" beserta seluruh nilai siswanya dari Supabase?`,
       confirmLabel: 'Ya, Hapus Sesi',
       tone: 'danger',
-      onConfirm: () => {
+      onConfirm: async () => {
         setConfirmDialog(null);
-        OralExamRepository.deleteSession(sessionToDelete.id);
-        if (currentSession?.id === sessionToDelete.id) {
-          setCurrentSession(null);
-          setScreen('LIST');
+        try {
+          await OralExamRepository.deleteSession(sessionToDelete.id, token || undefined);
+          if (currentSession?.id === sessionToDelete.id) {
+            setCurrentSession(null);
+            setScreen('LIST');
+          }
+          setIsDirty(false);
+          setScoreDrafts({});
+          await loadSessions();
+          showToast('info', 'Sesi Dihapus', 'Sesi penilaian lisan telah dihapus dari Supabase.');
+        } catch (err: any) {
+          showToast(
+            'error',
+            'Gagal Menghapus Sesi',
+            err?.message || 'Hanya Admin/Operator aktif yang dapat menghapus sesi di server.'
+          );
         }
-        setIsDirty(false);
-        setScoreDrafts({});
-        loadSessions();
-        showToast('info', 'Sesi Dihapus', 'Sesi penilaian lisan telah dihapus.');
       },
     });
   };
@@ -750,7 +832,8 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   const handleExportPdf = async () => {
     if (!currentSession) return;
     if (isDirty) {
-      handleSaveSession(true);
+      const ok = await handleSaveSession(true);
+      if (!ok) return;
     }
     try {
       setIsExporting(true);
@@ -768,7 +851,8 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   const handleExportExcel = async () => {
     if (!currentSession) return;
     if (isDirty) {
-      handleSaveSession(true);
+      const ok = await handleSaveSession(true);
+      if (!ok) return;
     }
     try {
       const { OralExamExportService } = await import('../../../lib/oral-exam-export.lib');
@@ -783,12 +867,13 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   const navigateWithDirtyGuard = useCallback((action: () => void) => {
     if (isDirty && screen === 'ASSESS') {
       setConfirmDialog({
-        title: 'Simpan Nilai Terlebih Dahulu?',
-        message: 'Ada nilai ujian yang belum disimpan. Pilih "Simpan & Keluar" agar data aman, atau "Buang Perubahan".',
+        title: 'Simpan Nilai ke Supabase?',
+        message: 'Ada nilai ujian yang belum disimpan ke cloud. Pilih "Simpan & Keluar" agar data aman, atau "Buang Perubahan".',
         confirmLabel: 'Simpan & Keluar',
         tone: 'primary',
-        onConfirm: () => {
-          handleSaveSession(false);
+        onConfirm: async () => {
+          const ok = await handleSaveSession(false);
+          if (!ok) return;
           setConfirmDialog(null);
           action();
         },
@@ -1466,12 +1551,17 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
                           <button
                             type="button"
+                            disabled={isOpeningSession || isLoadingSessions}
                             onClick={() => handleLaunchReadyAssignmentSession(activeGuruAssignment, activeTrack)}
-                            className="w-full h-12 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold cursor-pointer transition-colors"
+                            className="w-full h-12 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm font-bold cursor-pointer transition-colors"
                           >
-                            {doneCount > 0
-                              ? `Lanjutkan Menilai (${doneCount}/${totalCount})`
-                              : `Mulai Menilai Sekarang (${totalCount} Siswa)`}
+                            {isOpeningSession
+                              ? 'Menyiapkan Data Supabase...'
+                              : isLoadingSessions
+                                ? 'Menyinkronkan Nilai...'
+                                : doneCount > 0
+                                  ? `Lanjutkan Menilai (${doneCount}/${totalCount})`
+                                  : `Mulai Menilai Sekarang (${totalCount} Siswa)`}
                           </button>
 
                           {existingSessionForActiveGuruTrack && (
@@ -1534,18 +1624,22 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                 {renderTrackSwitcher()}
 
                 {/* Daftar Sesi pada Tab Aktif */}
-                {trackSessions.length === 0 ? (
+                {isLoadingSessions ? (
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center text-xs font-semibold text-slate-500">
+                    Memuat data sesi &amp; nilai ujian lisan dari Supabase...
+                  </div>
+                ) : trackSessions.length === 0 ? (
                   <div className="p-6 rounded-2xl bg-white border border-dashed border-slate-300 text-center space-y-2.5">
                     <div className="w-12 h-12 rounded-2xl bg-slate-100 text-[#023246] flex items-center justify-center mx-auto">
                       {activeTrack === 'BAHASA' ? <Languages className="w-6 h-6" /> : <BookOpen className="w-6 h-6" />}
                     </div>
                     <h3 className="text-sm font-extrabold text-slate-900">
                       {activeTrack === 'BAHASA'
-                        ? 'Belum Ada Sesi Ujian Bahasa di Perangkat Ini'
-                        : 'Belum Ada Sesi Ujian BTQ di Perangkat Ini'}
+                        ? 'Belum Ada Sesi Ujian Bahasa di Supabase'
+                        : 'Belum Ada Sesi Ujian BTQ di Supabase'}
                     </h3>
                     <p className="text-xs text-slate-500 leading-relaxed">
-                      Klik tombol di bawah untuk membuka/membuat sesi penilaian kelompok penguji atau kelas.
+                      Klik tombol di bawah untuk membuat sesi penilaian di database cloud Supabase.
                     </p>
                   </div>
                 ) : (
@@ -2293,7 +2387,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
                   <button
                     type="button"
-                    disabled={!isDirty}
+                    disabled={!isDirty || isSavingSession}
                     onClick={() => handleSaveSession(false)}
                     className={`flex-1 h-12 px-3 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
                       isDirty
@@ -2302,7 +2396,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                     }`}
                   >
                     <Save className="w-4 h-4" />
-                    <span>{isDirty ? 'Simpan Nilai' : 'Tersimpan'}</span>
+                    <span>{isSavingSession ? 'Menyimpan...' : isDirty ? 'Simpan Nilai' : 'Tersimpan di Cloud'}</span>
                   </button>
 
                   <button
@@ -2328,7 +2422,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    disabled={!isDirty}
+                    disabled={!isDirty || isSavingSession}
                     onClick={() => handleSaveSession(false)}
                     className={`flex-1 h-12 px-3 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
                       isDirty
@@ -2337,7 +2431,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                     }`}
                   >
                     <Save className="w-4 h-4" />
-                    <span>{isDirty ? 'Simpan Nilai' : 'Tersimpan'}</span>
+                    <span>{isSavingSession ? 'Menyimpan...' : isDirty ? 'Simpan Nilai' : 'Tersimpan di Cloud'}</span>
                   </button>
                   <button
                     type="button"

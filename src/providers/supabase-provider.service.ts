@@ -107,7 +107,7 @@ import type {
   ExamScheduleData,
   ExamPeriodSettings,
 } from '../types/exam-schedule.types';
-import type { OralExamAssignment } from '../types/oral-exam.types';
+import type { OralExamAssignment, OralExamSession } from '../types/oral-exam.types';
 import type { MeetingMinute } from '../types/meeting-minutes.types';
 import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters, getEffectiveAllowedRadius, sanitizeCoordinate, sanitizeSchoolCoordinates } from '../utils/geofence.utils';
@@ -238,6 +238,7 @@ export class SupabaseProvider implements IDataProvider {
     this.cachedExamCommittees.clear();
     this.cachedExamSchedules.clear();
     this.cachedOralExamAssignments.clear();
+    this.cachedOralExamSessions.clear();
     this.inFlightRequests.clear();
   }
 
@@ -8508,8 +8509,9 @@ export class SupabaseProvider implements IDataProvider {
     return true;
   }
 
-  // ── Oral Exam Examiner Assignments API (Supabase Cloud Sync) ────────────
+  // ── Oral Exam Cloud API (100% Supabase Cloud, Zero localStorage) ────────
   private cachedOralExamAssignments: Map<string, { data: OralExamAssignment[]; timestamp: number }> = new Map();
+  private cachedOralExamSessions: Map<string, { data: OralExamSession[]; timestamp: number }> = new Map();
 
   public async getOralExamAssignments(academicYear?: string, _token?: string): Promise<OralExamAssignment[] | null> {
     const targetYear = academicYear || '2026/2027';
@@ -8533,27 +8535,12 @@ export class SupabaseProvider implements IDataProvider {
           const parsed: OralExamAssignment[] = JSON.parse(data.value);
           if (Array.isArray(parsed)) {
             this.cachedOralExamAssignments.set(cleanYear, { data: parsed, timestamp: Date.now() });
-            try {
-              if (typeof localStorage !== 'undefined') {
-                localStorage.setItem(`smart_absensi_oral_exam_assignments_${cleanYear}`, JSON.stringify(parsed));
-              }
-            } catch {}
             return parsed;
           }
         }
       } catch (err) {
         logger.warn('SupabaseProvider', 'Failed to fetch oral exam assignments from system_settings:', err);
       }
-
-      try {
-        if (typeof localStorage !== 'undefined') {
-          const raw = localStorage.getItem(`smart_absensi_oral_exam_assignments_${cleanYear}`);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) return parsed;
-          }
-        }
-      } catch {}
 
       return null;
     });
@@ -8566,17 +8553,8 @@ export class SupabaseProvider implements IDataProvider {
   ): Promise<boolean> {
     const targetYear = academicYear || '2026/2027';
     const cleanYear = targetYear.replace(/[^\w]/g, '_');
-    const localKey = `smart_absensi_oral_exam_assignments_${cleanYear}`;
 
-    let prevRaw: string | null = null;
     this.cachedOralExamAssignments.delete(cleanYear);
-
-    try {
-      if (typeof localStorage !== 'undefined') {
-        prevRaw = localStorage.getItem(localKey);
-        localStorage.setItem(localKey, JSON.stringify(assignments));
-      }
-    } catch {}
 
     try {
       const token = resolveClientAuthToken(_token);
@@ -8604,18 +8582,170 @@ export class SupabaseProvider implements IDataProvider {
     } catch (err) {
       logger.warn('SupabaseProvider', 'Failed to save oral exam assignments via serverless endpoint:', err);
       this.cachedOralExamAssignments.delete(cleanYear);
-      try {
-        if (typeof localStorage !== 'undefined') {
-          if (prevRaw !== null) localStorage.setItem(localKey, prevRaw);
-          else localStorage.removeItem(localKey);
-        }
-      } catch {}
       return false;
     }
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('smart_absensi_oral_exam_assignments_changed', { detail: assignments })
+      );
+    }
+
+    return true;
+  }
+
+  public async getOralExamSessions(academicYear?: string, _token?: string): Promise<OralExamSession[]> {
+    const targetYear = (academicYear || '').trim();
+    const cacheKey = targetYear || '__ALL__';
+
+    const cached = this.cachedOralExamSessions.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 30000) {
+      return cached.data;
+    }
+
+    return this.dedupeRequest(`getOralExamSessions_${cacheKey}`, async () => {
+      const token = resolveClientAuthToken(_token);
+      if (token && typeof window !== 'undefined' && typeof window.fetch === 'function') {
+        try {
+          const qs = new URLSearchParams({ action: 'list_oral_sessions' });
+          if (targetYear) qs.set('academicYear', targetYear);
+          const resp = await fetch(
+            `/api/exam-correction?${qs.toString()}`,
+            buildAuthenticatedFetchOptions('GET', undefined, token)
+          );
+          const json = await resp.json().catch(() => null);
+          if (resp.ok && json?.success && Array.isArray(json.sessions)) {
+            this.cachedOralExamSessions.set(cacheKey, { data: json.sessions, timestamp: Date.now() });
+            return json.sessions;
+          }
+        } catch (err) {
+          logger.warn('SupabaseProvider', 'Serverless oral exam list fallback to Supabase SELECT:', err);
+        }
+      }
+
+      // Direct PostgreSQL SELECT fallback (for non-serverless Vite dev) — strictly Supabase, zero localStorage
+      const sessionMap = new Map<string, OralExamSession>();
+      try {
+        let relQuery = this.client
+          .from('oral_exam_sessions')
+          .select('*')
+          .order('updated_at', { ascending: false });
+        if (targetYear) {
+          relQuery = relQuery.eq('academic_year', targetYear);
+        }
+        const { data: relRows, error: relErr } = await relQuery;
+        if (!relErr && Array.isArray(relRows)) {
+          for (const row of relRows) {
+            sessionMap.set(String(row.id), {
+              id: String(row.id),
+              templateType: row.template_type === 'BAHASA_INGGRIS_ARAB' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN',
+              ...(row.subject_scope ? { subjectScope: row.subject_scope } : {}),
+              ...(row.group_id !== undefined && row.group_id !== null ? { groupId: String(row.group_id) } : {}),
+              title: String(row.title || ''),
+              academicYear: String(row.academic_year || '2026/2027'),
+              semester: row.semester === 'GENAP' ? 'GENAP' : 'GANJIL',
+              examinerUserId: row.examiner_user_id ? String(row.examiner_user_id) : null,
+              examinerName: String(row.examiner_name || ''),
+              examinerNpp: row.examiner_npp ? String(row.examiner_npp) : null,
+              roomNumber: String(row.room_number || 'Ruang 01'),
+              className: String(row.class_name || '7'),
+              date: String(row.exam_date || ''),
+              totalQuestions: Number(row.total_questions) || 15,
+              students: Array.isArray(row.students) ? row.students : [],
+              createdAt: String(row.created_at || new Date().toISOString()),
+              updatedAt: String(row.updated_at || new Date().toISOString()),
+            });
+          }
+        }
+      } catch {
+        // table may not exist yet before Migration 73
+      }
+
+      try {
+        const { data: kvRows, error: kvErr } = await this.client
+          .from('system_settings')
+          .select('key, value')
+          .like('key', 'oral_exam_session_%');
+        if (!kvErr && Array.isArray(kvRows)) {
+          for (const row of kvRows) {
+            if (!row?.value) continue;
+            try {
+              const parsed: OralExamSession = JSON.parse(row.value);
+              if (parsed && parsed.id) {
+                if (targetYear && parsed.academicYear !== targetYear) continue;
+                if (!sessionMap.has(parsed.id)) {
+                  sessionMap.set(parsed.id, parsed);
+                }
+              }
+            } catch {}
+          }
+        }
+      } catch {}
+
+      const list = Array.from(sessionMap.values()).sort((a, b) =>
+        String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+      );
+      this.cachedOralExamSessions.set(cacheKey, { data: list, timestamp: Date.now() });
+      return list;
+    });
+  }
+
+  public async saveOralExamSession(session: OralExamSession, _token?: string): Promise<OralExamSession> {
+    this.cachedOralExamSessions.clear();
+
+    const token = resolveClientAuthToken(_token);
+    if (!token) {
+      throw new Error('AUTH_SESSION_MISSING: Sesi login diperlukan agar nilai ujian lisan tersimpan di Supabase.');
+    }
+
+    const resp = await fetch(
+      '/api/exam-correction',
+      buildAuthenticatedFetchOptions(
+        'POST',
+        {
+          action: 'save_oral_session',
+          session,
+        },
+        token
+      )
+    );
+    const resJson = await resp.json().catch(() => null);
+    if (!resp.ok || !resJson?.success || !resJson?.session) {
+      throw new Error(
+        resJson?.errorMessage ||
+          resJson?.message ||
+          `HTTP ${resp.status}: Gagal menyimpan nilai ujian lisan ke Supabase.`
+      );
+    }
+
+    return resJson.session as OralExamSession;
+  }
+
+  public async deleteOralExamSession(sessionId: string, _token?: string): Promise<boolean> {
+    this.cachedOralExamSessions.clear();
+
+    const token = resolveClientAuthToken(_token);
+    if (!token) {
+      throw new Error('AUTH_SESSION_MISSING: Sesi login diperlukan untuk menghapus sesi di Supabase.');
+    }
+
+    const resp = await fetch(
+      '/api/exam-correction',
+      buildAuthenticatedFetchOptions(
+        'POST',
+        {
+          action: 'delete_oral_session',
+          sessionId,
+        },
+        token
+      )
+    );
+    const resJson = await resp.json().catch(() => null);
+    if (!resp.ok || !resJson?.success) {
+      throw new Error(
+        resJson?.errorMessage ||
+          resJson?.message ||
+          `HTTP ${resp.status}: Gagal menghapus sesi ujian lisan dari Supabase.`
       );
     }
 
