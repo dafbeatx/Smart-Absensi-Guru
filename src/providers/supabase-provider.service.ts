@@ -294,12 +294,65 @@ export class SupabaseProvider implements IDataProvider {
         : '') ||
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZucHBmbWpzYnF4YnRpb3lwbmFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzcyNDksImV4cCI6MjEwNDk1MzI0OX0.ewXX-KW3SMEF-KtOZ5P1MY5IpZSJQImDt5g9maTOWfE';
 
-    this.client = createClient(url, key);
+    this.client = createClient(url, key, {
+      realtime: {
+        reconnectAfterMs: (tries: number) => {
+          if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            return 60000;
+          }
+          if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+            return 30000;
+          }
+          return [1000, 2000, 5000, 10000][tries - 1] ?? 15000;
+        },
+      },
+    });
 
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       window.addEventListener('smart_absensi_logout', () => {
         this.clearAllCaches();
       });
+      window.addEventListener('offline', () => {
+        try {
+          void this.client.realtime.disconnect();
+        } catch {
+          // ignore disconnect error while going offline
+        }
+      });
+      window.addEventListener('online', () => {
+        try {
+          if (this.client.getChannels().length > 0 && !this.client.realtime.isConnected()) {
+            this.client.realtime.connect();
+          }
+        } catch {
+          // ignore reconnect error on network transition
+        }
+      });
+    }
+  }
+
+  private handleRealtimeChannelStatus(channelLabel: string, status: string): void {
+    logger.info('SupabaseProvider', `Realtime ${channelLabel} status:`, status);
+    if (
+      (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') &&
+      typeof navigator !== 'undefined' &&
+      navigator.onLine === false
+    ) {
+      try {
+        void this.client.realtime.disconnect();
+      } catch {
+        // ignore disconnect failure while offline
+      }
+    }
+  }
+
+  private pauseRealtimeIfOffline(): void {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      try {
+        void this.client.realtime.disconnect();
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -1971,9 +2024,10 @@ export class SupabaseProvider implements IDataProvider {
         }
       )
       .subscribe((status) => {
-        logger.info('SupabaseProvider', `Realtime channel [${channelId}] status:`, status);
+        this.handleRealtimeChannelStatus(`channel [${channelId}]`, status);
       });
 
+    this.pauseRealtimeIfOffline();
     this.activeAttendanceChannel = channel;
 
     return () => {
@@ -3493,9 +3547,10 @@ export class SupabaseProvider implements IDataProvider {
         }
       )
       .subscribe((status) => {
-        logger.info('SupabaseProvider', `Realtime notifications channel [${channelId}] status:`, status);
+        this.handleRealtimeChannelStatus(`notifications channel [${channelId}]`, status);
       });
 
+    this.pauseRealtimeIfOffline();
     this.activeNotificationChannel = channel;
 
     return () => {
@@ -8695,7 +8750,11 @@ export class SupabaseProvider implements IDataProvider {
           callback({ eventType: payload.eventType, payload });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        this.handleRealtimeChannelStatus(`meeting_minutes channel [${channelId}]`, status);
+      });
+
+    this.pauseRealtimeIfOffline();
 
     return () => {
       try {

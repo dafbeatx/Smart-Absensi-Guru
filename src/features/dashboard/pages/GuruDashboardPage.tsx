@@ -374,9 +374,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, [previewUser, authUser]);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
-  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN' | 'SURVEY_ANALYTICS' | 'GAME_PID' | 'BIMTEK' | 'COUNSELING_BK'>('HOME');
+  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN' | 'SURVEY_ANALYTICS' | 'GAME_PID' | 'BIMTEK' | 'COUNSELING_BK' | 'ORAL_EXAM'>('HOME');
   const [bimtekReturnTarget, setBimtekReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const [counselingReturnTarget, setCounselingReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
+  const [oralExamReturnTarget, setOralExamReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const berandaLayerRef = React.useRef(berandaLayer);
   berandaLayerRef.current = berandaLayer;
   const [gamePidReturnTarget, setGamePidReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
@@ -567,7 +568,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   });
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [isAdministrationModalOpen, setIsAdministrationModalOpen] = useState(false);
-  const [isOralExamModalOpen, setIsOralExamModalOpen] = useState(false);
   const [guruOralAssignments, setGuruOralAssignments] = useState<OralExamAssignment[]>([]);
 
   useEffect(() => {
@@ -874,7 +874,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     { id: 'guru_celebration_modal', isOpen: isCelebrationModalOpen, onClose: () => setIsCelebrationModalOpen(false), title: 'Apresiasi Guru Teladan' },
     { id: 'guru_point_history', isOpen: isPointHistoryModalOpen, onClose: () => setIsPointHistoryModalOpen(false), title: 'Riwayat Poin Guru' },
     { id: 'guru_administration', isOpen: isAdministrationModalOpen, onClose: () => setIsAdministrationModalOpen(false), title: 'Hub Administrasi' },
-    { id: 'guru_oral_exam', isOpen: isOralExamModalOpen, onClose: () => setIsOralExamModalOpen(false), title: 'Ujian Lisan' },
     { id: 'guru_exam_schedule', isOpen: isExamScheduleModalOpen, onClose: () => setIsExamScheduleModalOpen(false), title: 'Jadwal & Pengawas Ujian' },
     { id: 'guru_emergency', isOpen: isEmergencyModalOpen, onClose: () => setIsEmergencyModalOpen(false), title: 'Darurat Kelas / UKS' },
     { id: 'guru_preferences', isOpen: isPreferencesModalOpen, onClose: () => setIsPreferencesModalOpen(false), title: 'Preferensi Notifikasi' },
@@ -911,6 +910,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         setBerandaLayer(bimtekReturnTarget || 'HOME');
       } else if (berandaLayer === 'COUNSELING_BK') {
         setBerandaLayer(counselingReturnTarget || 'HOME');
+      } else if (berandaLayer === 'ORAL_EXAM') {
+        setBerandaLayer(oralExamReturnTarget || 'HOME');
       } else if (berandaLayer === 'GAME_PID') {
         setBerandaLayer(gamePidReturnTarget || 'HOME');
       } else {
@@ -1007,7 +1008,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         setIsExamCardModalOpen(true);
         break;
       case 'oral_exam':
-        setIsOralExamModalOpen(true);
+        setOralExamReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+        setActiveTab('BERANDA');
+        setBerandaLayer('ORAL_EXAM');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
       case 'jadwal_ujian_ngawas':
         setIsExamScheduleReadOnly(true);
@@ -4625,11 +4629,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </div>
               </div>
 
-              {/* Akses Cepat Ujian Lisan di Menu Utama (Siap Pakai sesuai Penugasan Admin) */}
+              {/* Akses Cepat Ujian Lisan di Menu Utama (Siap Pakai sesuai Penugasan Admin - Non-Popup) */}
               <div className="pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsOralExamModalOpen(true)}
+                  onClick={() => {
+                    setOralExamReturnTarget('HOME');
+                    setActiveTab('BERANDA');
+                    setBerandaLayer('ORAL_EXAM');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   className={`w-full py-2.5 px-3.5 rounded-2xl active:scale-[0.98] border text-xs font-bold flex items-center justify-between transition-all cursor-pointer group ${
                     guruOralAssignments.length > 0
                       ? 'bg-emerald-50/90 hover:bg-emerald-100/80 border-emerald-200 text-emerald-950'
@@ -5365,10 +5374,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </span>
                   </button>
 
-                  {/* Penilaian Ujian Lisan (Bahasa & BTQ - Siap Pakai) */}
+                  {/* Penilaian Ujian Lisan (Bahasa & BTQ - Non-Popup Siap Pakai) */}
                   <button
                     type="button"
-                    onClick={() => setIsOralExamModalOpen(true)}
+                    onClick={() => {
+                      setOralExamReturnTarget('ALL_FEATURES');
+                      setActiveTab('BERANDA');
+                      setBerandaLayer('ORAL_EXAM');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
                     className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                     title="Penilaian Ujian Lisan Bahasa & BTQ (Penempatan diatur Admin)"
                   >
@@ -5889,6 +5903,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
+        )}
+
+        {/* ── LAYER: PENILAIAN UJIAN LISAN (DEDICATED FULL VIEW - NON-POPUP) ─── */}
+        {activeTab === 'BERANDA' && berandaLayer === 'ORAL_EXAM' && (
+          <React.Suspense fallback={<div className="p-6 text-center text-xs font-semibold text-slate-500">Memuat Penilaian Ujian Lisan...</div>}>
+            <OralExamAssessmentModal
+              isOpen={true}
+              displayMode="page"
+              onClose={() => {
+                setBerandaLayer(oralExamReturnTarget);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              roleMode="GURU"
+            />
+          </React.Suspense>
         )}
 
         {/* ── TAB 2: RIWAYAT BULANAN ──────────────────────────────────────── */}
@@ -7232,7 +7261,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               setIsRecapModalOpen(true);
               break;
             case 'oral_exam':
-              setIsOralExamModalOpen(true);
+              setOralExamReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+              setActiveTab('BERANDA');
+              setBerandaLayer('ORAL_EXAM');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
               break;
             default:
               break;
@@ -7259,17 +7291,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           initialTab={examScheduleInitialTab}
           readOnly={isExamScheduleReadOnly}
         />
-      )}
-
-      {/* 🗣️ Modal Penilaian Ujian Lisan (BTQ & Hafalan / Bahasa Inggris & Arab) */}
-      {isOralExamModalOpen && (
-        <React.Suspense fallback={null}>
-          <OralExamAssessmentModal
-            isOpen={isOralExamModalOpen}
-            onClose={() => setIsOralExamModalOpen(false)}
-            roleMode="GURU"
-          />
-        </React.Suspense>
       )}
 
       {/* 13. Terminal Presensi RFID Siswa 2 (Akses Cepat Guru Piket & Pengajar) */}

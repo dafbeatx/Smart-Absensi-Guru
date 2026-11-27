@@ -45,6 +45,7 @@ export interface OralExamAdminSetupModalProps {
   isOpen: boolean;
   onClose: () => void;
   academicYear?: string;
+  displayMode?: 'page' | 'modal';
 }
 
 const AVAILABLE_CLASSES = ['7', '8A', '8B', '9A', '9B', 'SMA', '10', '11', '12'];
@@ -53,6 +54,7 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
   isOpen,
   onClose,
   academicYear: propAcademicYear,
+  displayMode = 'page',
 }) => {
   const { user, token } = useAuthStore();
   const { showToast } = useToastStore();
@@ -80,13 +82,13 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
   const [selectedMasterIds, setSelectedMasterIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!isOpen || typeof document === 'undefined') return;
+    if (displayMode !== 'modal' || !isOpen || typeof document === 'undefined') return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prevOverflow;
     };
-  }, [isOpen]);
+  }, [isOpen, displayMode]);
 
   const loadAllData = useCallback(async (preserveEditing = false) => {
     if (!preserveEditing) setIsLoading(true);
@@ -361,39 +363,48 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
     setHasUnsavedChanges(true);
   };
 
-  if (!isOpen || typeof document === 'undefined') return null;
+  if (!isOpen) return null;
 
-  return createPortal(
+  const isPageMode = displayMode === 'page';
+
+  const setupContent = (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="oral-admin-setup-title"
-      className="fixed inset-0 z-110 flex items-center justify-center bg-black/60 md:p-4 md:backdrop-blur-xs"
+      className={
+        isPageMode
+          ? 'w-full space-y-4 text-slate-900 font-sans pb-6'
+          : 'w-full h-dvh md:h-auto md:max-h-[92dvh] md:max-w-3xl bg-[#F8FAFC] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-900 font-sans'
+      }
     >
-      <div className="w-full h-dvh md:h-auto md:max-h-[92dvh] md:max-w-3xl bg-[#F8FAFC] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-900 font-sans">
-        {/* 1. STICKY HEADER */}
-        <header className="h-14 sm:h-16 px-4 pt-[env(safe-area-inset-top)] bg-white border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 sticky top-0 z-20">
-          <div className="flex items-center gap-2 min-w-0">
-            <button
-              type="button"
-              onClick={() => (editingGroup ? setEditingGroup(null) : onClose())}
-              aria-label={editingGroup ? 'Kembali ke daftar kelompok' : 'Tutup'}
-              className="w-11 h-11 -ml-1.5 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 cursor-pointer shrink-0"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="min-w-0">
-              <h2 id="oral-admin-setup-title" className="text-sm sm:text-base font-extrabold text-slate-900 truncate">
-                {editingGroup ? 'Atur Penguji & Peserta' : 'Pengaturan Penguji Ujian Lisan (Admin)'}
-              </h2>
-              <p className="text-[11px] text-slate-500 truncate">
-                {editingGroup
-                  ? `${editingGroup.roomNumber} • Kelas ${editingGroup.className}`
-                  : `TA ${activeAcademicYear} • Guru tinggal siap pakai sesuai penempatan ini`}
-              </p>
-            </div>
+      {/* 1. STICKY HEADER */}
+      <header
+        className={
+          isPageMode
+            ? 'sticky top-0 z-20 px-3.5 py-2.5 sm:px-4 sm:py-3 bg-white border border-slate-200 rounded-2xl shadow-2xs flex items-center justify-between gap-2'
+            : 'h-14 sm:h-16 px-4 pt-[env(safe-area-inset-top)] bg-white border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 sticky top-0 z-20'
+        }
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={() => (editingGroup ? setEditingGroup(null) : onClose())}
+            aria-label={editingGroup ? 'Kembali ke daftar kelompok' : 'Kembali'}
+            className="w-11 h-11 -ml-1.5 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 cursor-pointer shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="min-w-0">
+            <h2 id="oral-admin-setup-title" className="text-sm sm:text-base font-extrabold text-slate-900 truncate">
+              {editingGroup ? 'Atur Penguji & Peserta' : 'Pengaturan Penguji Ujian Lisan (Admin)'}
+            </h2>
+            <p className="text-[11px] text-slate-500 truncate">
+              {editingGroup
+                ? `${editingGroup.roomNumber} • Kelas ${editingGroup.className}`
+                : `TA ${activeAcademicYear} • Guru tinggal siap pakai sesuai penempatan ini`}
+            </p>
           </div>
+        </div>
 
+        {!isPageMode && (
           <button
             type="button"
             onClick={onClose}
@@ -402,11 +413,12 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
           >
             <X className="w-5 h-5" />
           </button>
-        </header>
+        )}
+      </header>
 
-        {/* 2. SCROLLABLE CONTENT */}
-        <main className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
-          <div className="w-full max-w-2xl mx-auto space-y-4">
+      {/* 2. SCROLLABLE CONTENT */}
+      <div className={isPageMode ? '' : 'flex-1 overflow-y-auto overscroll-contain px-4 py-4'}>
+        <div className={isPageMode ? 'w-full max-w-3xl mx-auto space-y-4' : 'w-full max-w-2xl mx-auto space-y-4'}>
             {isLoading ? (
               <div className="p-8 rounded-xl bg-white border border-slate-200 text-center text-xs font-semibold text-slate-500">
                 Memuat daftar penguji &amp; data siswa...
@@ -884,11 +896,17 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
               </>
             )}
           </div>
-        </main>
+        </div>
 
         {/* 3. STICKY FOOTER */}
-        <footer className="sticky bottom-0 z-20 bg-white border-t border-slate-200 p-3 pb-[max(12px,env(safe-area-inset-bottom))] shrink-0">
-          <div className="w-full max-w-2xl mx-auto flex items-center gap-2.5">
+        <footer
+          className={
+            isPageMode
+              ? 'sticky bottom-2 z-20 bg-white/95 backdrop-blur-xs border border-slate-200 rounded-2xl p-3 shadow-lg max-w-3xl mx-auto w-full'
+              : 'sticky bottom-0 z-20 bg-white border-t border-slate-200 p-3 pb-[max(12px,env(safe-area-inset-bottom))] shrink-0'
+          }
+        >
+          <div className={isPageMode ? 'w-full flex items-center gap-2.5' : 'w-full max-w-2xl mx-auto flex items-center gap-2.5'}>
             {editingGroup ? (
               <>
                 <button
@@ -914,7 +932,7 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                   onClick={onClose}
                   className="h-12 px-4 rounded-xl border border-slate-300 text-slate-700 text-xs sm:text-sm font-bold cursor-pointer"
                 >
-                  Tutup
+                  {isPageMode ? 'Kembali' : 'Tutup'}
                 </button>
                 <button
                   type="button"
@@ -935,7 +953,21 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
             )}
           </div>
         </footer>
-      </div>
+    </div>
+  );
+
+  if (isPageMode || typeof document === 'undefined') {
+    return setupContent;
+  }
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="oral-admin-setup-title"
+      className="fixed inset-0 z-110 flex items-center justify-center bg-black/60 md:p-4 md:backdrop-blur-xs"
+    >
+      {setupContent}
     </div>,
     document.body
   );

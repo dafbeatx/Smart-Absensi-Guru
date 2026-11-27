@@ -128,6 +128,17 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
     return modules.filter((m) => m.isEnabled).sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [modules]);
 
+  if (isOralExamSetupOpen && ['ADMIN', 'OPERATOR'].includes((userRole || '').toUpperCase())) {
+    return (
+      <OralExamAdminSetupModal
+        isOpen={true}
+        displayMode="page"
+        onClose={() => setIsOralExamSetupOpen(false)}
+        academicYear={academicYear}
+      />
+    );
+  }
+
   const categories: Array<{ id: AdministrationCategory; title: string; subtitle: string; icon: string }> = [
     {
       id: 'UJIAN',
@@ -443,22 +454,15 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
 
       {/* Modal Pengaturan Periode Ujian & Kepanitiaan (Toggle & Waktu Berakhir) */}
       {['ADMIN', 'OPERATOR'].includes((userRole || '').toUpperCase()) && (
-        <>
-          <ExamPeriodSettingsModal
-            isOpen={isExamPeriodModalOpen}
-            onClose={() => setIsExamPeriodModalOpen(false)}
-            academicYear={academicYear}
-            userRole={userRole}
-            onSettingsSaved={(_newSettings, newStatus) => {
-              setExamPeriodStatus(newStatus);
-            }}
-          />
-          <OralExamAdminSetupModal
-            isOpen={isOralExamSetupOpen}
-            onClose={() => setIsOralExamSetupOpen(false)}
-            academicYear={academicYear}
-          />
-        </>
+        <ExamPeriodSettingsModal
+          isOpen={isExamPeriodModalOpen}
+          onClose={() => setIsExamPeriodModalOpen(false)}
+          academicYear={academicYear}
+          userRole={userRole}
+          onSettingsSaved={(_newSettings, newStatus) => {
+            setExamPeriodStatus(newStatus);
+          }}
+        />
       )}
     </div>
   );

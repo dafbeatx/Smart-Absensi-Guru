@@ -92,7 +92,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isExamCreatorModalOpen, setIsExamCreatorModalOpen] = useState(false);
   const [isExamCardModalOpen, setIsExamCardModalOpen] = useState(false);
   const [isExamScheduleModalOpen, setIsExamScheduleModalOpen] = useState(false);
-  const [isOralExamModalOpen, setIsOralExamModalOpen] = useState(false);
   const [isHomeroomModalOpen, setIsHomeroomModalOpen] = useState(false);
   const [isTeachingMaterialsModalOpen, setIsTeachingMaterialsModalOpen] = useState(false);
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
@@ -493,7 +492,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'admin_exam_creator', isOpen: isExamCreatorModalOpen, onClose: () => setIsExamCreatorModalOpen(false), title: 'Pembuat Soal Ujian' },
     { id: 'admin_exam_card', isOpen: isExamCardModalOpen, onClose: () => setIsExamCardModalOpen(false), title: 'Kartu Asesmen Ujian' },
     { id: 'admin_exam_schedule', isOpen: isExamScheduleModalOpen, onClose: () => setIsExamScheduleModalOpen(false), title: 'Jadwal & Pengawas Ujian' },
-    { id: 'admin_oral_exam', isOpen: isOralExamModalOpen, onClose: () => setIsOralExamModalOpen(false), title: 'Ujian Lisan' },
     { id: 'admin_homeroom', isOpen: isHomeroomModalOpen, onClose: () => setIsHomeroomModalOpen(false), title: 'Wali Kelas Hub' },
     { id: 'admin_teaching_materials', isOpen: isTeachingMaterialsModalOpen, onClose: () => setIsTeachingMaterialsModalOpen(false), title: 'Bahan Ajar' },
     { id: 'admin_leaderboard', isOpen: isLeaderboardModalOpen, onClose: () => setIsLeaderboardModalOpen(false), title: 'Papan Peringkat Kedisiplinan' },
@@ -588,6 +586,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       id: 'QUESTION_CORRECTION',
       label: 'Koreksi Soal & Nilai',
       icon: '📋',
+    },
+    {
+      id: 'ORAL_EXAM',
+      label: 'Penilaian Ujian Lisan',
+      icon: '🗣️',
     },
     {
       id: 'LEADERBOARD',
@@ -849,11 +852,33 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                 } else if (actionId === 'materials') {
                   setIsTeachingMaterialsModalOpen(true);
                 } else if (actionId === 'oral_exam') {
-                  setIsOralExamModalOpen(true);
+                  setActiveTab('ORAL_EXAM');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
               }}
               onBackToDashboard={() => setActiveTab('DASHBOARD')}
             />
+          )}
+
+          {/* TAB: PENILAIAN UJIAN LISAN (DEDICATED FULL VIEW - NON-POPUP) */}
+          {activeTab === 'ORAL_EXAM' && (
+            <React.Suspense
+              fallback={
+                <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center text-xs font-semibold text-slate-500">
+                  Memuat Penilaian Ujian Lisan...
+                </div>
+              }
+            >
+              <OralExamAssessmentModal
+                isOpen={true}
+                displayMode="page"
+                onClose={() => {
+                  setActiveTab('ADMINISTRATION');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                roleMode="ADMIN"
+              />
+            </React.Suspense>
           )}
 
           {/* TAB: NOTULEN RAPAT AI */}
@@ -1216,17 +1241,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           onClose={() => setIsTeachingMaterialsModalOpen(false)}
           user={user}
         />
-      )}
-
-      {/* Modal Penilaian Ujian Lisan (BTQ & Bahasa Inggris/Arab) */}
-      {isOralExamModalOpen && (
-        <React.Suspense fallback={null}>
-          <OralExamAssessmentModal
-            isOpen={isOralExamModalOpen}
-            onClose={() => setIsOralExamModalOpen(false)}
-            roleMode="ADMIN"
-          />
-        </React.Suspense>
       )}
 
       {/* ✨ Modal Pembuat Soal Otomatis AI, Kunci Jawaban & Kisi-Kisi (KOP SMPT Al-Ittihadiyah) */}

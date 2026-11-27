@@ -17,9 +17,11 @@ export class AutoUpdateService {
       this.checkForUpdates();
     }, 1000);
 
-    // 2. Periodic background polling every 15 seconds
+    // 2. Periodic background polling every 15 seconds (only when visible & online to avoid offline noise)
     if (!this.checkIntervalTimer) {
       this.checkIntervalTimer = setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
         this.checkForUpdates();
       }, 15000);
     }
@@ -55,6 +57,9 @@ export class AutoUpdateService {
    */
   public static async checkForUpdates(): Promise<boolean> {
     if (this.isChecking || this.updateTriggered || typeof window === 'undefined') {
+      return false;
+    }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       return false;
     }
 

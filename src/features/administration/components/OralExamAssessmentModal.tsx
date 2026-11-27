@@ -75,6 +75,7 @@ export interface OralExamAssessmentModalProps {
   onClose: () => void;
   academicYear?: string;
   roleMode?: 'GURU' | 'ADMIN';
+  displayMode?: 'page' | 'modal';
 }
 
 type ModalScreen = 'LIST' | 'CREATE' | 'ASSESS';
@@ -100,6 +101,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   onClose,
   academicYear: propAcademicYear,
   roleMode = 'GURU',
+  displayMode = 'page',
 }) => {
   const { user, token } = useAuthStore();
   const { showToast } = useToastStore();
@@ -164,15 +166,22 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   const [addStudentDialogOpen, setAddStudentDialogOpen] = useState<boolean>(false);
   const [newStudentNameDraft, setNewStudentNameDraft] = useState<string>('');
 
-  // Lock background scroll on open
+  // Lock background scroll only when rendered as popup modal
   useEffect(() => {
-    if (!isOpen || typeof document === 'undefined') return;
+    if (displayMode !== 'modal' || !isOpen || typeof document === 'undefined') return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prevOverflow;
     };
-  }, [isOpen]);
+  }, [isOpen, displayMode]);
+
+  // Smoothly scroll inline confirm/add form into view when using non-popup page mode
+  useEffect(() => {
+    if (displayMode === 'page' && (confirmDialog || addStudentDialogOpen) && typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [displayMode, confirmDialog, addStudentDialogOpen]);
 
   const loadSessions = useCallback(() => {
     const list = OralExamRepository.getAllSessions(activeAcademicYear);
@@ -1163,52 +1172,161 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     );
   };
 
-  return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="oral-exam-title"
-      className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 md:p-4 md:backdrop-blur-xs"
+  if (!isOpen) return null;
+
+  const isPageMode = displayMode === 'page';
+
+  // In page mode, render Admin setup inline without any floating popup overlay
+  if (isPageMode && isAdminControl && isAdminSetupOpen) {
+    return (
+      <OralExamAdminSetupModal
+        isOpen={true}
+        displayMode="page"
+        onClose={() => {
+          setIsAdminSetupOpen(false);
+          loadAssignments();
+        }}
+        academicYear={activeAcademicYear}
+      />
+    );
+  }
+
+  const inlineAddStudentCard = isAdminControl && addStudentDialogOpen && isPageMode && (
+    <form
+      onSubmit={handleConfirmAddStudent}
+      className="bg-white rounded-2xl w-full p-4 shadow-sm border-2 border-emerald-200 space-y-3"
     >
-      <div className="w-full h-dvh md:h-auto md:max-h-[92dvh] md:max-w-3xl bg-[#F8FAFC] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-900 font-sans">
-        {/* 1. STICKY HEADER */}
-        <header className="h-14 sm:h-16 px-4 pt-[env(safe-area-inset-top)] bg-white border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 sticky top-0 z-20">
-          <div className="flex items-center gap-2 min-w-0">
+      <div className="space-y-0.5">
+        <h3 className="text-sm font-extrabold text-slate-900">Tambah Siswa ke Sesi Ujian</h3>
+        <p className="text-xs text-slate-500">
+          Ketik nama lengkap siswa untuk dimasukkan ke daftar ujian ini.
+        </p>
+      </div>
+      <input
+        type="text"
+        autoFocus
+        value={newStudentNameDraft}
+        onChange={(e) => setNewStudentNameDraft(e.target.value)}
+        placeholder="Contoh: Ahmad Fauzan"
+        className="w-full h-11 bg-white border border-slate-300 rounded-xl px-3.5 text-base sm:text-sm font-medium focus:ring-2 focus:ring-[#023246] focus:outline-none"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setAddStudentDialogOpen(false)}
+          className="h-11 px-4 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold cursor-pointer"
+        >
+          Batal
+        </button>
+        <button
+          type="submit"
+          className="flex-1 h-11 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
+        >
+          Tambahkan Siswa
+        </button>
+      </div>
+    </form>
+  );
+
+  const inlineConfirmCard = confirmDialog && isPageMode && (
+    <div
+      role="alert"
+      className="bg-amber-50/95 rounded-2xl w-full p-4 shadow-sm border border-amber-300 space-y-3"
+    >
+      <div className="space-y-1">
+        <h3 className="text-sm font-extrabold text-slate-900">{confirmDialog.title}</h3>
+        <p className="text-xs text-slate-700 leading-relaxed">{confirmDialog.message}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setConfirmDialog(null)}
+          className="h-11 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold cursor-pointer"
+        >
+          Batal
+        </button>
+        {confirmDialog.secondaryLabel && confirmDialog.onSecondary && (
+          <button
+            type="button"
+            onClick={confirmDialog.onSecondary}
+            className="h-11 px-4 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold cursor-pointer"
+          >
+            {confirmDialog.secondaryLabel}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={confirmDialog.onConfirm}
+          className={`flex-1 h-11 px-4 rounded-xl text-white text-xs font-bold cursor-pointer ${
+            confirmDialog.tone === 'danger'
+              ? 'bg-rose-600 hover:bg-rose-700'
+              : 'bg-[#023246] hover:bg-[#034560]'
+          }`}
+        >
+          {confirmDialog.confirmLabel}
+        </button>
+      </div>
+    </div>
+  );
+
+  const hasFooterContent =
+    (screen === 'LIST' && isAdminControl) ||
+    (screen === 'CREATE' && isAdminControl) ||
+    (screen === 'ASSESS' && Boolean(currentSession));
+
+  const viewBody = (
+    <div
+      className={
+        isPageMode
+          ? 'w-full space-y-4 text-slate-900 font-sans pb-6'
+          : 'w-full h-dvh md:h-auto md:max-h-[92dvh] md:max-w-3xl bg-[#F8FAFC] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-900 font-sans'
+      }
+    >
+      {/* 1. STICKY HEADER */}
+      <header
+        className={
+          isPageMode
+            ? 'sticky top-0 z-20 px-3.5 py-2.5 sm:px-4 sm:py-3 bg-white border border-slate-200 rounded-2xl shadow-2xs flex items-center justify-between gap-2'
+            : 'h-14 sm:h-16 px-4 pt-[env(safe-area-inset-top)] bg-white border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 sticky top-0 z-20'
+        }
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={handleBackNavigation}
+            aria-label={screen === 'LIST' ? 'Kembali' : 'Kembali'}
+            className="w-11 h-11 -ml-1.5 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="min-w-0">
+            <h2 id="oral-exam-title" className="text-sm sm:text-base font-extrabold text-slate-900 truncate">
+              {screen === 'LIST' && 'Penilaian Ujian Lisan'}
+              {screen === 'CREATE' && (activeTrack === 'BAHASA' ? 'Buat Sesi Ujian Bahasa' : 'Buat Sesi Ujian BTQ')}
+              {screen === 'ASSESS' && (currentSession?.title || 'Input Nilai Ujian Lisan')}
+            </h2>
+            <p className="text-[11px] text-slate-500 truncate">
+              {screen === 'LIST' && (isAdminControl ? 'Kelola penugasan penguji & pantau penilaian' : 'Siap pakai menilai siswa sesuai penempatan Admin')}
+              {screen === 'CREATE' && 'Mode Admin: Buat sesi penilaian tambahan'}
+              {screen === 'ASSESS' && currentSession && (
+                `${currentSession.examinerName} • ${currentSession.className === 'SMA' ? 'SMA' : `Kelas ${currentSession.className}`} • ${currentSession.roomNumber || 'Ruang 01'}`
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isAdminControl && screen === 'LIST' && (
             <button
               type="button"
-              onClick={handleBackNavigation}
-              aria-label={screen === 'LIST' ? 'Tutup' : 'Kembali'}
-              className="w-11 h-11 -ml-1.5 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shrink-0"
+              onClick={() => setIsAdminSetupOpen(true)}
+              className="h-10 px-3 rounded-xl bg-[#023246] hover:bg-[#034560] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Atur Penguji</span>
             </button>
-            <div className="min-w-0">
-              <h2 id="oral-exam-title" className="text-sm sm:text-base font-extrabold text-slate-900 truncate">
-                {screen === 'LIST' && 'Penilaian Ujian Lisan'}
-                {screen === 'CREATE' && (activeTrack === 'BAHASA' ? 'Buat Sesi Ujian Bahasa' : 'Buat Sesi Ujian BTQ')}
-                {screen === 'ASSESS' && (currentSession?.title || 'Input Nilai Ujian Lisan')}
-              </h2>
-              <p className="text-[11px] text-slate-500 truncate">
-                {screen === 'LIST' && (isAdminControl ? 'Kelola penugasan penguji & pantau penilaian' : 'Siap pakai menilai siswa sesuai penempatan Admin')}
-                {screen === 'CREATE' && 'Mode Admin: Buat sesi penilaian tambahan'}
-                {screen === 'ASSESS' && currentSession && (
-                  `${currentSession.examinerName} • ${currentSession.className === 'SMA' ? 'SMA' : `Kelas ${currentSession.className}`} • ${currentSession.roomNumber || 'Ruang 01'}`
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {isAdminControl && screen === 'LIST' && (
-              <button
-                type="button"
-                onClick={() => setIsAdminSetupOpen(true)}
-                className="h-10 px-3 rounded-xl bg-[#023246] hover:bg-[#034560] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>Atur Penguji</span>
-              </button>
-            )}
+          )}
+          {!isPageMode && (
             <button
               type="button"
               onClick={handleRequestCloseModal}
@@ -1217,12 +1335,15 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
             >
               <X className="w-5 h-5" />
             </button>
-          </div>
-        </header>
+          )}
+        </div>
+      </header>
 
-        {/* 2. SCROLLABLE WORKSPACE */}
-        <main className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
-          <div className="w-full max-w-lg mx-auto space-y-4">
+      {/* 2. SCROLLABLE WORKSPACE */}
+      <div className={isPageMode ? '' : 'flex-1 overflow-y-auto overscroll-contain px-4 py-4'}>
+        <div className={isPageMode ? (isAdminControl ? 'w-full max-w-3xl mx-auto space-y-4' : 'w-full space-y-4') : 'w-full max-w-lg mx-auto space-y-4'}>
+          {inlineConfirmCard}
+          {inlineAddStudentCard}
             {/* ==================== SCREEN 1: GURU READY-TO-USE HOME ==================== */}
             {screen === 'LIST' && !isAdminControl && (
               <>
@@ -2101,141 +2222,166 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
               </div>
             )}
           </div>
-        </main>
+        </div>
 
         {/* 3. STICKY BOTTOM ACTION BAR (THUMB ZONE) */}
-        <footer className="sticky bottom-0 z-20 bg-white border-t border-slate-200 p-3 pb-[max(12px,env(safe-area-inset-bottom))] shrink-0">
-          <div className="w-full max-w-lg mx-auto">
-            {screen === 'LIST' && isAdminControl && (
-              <button
-                type="button"
-                onClick={() => openCreateScreen(activeTrack)}
-                className="w-full h-12 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                <span>
-                  {activeTrack === 'BAHASA' ? 'Buat Sesi Ujian Bahasa' : 'Buat Sesi Ujian BTQ'}
-                </span>
-              </button>
-            )}
-
-            {screen === 'LIST' && !isAdminControl && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold cursor-pointer"
-              >
-                Tutup
-              </button>
-            )}
-
-            {screen === 'CREATE' && isAdminControl && (
-              <div className="flex items-center gap-2.5">
+        {(!isPageMode || hasFooterContent) && (
+          <footer
+            className={
+              isPageMode
+                ? `${
+                    isAdminControl ? 'sticky bottom-2 max-w-3xl mx-auto' : 'sticky bottom-[68px] sm:bottom-3'
+                  } z-20 bg-white/95 backdrop-blur-xs border border-slate-200 rounded-2xl p-3 shadow-lg w-full`
+                : 'sticky bottom-0 z-20 bg-white border-t border-slate-200 p-3 pb-[max(12px,env(safe-area-inset-bottom))] shrink-0'
+            }
+          >
+            <div className={isPageMode ? 'w-full' : 'w-full max-w-lg mx-auto'}>
+              {screen === 'LIST' && isAdminControl && (
                 <button
                   type="button"
-                  onClick={() => setScreen('LIST')}
-                  className="h-12 px-4 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-bold cursor-pointer"
+                  onClick={() => openCreateScreen(activeTrack)}
+                  className="w-full h-12 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
                 >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  disabled={isCreatingLoading}
-                  onClick={handleCreateSessionSubmit}
-                  className="flex-1 h-12 px-4 rounded-xl bg-[#023246] hover:bg-[#034560] disabled:opacity-50 text-white text-xs sm:text-sm font-bold cursor-pointer transition-colors"
-                >
-                  {isCreatingLoading ? 'Menyiapkan...' : 'Mulai Menilai Sekarang'}
-                </button>
-              </div>
-            )}
-
-            {screen === 'ASSESS' && currentSession && assessViewMode === 'FOCUS' && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={activeStudentIndex <= 0}
-                  onClick={() => setActiveStudentIndex((idx) => Math.max(0, idx - 1))}
-                  className="h-12 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 text-slate-700 text-xs font-bold inline-flex items-center gap-1 cursor-pointer shrink-0"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Sblm</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={!isDirty}
-                  onClick={() => handleSaveSession(false)}
-                  className={`flex-1 h-12 px-3 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
-                    isDirty
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      : 'bg-slate-100 text-slate-500 border border-slate-200'
-                  }`}
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{isDirty ? 'Simpan Nilai' : 'Tersimpan'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (activeStudentIndex < currentSession.students.length - 1) {
-                      setActiveStudentIndex((idx) => idx + 1);
-                    } else {
-                      setAssessViewMode('ALL');
-                    }
-                  }}
-                  className="h-12 px-3 rounded-xl bg-[#023246] hover:bg-[#034560] text-white text-xs font-bold inline-flex items-center gap-1 cursor-pointer shrink-0"
-                >
+                  <Plus className="w-4 h-4" />
                   <span>
-                    {activeStudentIndex < currentSession.students.length - 1 ? 'Lanjut' : 'Daftar'}
+                    {activeTrack === 'BAHASA' ? 'Buat Sesi Ujian Bahasa' : 'Buat Sesi Ujian BTQ'}
                   </span>
-                  <ChevronRight className="w-4 h-4" />
                 </button>
-              </div>
-            )}
+              )}
 
-            {screen === 'ASSESS' && currentSession && assessViewMode === 'ALL' && (
-              <div className="flex items-center gap-2">
+              {!isPageMode && screen === 'LIST' && !isAdminControl && (
                 <button
                   type="button"
-                  disabled={!isDirty}
-                  onClick={() => handleSaveSession(false)}
-                  className={`flex-1 h-12 px-3 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
-                    isDirty
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      : 'bg-slate-100 text-slate-500 border border-slate-200'
-                  }`}
+                  onClick={onClose}
+                  className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold cursor-pointer"
                 >
-                  <Save className="w-4 h-4" />
-                  <span>{isDirty ? 'Simpan Nilai' : 'Tersimpan'}</span>
+                  Tutup
                 </button>
-                <button
-                  type="button"
-                  disabled={isExporting}
-                  onClick={handleExportPdf}
-                  className="h-12 px-3.5 rounded-xl bg-[#023246] hover:bg-[#034560] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shrink-0"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>PDF</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExportExcel}
-                  className="h-12 px-3.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shrink-0"
-                >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                  <span>Excel</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </footer>
-      </div>
+              )}
 
-      {/* Modal Pengaturan Penguji Admin */}
+              {screen === 'CREATE' && isAdminControl && (
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setScreen('LIST')}
+                    className="h-12 px-4 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-bold cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isCreatingLoading}
+                    onClick={handleCreateSessionSubmit}
+                    className="flex-1 h-12 px-4 rounded-xl bg-[#023246] hover:bg-[#034560] disabled:opacity-50 text-white text-xs sm:text-sm font-bold cursor-pointer transition-colors"
+                  >
+                    {isCreatingLoading ? 'Menyiapkan...' : 'Mulai Menilai Sekarang'}
+                  </button>
+                </div>
+              )}
+
+              {screen === 'ASSESS' && currentSession && assessViewMode === 'FOCUS' && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={activeStudentIndex <= 0}
+                    onClick={() => setActiveStudentIndex((idx) => Math.max(0, idx - 1))}
+                    className="h-12 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 text-slate-700 text-xs font-bold inline-flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Sblm</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!isDirty}
+                    onClick={() => handleSaveSession(false)}
+                    className={`flex-1 h-12 px-3 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                      isDirty
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-slate-100 text-slate-500 border border-slate-200'
+                    }`}
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{isDirty ? 'Simpan Nilai' : 'Tersimpan'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeStudentIndex < currentSession.students.length - 1) {
+                        setActiveStudentIndex((idx) => idx + 1);
+                      } else {
+                        setAssessViewMode('ALL');
+                      }
+                    }}
+                    className="h-12 px-3 rounded-xl bg-[#023246] hover:bg-[#034560] text-white text-xs font-bold inline-flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <span>
+                      {activeStudentIndex < currentSession.students.length - 1 ? 'Lanjut' : 'Daftar'}
+                    </span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {screen === 'ASSESS' && currentSession && assessViewMode === 'ALL' && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!isDirty}
+                    onClick={() => handleSaveSession(false)}
+                    className={`flex-1 h-12 px-3 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                      isDirty
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-slate-100 text-slate-500 border border-slate-200'
+                    }`}
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{isDirty ? 'Simpan Nilai' : 'Tersimpan'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isExporting}
+                    onClick={handleExportPdf}
+                    className="h-12 px-3.5 rounded-xl bg-[#023246] hover:bg-[#034560] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>PDF</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="h-12 px-3.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    <span>Excel</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </footer>
+        )}
+    </div>
+  );
+
+  if (isPageMode || typeof document === 'undefined') {
+    return viewBody;
+  }
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="oral-exam-title"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 md:p-4 md:backdrop-blur-xs"
+    >
+      {viewBody}
+
+      {/* Modal Pengaturan Penguji Admin (hanya saat modal mode) */}
       {isAdminControl && isAdminSetupOpen && (
         <OralExamAdminSetupModal
           isOpen={isAdminSetupOpen}
+          displayMode="modal"
           onClose={() => {
             setIsAdminSetupOpen(false);
             loadAssignments();
@@ -2244,7 +2390,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
         />
       )}
 
-      {/* Bottom-sheet Mobile / Clean Modal Desktop: Tambah Siswa Baru (Admin Only) */}
+      {/* Bottom-sheet Mobile / Clean Modal Desktop: Tambah Siswa Baru (Admin Only, modal mode) */}
       {isAdminControl && addStudentDialogOpen && (
         <div className="fixed inset-0 z-120 flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-900/60 backdrop-blur-xs">
           <form
@@ -2284,7 +2430,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
         </div>
       )}
 
-      {/* Bottom-sheet Mobile / Clean Modal Desktop: Konfirmasi Aksi */}
+      {/* Bottom-sheet Mobile / Clean Modal Desktop: Konfirmasi Aksi (modal mode) */}
       {confirmDialog && (
         <div className="fixed inset-0 z-120 flex items-end md:items-center justify-center p-0 md:p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white rounded-t-2xl md:rounded-2xl md:max-w-md w-full p-5 pb-[max(20px,env(safe-area-inset-bottom))] shadow-2xl border border-slate-200 space-y-4">
