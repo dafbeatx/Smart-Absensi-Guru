@@ -257,6 +257,24 @@
   animation: radar-ping-expand 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
+/* Super-App Primary Action Surface (#0D5C46) */
+@layer components {
+  .saga-btn-primary {
+    background-color: #0D5C46;
+    color: #FFFFFF;
+  }
+
+  @media (hover: hover) {
+    .saga-btn-primary:hover {
+      background-color: #094736;
+    }
+  }
+
+  .saga-btn-primary:active {
+    background-color: #07382B;
+  }
+}
+
 /* Reduced Motion Accessibility Standard */
 @media (prefers-reduced-motion: reduce) {
   html {

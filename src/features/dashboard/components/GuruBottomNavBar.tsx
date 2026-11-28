@@ -77,7 +77,7 @@ export const GuruDesktopNavBar: React.FC<GuruBottomNavBarProps> = ({
         <button
           type="button"
           onClick={onPressAbsen}
-          className="h-10 px-4 rounded-xl bg-[#0D5C46] hover:bg-[#094736] active:bg-[#07382B] text-white text-sm font-bold flex items-center gap-2 transition-colors cursor-pointer shrink-0"
+          className="h-10 px-4 rounded-xl saga-btn-primary text-sm font-bold flex items-center gap-2 transition-colors cursor-pointer shrink-0"
         >
           <SagaScanQrIcon tone="dark" className="w-5 h-5" />
           <span>Absen Sekarang</span>
@@ -128,7 +128,7 @@ export const GuruBottomNavBar: React.FC<GuruBottomNavBarProps> = ({
             type="button"
             onClick={onPressAbsen}
             aria-label="Absen Sekarang (Pindai QR atau Sidik Jari)"
-            className="w-14 h-14 -mt-5 rounded-full bg-[#0D5C46] hover:bg-[#094736] active:bg-[#07382B] text-white flex items-center justify-center ring-4 ring-white shadow-md transition-colors cursor-pointer"
+            className="w-14 h-14 -mt-5 rounded-full saga-btn-primary flex items-center justify-center ring-4 ring-white shadow-md transition-colors cursor-pointer"
           >
             <SagaScanQrIcon tone="dark" className="w-7.5 h-7.5" />
           </button>
