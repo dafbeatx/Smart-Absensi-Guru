@@ -34,11 +34,15 @@ import {
 } from '../../../data/oral-exam-groups';
 import { areClassCodesEqual, normalizeClassCode } from '../../../utils/class.utils';
 import type { StudentItem, UserProfile } from '../../../types/database.types';
-import type {
-  OralExamAssignment,
-  OralExamBahasaScope,
-  OralExamBtqScope,
-  OralExamTrack,
+import {
+  DEFAULT_BAHASA_CRITERIA,
+  DEFAULT_BTQ_CRITERIA,
+  resolveCriteriaLabels,
+  type OralExamAssignment,
+  type OralExamBahasaScope,
+  type OralExamBtqScope,
+  type OralExamCriteriaLabels,
+  type OralExamTrack,
 } from '../../../types/oral-exam.types';
 
 export interface OralExamAdminSetupModalProps {
@@ -255,6 +259,8 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
       examTracks: ['BAHASA', 'BTQ'],
       bahasaScope: 'ENGLISH_ONLY',
       btqScope: 'BOTH',
+      bahasaCriteria: [...DEFAULT_BAHASA_CRITERIA],
+      btqCriteria: [...DEFAULT_BTQ_CRITERIA],
       students: [],
       academicYear: activeAcademicYear,
       isActive: true,
@@ -343,6 +349,8 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
       ...editingGroup,
       examinerName: editingGroup.examinerName.trim(),
       roomNumber: editingGroup.roomNumber.trim() || 'Ruang 01',
+      bahasaCriteria: resolveCriteriaLabels(editingGroup.bahasaCriteria, 'BAHASA'),
+      btqCriteria: resolveCriteriaLabels(editingGroup.btqCriteria, 'BTQ'),
       updatedAt: new Date().toISOString(),
     };
     setAssignments((prev) => {
@@ -576,7 +584,7 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                     <label className="flex items-center justify-between gap-2 cursor-pointer">
                       <span className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
                         <Languages className="w-4 h-4 text-[#023246]" />
-                        <span>Ujian Lisan Bahasa (Checklist 15 Soal)</span>
+                        <span>Ujian Lisan Bahasa (3 Kriteria • 0–100)</span>
                       </span>
                       <input
                         type="checkbox"
@@ -586,20 +594,65 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                       />
                     </label>
                     {editingGroup.examTracks.includes('BAHASA') && (
-                      <select
-                        value={editingGroup.bahasaScope}
-                        onChange={(e) =>
-                          setEditingGroup({
-                            ...editingGroup,
-                            bahasaScope: e.target.value as OralExamBahasaScope,
-                          })
-                        }
-                        className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-xs font-semibold text-slate-800"
-                      >
-                        <option value="ENGLISH_ONLY">Bahasa Inggris Saja</option>
-                        <option value="ARABIC_ONLY">Bahasa Arab Saja</option>
-                        <option value="BOTH">Bahasa Inggris &amp; Bahasa Arab</option>
-                      </select>
+                      <div className="space-y-2.5">
+                        <select
+                          value={editingGroup.bahasaScope}
+                          onChange={(e) =>
+                            setEditingGroup({
+                              ...editingGroup,
+                              bahasaScope: e.target.value as OralExamBahasaScope,
+                            })
+                          }
+                          className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-xs font-semibold text-slate-800"
+                        >
+                          <option value="ENGLISH_ONLY">Bahasa Inggris Saja</option>
+                          <option value="ARABIC_ONLY">Bahasa Arab Saja</option>
+                          <option value="BOTH">Bahasa Inggris &amp; Bahasa Arab</option>
+                        </select>
+
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold text-slate-700">
+                              3 Kriteria Penilaian Bahasa (Skala 0–100)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditingGroup({
+                                  ...editingGroup,
+                                  bahasaCriteria: [...DEFAULT_BAHASA_CRITERIA],
+                                })
+                              }
+                              className="text-[11px] font-semibold text-[#023246] hover:underline cursor-pointer"
+                            >
+                              Reset Default
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {[0, 1, 2].map((idx) => {
+                              const currentLabels = editingGroup.bahasaCriteria || DEFAULT_BAHASA_CRITERIA;
+                              return (
+                                <input
+                                  key={`bahasa_crit_${idx}`}
+                                  type="text"
+                                  value={currentLabels[idx] ?? ''}
+                                  onChange={(e) => {
+                                    const next: OralExamCriteriaLabels = [
+                                      currentLabels[0] ?? DEFAULT_BAHASA_CRITERIA[0],
+                                      currentLabels[1] ?? DEFAULT_BAHASA_CRITERIA[1],
+                                      currentLabels[2] ?? DEFAULT_BAHASA_CRITERIA[2],
+                                    ];
+                                    next[idx] = e.target.value;
+                                    setEditingGroup({ ...editingGroup, bahasaCriteria: next });
+                                  }}
+                                  placeholder={`Kriteria ${idx + 1}`}
+                                  className="w-full h-10 px-2.5 bg-white border border-slate-300 rounded-lg text-base sm:text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
 
@@ -607,7 +660,7 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                     <label className="flex items-center justify-between gap-2 cursor-pointer">
                       <span className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
                         <BookOpen className="w-4 h-4 text-[#0D7A5F]" />
-                        <span>Ujian Mengaji BTQ &amp; Hafalan (Nilai 0–100)</span>
+                        <span>Ujian Mengaji BTQ &amp; Hafalan (3 Kriteria • 0–100)</span>
                       </span>
                       <input
                         type="checkbox"
@@ -617,20 +670,65 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                       />
                     </label>
                     {editingGroup.examTracks.includes('BTQ') && (
-                      <select
-                        value={editingGroup.btqScope}
-                        onChange={(e) =>
-                          setEditingGroup({
-                            ...editingGroup,
-                            btqScope: e.target.value as OralExamBtqScope,
-                          })
-                        }
-                        className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-xs font-semibold text-slate-800"
-                      >
-                        <option value="BTQ_ONLY">BTQ Saja</option>
-                        <option value="HAFALAN_ONLY">Hafalan Saja</option>
-                        <option value="BOTH">BTQ &amp; Hafalan (Keduanya)</option>
-                      </select>
+                      <div className="space-y-2.5">
+                        <select
+                          value={editingGroup.btqScope}
+                          onChange={(e) =>
+                            setEditingGroup({
+                              ...editingGroup,
+                              btqScope: e.target.value as OralExamBtqScope,
+                            })
+                          }
+                          className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-xs font-semibold text-slate-800"
+                        >
+                          <option value="BTQ_ONLY">BTQ Saja</option>
+                          <option value="HAFALAN_ONLY">Hafalan Saja</option>
+                          <option value="BOTH">BTQ &amp; Hafalan (Keduanya)</option>
+                        </select>
+
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold text-slate-700">
+                              3 Kriteria Penilaian BTQ / Hafalan (Skala 0–100)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditingGroup({
+                                  ...editingGroup,
+                                  btqCriteria: [...DEFAULT_BTQ_CRITERIA],
+                                })
+                              }
+                              className="text-[11px] font-semibold text-[#0D7A5F] hover:underline cursor-pointer"
+                            >
+                              Reset Default
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {[0, 1, 2].map((idx) => {
+                              const currentLabels = editingGroup.btqCriteria || DEFAULT_BTQ_CRITERIA;
+                              return (
+                                <input
+                                  key={`btq_crit_${idx}`}
+                                  type="text"
+                                  value={currentLabels[idx] ?? ''}
+                                  onChange={(e) => {
+                                    const next: OralExamCriteriaLabels = [
+                                      currentLabels[0] ?? DEFAULT_BTQ_CRITERIA[0],
+                                      currentLabels[1] ?? DEFAULT_BTQ_CRITERIA[1],
+                                      currentLabels[2] ?? DEFAULT_BTQ_CRITERIA[2],
+                                    ];
+                                    next[idx] = e.target.value;
+                                    setEditingGroup({ ...editingGroup, btqCriteria: next });
+                                  }}
+                                  placeholder={`Kriteria ${idx + 1}`}
+                                  className="w-full h-10 px-2.5 bg-white border border-slate-300 rounded-lg text-base sm:text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
 

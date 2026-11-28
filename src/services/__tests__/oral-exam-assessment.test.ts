@@ -6,7 +6,7 @@
 
 import {
   calculateDirectScorePredicate,
-  calculateChecklistScoreAndPredicate,
+  calculateCriteriaAverageAndPredicate,
   calculateOralExamSummaryStats,
   isStudentOralExamCompleted,
 } from '../../utils/oral-exam-scoring.utils';
@@ -99,61 +99,59 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
   );
 
   // =========================================================================
-  // Test 2: Model 2 (Bahasa Inggris & Arab) - Checklist 15 Butir Soal Lisan
-  // Kriteria: A: 14-15 Benar, B: 11-13 Benar, C: 6-10 Benar, D: 0-5 Benar
+  // Test 2: Penilaian Langsung 3 Kriteria (Rata-rata Skala 0-100 & Predikat A/B/C/D)
   // =========================================================================
-  // 15 Soal Benar
-  const check15 = new Array(15).fill(true);
-  const calc15 = calculateChecklistScoreAndPredicate(check15, 15);
+  const critA = calculateCriteriaAverageAndPredicate([95, 92, 90]); // sum 277 / 3 = 92.33 -> 92 (A)
   assert(
-    'Model B: 15 Jawaban Benar menghasilkan Skor 100 dan Predikat A',
-    calc15.correctCount === 15 && calc15.score === 100 && calc15.predicate === 'A',
-    `Count: ${calc15.correctCount}, Score: ${calc15.score}, Pred: ${calc15.predicate}`
+    '3 Kriteria: Nilai [95, 92, 90] menghasilkan Rata-rata 92, Predikat A, dan lengkap 3/3',
+    critA.isComplete && critA.filledCount === 3 && critA.averageScore === 92 && critA.predicate === 'A',
+    `Complete: ${critA.isComplete}, Avg: ${critA.averageScore}, Pred: ${critA.predicate}`
   );
 
-  // 14 Soal Benar (14/15 * 100 = 93.3 -> 93)
-  const check14 = [...new Array(14).fill(true), false];
-  const calc14 = calculateChecklistScoreAndPredicate(check14, 15);
+  const critB = calculateCriteriaAverageAndPredicate([85, 85, 80]); // sum 250 / 3 = 83.33 -> 83 (B)
   assert(
-    'Model B: 14 Jawaban Benar menghasilkan Skor 93 dan Predikat A',
-    calc14.correctCount === 14 && calc14.score === 93 && calc14.predicate === 'A',
-    `Count: ${calc14.correctCount}, Score: ${calc14.score}, Pred: ${calc14.predicate}`
+    '3 Kriteria: Nilai [85, 85, 80] menghasilkan Rata-rata 83 dan Predikat B',
+    critB.isComplete && critB.averageScore === 83 && critB.predicate === 'B',
+    `Avg: ${critB.averageScore}, Pred: ${critB.predicate}`
   );
 
-  // 12 Soal Benar (12/15 * 100 = 80 -> Predikat B)
-  const check12 = [...new Array(12).fill(true), false, false, false];
-  const calc12 = calculateChecklistScoreAndPredicate(check12, 15);
+  const critC = calculateCriteriaAverageAndPredicate([70, 75, 65]); // 70 (C)
   assert(
-    'Model B: 12 Jawaban Benar menghasilkan Skor 80 dan Predikat B',
-    calc12.correctCount === 12 && calc12.score === 80 && calc12.predicate === 'B',
-    `Count: ${calc12.correctCount}, Score: ${calc12.score}, Pred: ${calc12.predicate}`
+    '3 Kriteria: Nilai [70, 75, 65] menghasilkan Rata-rata 70 dan Predikat C',
+    critC.isComplete && critC.averageScore === 70 && critC.predicate === 'C',
+    `Avg: ${critC.averageScore}, Pred: ${critC.predicate}`
   );
 
-  // 8 Soal Benar (8/15 * 100 = 53 -> Predikat C)
-  const check8 = [...new Array(8).fill(true), ...new Array(7).fill(false)];
-  const calc8 = calculateChecklistScoreAndPredicate(check8, 15);
+  const critD = calculateCriteriaAverageAndPredicate([50, 55, 60]); // 55 (D)
   assert(
-    'Model B: 8 Jawaban Benar menghasilkan Skor 53 dan Predikat C (Minimal 6)',
-    calc8.correctCount === 8 && calc8.score === 53 && calc8.predicate === 'C',
-    `Count: ${calc8.correctCount}, Score: ${calc8.score}, Pred: ${calc8.predicate}`
+    '3 Kriteria: Nilai [50, 55, 60] menghasilkan Rata-rata 55 dan Predikat D',
+    critD.isComplete && critD.averageScore === 55 && critD.predicate === 'D',
+    `Avg: ${critD.averageScore}, Pred: ${critD.predicate}`
   );
 
-  // 4 Soal Benar (4/15 * 100 = 27 -> Predikat D)
-  const check4 = [...new Array(4).fill(true), ...new Array(11).fill(false)];
-  const calc4 = calculateChecklistScoreAndPredicate(check4, 15);
+  const critPartial = calculateCriteriaAverageAndPredicate([90, 80, null]);
   assert(
-    'Model B: 4 Jawaban Benar menghasilkan Skor 27 dan Predikat D',
-    calc4.correctCount === 4 && calc4.score === 27 && calc4.predicate === 'D',
-    `Count: ${calc4.correctCount}, Score: ${calc4.score}, Pred: ${calc4.predicate}`
+    '3 Kriteria Parsial: [90, 80, null] menghitung sementara 85 (B) dan menandai belum lengkap (2/3)',
+    !critPartial.isComplete &&
+      critPartial.filledCount === 2 &&
+      critPartial.averageScore === 85 &&
+      critPartial.predicate === 'B',
+    `Complete: ${critPartial.isComplete}, Filled: ${critPartial.filledCount}, Avg: ${critPartial.averageScore}`
   );
 
-  // 0 Soal Benar
-  const check0 = new Array(15).fill(false);
-  const calc0 = calculateChecklistScoreAndPredicate(check0, 15);
+  const critClamped = calculateCriteriaAverageAndPredicate([120, -10, 90]); // clamped [100, 0, 90] -> avg 63 (C)
+  const critEmpty = calculateCriteriaAverageAndPredicate([null, undefined, null]);
   assert(
-    'Model B: 0 Jawaban Benar menghasilkan Skor 0 dan Predikat D',
-    calc0.correctCount === 0 && calc0.score === 0 && calc0.predicate === 'D',
-    `Count: ${calc0.correctCount}, Score: ${calc0.score}, Pred: ${calc0.predicate}`
+    '3 Kriteria Batas & Null: Input di luar rentang 0-100 dijaga [0..100] dan kosong aman mengembalikan null',
+    critClamped.isComplete &&
+      critClamped.scores[0] === 100 &&
+      critClamped.scores[1] === 0 &&
+      critClamped.averageScore === 63 &&
+      critClamped.predicate === 'C' &&
+      critEmpty.filledCount === 0 &&
+      critEmpty.averageScore === null &&
+      critEmpty.predicate === null,
+    `ClampedAvg: ${critClamped.averageScore}, EmptyAvg: ${critEmpty.averageScore}`
   );
 
   // =========================================================================
@@ -168,6 +166,7 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
     const testSession: OralExamSession = {
       id: `session_test_${Date.now()}`,
       templateType: 'BTQ_HAFALAN',
+      criteriaLabels: ['Tajwid & Makhraj', 'Kelancaran Bacaan', 'Hafalan & Adab'],
       title: 'Ujian Lisan BTQ & Tahfidz Terpadu',
       academicYear: '2026/2027',
       semester: 'GANJIL',
@@ -175,14 +174,16 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
       roomNumber: 'Ruang 01',
       className: '7A',
       date: '2026-10-12',
-      totalQuestions: 15,
+      totalQuestions: 3,
       students: [
         {
           studentId: 'st_1',
           studentName: 'Muhammad Nabiel Alqarani',
           className: '7A',
+          btqCriteria: [94, 92, 90],
           btqScore: 92,
           btqPredicate: 'A',
+          hafalanCriteria: [85, 86, 84],
           hafalanScore: 85,
           hafalanPredicate: 'B',
         },
@@ -190,8 +191,10 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
           studentId: 'st_2',
           studentName: 'Sela Mutia Nur Azimah',
           className: '7A',
+          btqCriteria: [78, 80, 76],
           btqScore: 78,
           btqPredicate: 'C',
+          hafalanCriteria: [60, 62, 58],
           hafalanScore: 60,
           hafalanPredicate: 'D',
         },
@@ -243,51 +246,58 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
     // =========================================================================
     const printHtmlBtq = OralExamExportService.generatePrintHtml(testSession);
     assert(
-      'Generator HTML: Memuat Kop Resmi SMP Terpadu Al-Ittihadiyah, Nama Penguji, Kriteria, dan Siswa',
+      'Generator HTML BTQ 3 Kriteria: Memuat Kop Resmi, Nama Penguji, 3 Kriteria BTQ, Skala 0-100, dan Siswa',
       printHtmlBtq.includes('SMP TERPADU AL-ITTIHADIYAH') &&
         printHtmlBtq.includes('Ibu Mira Nurdianti, S.Pd') &&
         printHtmlBtq.includes('Muhammad Nabiel Alqarani') &&
-        printHtmlBtq.includes('KRITERIA PENILAIAN (SKALA 0 – 100)') &&
+        printHtmlBtq.includes('KRITERIA PENILAIAN UJIAN LISAN (3 KRITERIA • SKALA 0 – 100)') &&
+        printHtmlBtq.includes('Tajwid &amp; Makhraj') &&
+        printHtmlBtq.includes('Kelancaran Bacaan') &&
+        printHtmlBtq.includes('Hafalan &amp; Adab') &&
         printHtmlBtq.includes('Mengetahui'),
-      'Template HTML BTQ terverifikasi'
+      'Template HTML BTQ 3 kriteria terverifikasi'
     );
 
-    const checklistSession: OralExamSession = {
+    const bahasaSession: OralExamSession = {
       ...testSession,
-      id: `session_check_${Date.now()}`,
+      id: `session_bahasa_${Date.now()}`,
       templateType: 'BAHASA_INGGRIS_ARAB',
+      criteriaLabels: ['Pelafalan', 'Kelancaran', 'Pemahaman & Kosakata'],
       examinerName: 'Ibu Septi Nur Aeni, S.E',
       students: [
         {
           studentId: 'st_1',
           studentName: 'Adiba Khansa Az-Zahra',
           className: '7A',
-          englishChecklist: new Array(15).fill(true),
-          englishCorrectCount: 15,
-          englishScore: 100,
+          englishCriteria: [95, 92, 95],
+          englishScore: 94,
           englishPredicate: 'A',
-          arabicChecklist: [...new Array(11).fill(true), ...new Array(4).fill(false)],
-          arabicCorrectCount: 11,
-          arabicScore: 73,
+          englishAssessed: true,
+          arabicCriteria: [84, 85, 86],
+          arabicScore: 85,
           arabicPredicate: 'B',
+          arabicAssessed: true,
         },
       ],
     };
 
-    const printHtmlChecklist = OralExamExportService.generatePrintHtml(checklistSession);
+    const printHtmlBahasa = OralExamExportService.generatePrintHtml(bahasaSession);
     assert(
-      'Generator HTML Checklist: Memuat 15 Butir Kolom Soal Bahasa Inggris & Arab serta Kriteria 14-15 Benar',
-      printHtmlChecklist.includes('BAHASA INGGRIS') &&
-        printHtmlChecklist.includes('BAHASA ARAB') &&
-        printHtmlChecklist.includes('KRITERIA PENILAIAN (DARI 15 BUTIR SOAL)') &&
-        printHtmlChecklist.includes('A (14 – 15 Benar)') &&
-        printHtmlChecklist.includes('Ibu Septi Nur Aeni, S.E'),
-      'Template HTML Checklist Bahasa terverifikasi'
+      'Generator HTML Bahasa 3 Kriteria: Memuat 3 Kriteria Bahasa Inggris & Arab tanpa kolom 15 butir soal',
+      printHtmlBahasa.includes('BAHASA INGGRIS (3 KRITERIA)') &&
+        printHtmlBahasa.includes('BAHASA ARAB (3 KRITERIA)') &&
+        printHtmlBahasa.includes('Pelafalan') &&
+        printHtmlBahasa.includes('Kelancaran') &&
+        printHtmlBahasa.includes('Pemahaman &amp; Kosakata') &&
+        !printHtmlBahasa.includes('15 BUTIR SOAL') &&
+        !printHtmlBahasa.includes('14 – 15 Benar') &&
+        printHtmlBahasa.includes('Ibu Septi Nur Aeni, S.E'),
+      'Template HTML Bahasa 3 kriteria terverifikasi'
     );
 
     // Cleanup test session
     await OralExamRepository.deleteSession(testSession.id, 'MOCK_TOKEN');
-    await OralExamRepository.deleteSession(checklistSession.id, 'MOCK_TOKEN');
+    await OralExamRepository.deleteSession(bahasaSession.id, 'MOCK_TOKEN');
 
     assert(
       'Repository: Berhasil menghapus sesi pengujian secara bersih',
@@ -339,13 +349,13 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
       'MOCK_TOKEN'
     );
 
-    // Nilai hanya Bahasa Inggris pada siswa 1
-    englishOnlySession.students[0].englishChecklist = new Array(15).fill(true);
-    englishOnlySession.students[0].englishCorrectCount = 15;
-    englishOnlySession.students[0].englishScore = 100;
+    // Nilai hanya Bahasa Inggris 3 kriteria lengkap pada siswa 1; siswa 2 baru isi 2/3 kriteria pada Arab
+    englishOnlySession.students[0].englishCriteria = [95, 90, 92];
+    englishOnlySession.students[0].englishScore = 92;
     englishOnlySession.students[0].englishPredicate = 'A';
     englishOnlySession.students[0].englishAssessed = true;
     // Walaupun siswa 2 memiliki arabicAssessed, di scope ENGLISH_ONLY tidak dihitung selesai
+    englishOnlySession.students[1].arabicCriteria = [80, 80, 80];
     englishOnlySession.students[1].arabicAssessed = true;
     englishOnlySession.students[1].arabicScore = 80;
     await OralExamRepository.saveSession(englishOnlySession, 'MOCK_TOKEN');
@@ -366,23 +376,32 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
         roomNumber: 'Ruang 01',
         className: '7',
         date: '2026-11-27',
-        students: [{ studentId: 'k7_1', studentName: 'Afhtar Shakil', className: '7' }],
+        students: [
+          { studentId: 'k7_1', studentName: 'Afhtar Shakil', className: '7' },
+          { studentId: 'k7_2', studentName: 'Akbar Azhi Mughni', className: '7' },
+        ],
       },
       'MOCK_TOKEN'
     );
+    btqOnlySession.students[0].btqCriteria = [94, 96, 92];
     btqOnlySession.students[0].btqScore = 94;
     btqOnlySession.students[0].btqPredicate = 'A';
+    // Siswa kedua baru 2 dari 3 kriteria -> belum terhitung lengkap
+    btqOnlySession.students[1].btqCriteria = [88, 90, null];
+    btqOnlySession.students[1].btqScore = 89;
+    btqOnlySession.students[1].btqPredicate = 'B';
     await OralExamRepository.saveSession(btqOnlySession, 'MOCK_TOKEN');
 
     assert(
-      'Track Separation: BAHASA vs BTQ terpisah tegas, dan ENGLISH_ONLY / BTQ_ONLY menghitung penyelesaian & statistik secara akurat',
+      'Track Separation: BAHASA vs BTQ terpisah tegas, dan ENGLISH_ONLY / BTQ_ONLY mewajibkan 3/3 kriteria lengkap',
       getOralExamSessionTrack(englishOnlySession) === 'BAHASA' &&
         getOralExamSessionTrack(btqOnlySession) === 'BTQ' &&
         isStudentOralExamCompleted(englishOnlySession.students[0], 'BAHASA_INGGRIS_ARAB', 'ENGLISH_ONLY') === true &&
         isStudentOralExamCompleted(englishOnlySession.students[1], 'BAHASA_INGGRIS_ARAB', 'ENGLISH_ONLY') === false &&
         engScopeStats.completedStudents === 1 &&
-        engScopeStats.averageScore1 === 100 &&
-        isStudentOralExamCompleted(btqOnlySession.students[0], 'BTQ_HAFALAN', 'BTQ_ONLY') === true,
+        engScopeStats.averageScore1 === 92 &&
+        isStudentOralExamCompleted(btqOnlySession.students[0], 'BTQ_HAFALAN', 'BTQ_ONLY') === true &&
+        isStudentOralExamCompleted(btqOnlySession.students[1], 'BTQ_HAFALAN', 'BTQ_ONLY') === false,
       `TrackEng=${getOralExamSessionTrack(englishOnlySession)}, TrackBtq=${getOralExamSessionTrack(btqOnlySession)}, Completed=${engScopeStats.completedStudents}`
     );
 
@@ -485,6 +504,8 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
       examTracks: ['BAHASA'],
       bahasaScope: 'ENGLISH_ONLY',
       btqScope: 'BOTH',
+      bahasaCriteria: ['Pronunciation', 'Fluency', 'Comprehension'],
+      btqCriteria: ['Tajwid', 'Makhraj', 'Adab'],
       students: [
         { studentId: 'st_a1', studentName: 'Abila Yazid Rizaki', className: '8B' },
         { studentId: 'st_a2', studentName: 'Adrian Putra Nugraha', className: '8B' },
@@ -560,10 +581,9 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
       'MOCK_TOKEN'
     );
 
-    // Simulasi guru menilai siswa pertama sebelum Admin mengedit penempatan
-    firstReady.students[0].englishChecklist = new Array(15).fill(true);
-    firstReady.students[0].englishCorrectCount = 15;
-    firstReady.students[0].englishScore = 100;
+    // Simulasi guru menilai siswa pertama dengan 3 kriteria sebelum Admin mengedit penempatan
+    firstReady.students[0].englishCriteria = [96, 94, 98];
+    firstReady.students[0].englishScore = 96;
     firstReady.students[0].englishPredicate = 'A';
     firstReady.students[0].englishAssessed = true;
     await OralExamRepository.saveSession(firstReady, 'MOCK_TOKEN');
@@ -572,6 +592,7 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
       ...customAssignment,
       roomNumber: 'Ruang 09',
       bahasaScope: 'BOTH',
+      bahasaCriteria: ['Pelafalan Khusus', 'Kelancaran Khusus', 'Kosakata Khusus'],
       students: [
         ...customAssignment.students,
         { studentId: 'st_a3', studentName: 'Siswa Tambahan Admin', className: '8B' },
@@ -592,15 +613,18 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
     await OralExamRepository.deleteSession(resyncedSession.id, 'MOCK_TOKEN');
 
     assert(
-      'Guru Siap Pakai Sync: openOrSyncAssignedSession langsung siap menilai & menjaga nilai lama saat Admin update ruang/scope/siswa',
+      'Guru Siap Pakai Sync: openOrSyncAssignedSession menyinkronkan 3 kriteria & menjaga nilai 3 kriteria lama saat Admin update',
       firstReady.students.length === 2 &&
+        firstReady.criteriaLabels?.[0] === 'Pronunciation' &&
         resyncedSession.id === firstReady.id &&
         resyncedSession.roomNumber === 'Ruang 09' &&
         resyncedSession.subjectScope === 'BOTH' &&
+        resyncedSession.criteriaLabels?.[0] === 'Pelafalan Khusus' &&
         resyncedSession.students.length === 3 &&
-        resyncedSession.students[0].englishScore === 100 &&
+        resyncedSession.students[0].englishScore === 96 &&
+        resyncedSession.students[0].englishCriteria?.[2] === 98 &&
         resyncedSession.students[2].studentName === 'Siswa Tambahan Admin',
-      `room=${resyncedSession.roomNumber}, scope=${resyncedSession.subjectScope}, count=${resyncedSession.students.length}, preserved=${resyncedSession.students[0].englishScore}`
+      `room=${resyncedSession.roomNumber}, crit0=${resyncedSession.criteriaLabels?.[0]}, count=${resyncedSession.students.length}, preserved=${resyncedSession.students[0].englishScore}`
     );
 
     // Test 12: Sinkronisasi Nama Penguji dari Data Manajemen Guru & Staf
@@ -826,6 +850,7 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
       id: 'oral_session_cloud_test_1',
       templateType: 'BTQ_HAFALAN',
       subjectScope: 'BTQ_ONLY',
+      criteriaLabels: ['Tajwid & Makhraj', 'Kelancaran Bacaan', 'Hafalan & Adab'],
       groupId: 'oral_grp_01_adi',
       title: 'Ujian Lisan BTQ - Kelas 7',
       academicYear: '2026/2027',
@@ -836,9 +861,15 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
       roomNumber: 'Ruang 01',
       className: '7',
       date: '2026-11-27',
-      totalQuestions: 15,
+      totalQuestions: 3,
       students: [
-        { studentId: 'k7_1', studentName: 'Afhtar Shakil', btqScore: 95, btqPredicate: 'A' },
+        {
+          studentId: 'k7_1',
+          studentName: 'Afhtar Shakil',
+          btqCriteria: [95, 94, 96],
+          btqScore: 95,
+          btqPredicate: 'A',
+        },
       ],
     };
 

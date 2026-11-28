@@ -1,12 +1,12 @@
 /**
  * SMART ABSENSI GURU - MODAL PENILAIAN UJIAN LISAN (MOBILE-FIRST & RAMAH GURU)
- * Memisahkan secara tegas 2 jalur penilaian:
- * 1. Ujian Bahasa (Checklist 15 Soal Bahasa Inggris / Bahasa Arab)
- * 2. Ujian BTQ & Hafalan (Skala Angka 0–100 + Tombol Nilai Cepat)
+ * Memisahkan secara tegas 2 jalur penilaian berbasis 3 kriteria langsung (Skala 0–100 & Otomatis Predikat A–D):
+ * 1. Ujian Bahasa (Bahasa Inggris / Bahasa Arab — 3 Kriteria)
+ * 2. Ujian BTQ & Hafalan (BTQ / Tahfidz — 3 Kriteria)
  *
  * Pemisahan Wewenang:
- * - Mode ADMIN (`roleMode === 'ADMIN'`): Mengatur siapa penguji, ruang, mata uji, dan daftar siswa via OralExamAdminSetupModal + monitoring sesi.
- * - Mode GURU (`roleMode === 'GURU'`): Tinggal siap pakai langsung menilai siswa yang telah ditempatkan oleh Admin tanpa setup manual.
+ * - Mode ADMIN (`roleMode === 'ADMIN'`): Mengatur siapa penguji, ruang, mata uji, 3 kriteria, dan daftar siswa via OralExamAdminSetupModal + monitoring sesi.
+ * - Mode GURU (`roleMode === 'GURU'`): Tinggal siap pakai langsung menilai siswa pada 3 kriteria sesuai penempatan Admin.
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -14,7 +14,6 @@ import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
   BookOpen,
-  Check,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -51,22 +50,28 @@ import {
   resolveAssignmentDisplayForUser,
 } from '../../../data/oral-exam-groups';
 import {
+  getDefaultCriteriaHelpers,
+  getDefaultCriteriaLabels,
   getEffectiveSubjectScope,
   getOralExamSessionTrack,
+  resolveCriteriaLabels,
   type OralExamAssignment,
+  type OralExamCriteriaLabels,
   type OralExamSession,
   type OralExamStudentRecord,
+  type OralExamSubjectScoreKey,
   type OralExamSubjectScope,
   type OralExamTemplateType,
   type OralExamTrack,
 } from '../../../types/oral-exam.types';
 import {
+  calculateCriteriaAverageAndPredicate,
   calculateDirectScorePredicate,
-  calculateChecklistScoreAndPredicate,
   getOralExamPredicateBadgeStyle,
   calculateOralExamSummaryStats,
-  isChecklistTrackAssessed,
+  isOralSubjectAssessed,
   isStudentOralExamCompleted,
+  normalizeCriteriaScores,
 } from '../../../utils/oral-exam-scoring.utils';
 import { areClassCodesEqual, normalizeClassCode } from '../../../utils/class.utils';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
@@ -86,16 +91,16 @@ type AssessViewMode = 'FOCUS' | 'ALL';
 type RosterSourceMode = 'OFFICIAL_GROUP' | 'CLASS_FULL';
 
 const AVAILABLE_CLASSES = ['7', '8A', '8B', '9A', '9B', 'SMA', '10', '11', '12'];
-const QUICK_BTQ_SCORES = [60, 70, 75, 80, 85, 90, 95, 100];
+const QUICK_CRITERIA_SCORES = [60, 70, 75, 80, 85, 90, 95, 100];
 
 const getScopeLabel = (templateType: OralExamTemplateType, scope: OralExamSubjectScope): string => {
   if (templateType === 'BAHASA_INGGRIS_ARAB') {
-    if (scope === 'ENGLISH_ONLY') return 'Bahasa Inggris (15 Soal)';
-    if (scope === 'ARABIC_ONLY') return 'Bahasa Arab (15 Soal)';
+    if (scope === 'ENGLISH_ONLY') return 'Bahasa Inggris (3 Kriteria)';
+    if (scope === 'ARABIC_ONLY') return 'Bahasa Arab (3 Kriteria)';
     return 'Bahasa Inggris & Arab';
   }
-  if (scope === 'BTQ_ONLY') return 'BTQ Saja (0–100)';
-  if (scope === 'HAFALAN_ONLY') return 'Hafalan Saja (0–100)';
+  if (scope === 'BTQ_ONLY') return 'BTQ Saja (3 Kriteria)';
+  if (scope === 'HAFALAN_ONLY') return 'Hafalan Saja (3 Kriteria)';
   return 'BTQ & Hafalan';
 };
 
@@ -138,6 +143,9 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
   // Create session wizard state (Admin Only)
   const [subjectScopeDraft, setSubjectScopeDraft] = useState<OralExamSubjectScope>('ENGLISH_ONLY');
+  const [criteriaLabelsDraft, setCriteriaLabelsDraft] = useState<OralExamCriteriaLabels>(() =>
+    getDefaultCriteriaLabels('BAHASA')
+  );
   const [rosterSourceMode, setRosterSourceMode] = useState<RosterSourceMode>('OFFICIAL_GROUP');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [selectedClass, setSelectedClass] = useState<string>('7');
@@ -338,6 +346,10 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     setSessionTitle('');
     setSessionDate(getTodayDateInJakarta());
     const targetGrp = selectedAdminAssignment;
+    const grpCriteria = targetGrp
+      ? resolveCriteriaLabels(track === 'BAHASA' ? targetGrp.bahasaCriteria : targetGrp.btqCriteria, track)
+      : getDefaultCriteriaLabels(track);
+    setCriteriaLabelsDraft(grpCriteria);
     if (targetGrp) {
       setRosterSourceMode('OFFICIAL_GROUP');
       setSelectedGroupId(targetGrp.id);
@@ -367,6 +379,9 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       setUseManualExaminerInput(!grp.examinerUserId && Boolean(grp.examinerName));
       setRoomNumber(grp.roomNumber);
       setSelectedClass(grp.className);
+      setCriteriaLabelsDraft(
+        resolveCriteriaLabels(activeTrack === 'BAHASA' ? grp.bahasaCriteria : grp.btqCriteria, activeTrack)
+      );
     }
   };
 
@@ -501,6 +516,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
         {
           templateType,
           subjectScope: subjectScopeDraft,
+          criteriaLabels: resolveCriteriaLabels(criteriaLabelsDraft, activeTrack),
           groupId,
           title: sessionTitle.trim() || defaultTitle,
           academicYear: activeAcademicYear,
@@ -537,15 +553,64 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     }
   };
 
-  // --- Scoring Handlers ---
-  const handleDirectScoreChange = (
+  // --- Unified 3-Criteria Direct Scoring Handlers ---
+  const applySubjectCriteriaValue = (
     studentIndex: number,
-    field: 'btqScore' | 'hafalanScore',
+    subjectKey: OralExamSubjectScoreKey,
+    criterionIndex: 0 | 1 | 2,
+    scoreValue: number | null
+  ) => {
+    if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
+    const updatedStudents = [...currentSession.students];
+    const target = { ...updatedStudents[studentIndex] };
+
+    const existingCriteria =
+      subjectKey === 'english'
+        ? target.englishCriteria
+        : subjectKey === 'arabic'
+          ? target.arabicCriteria
+          : subjectKey === 'btq'
+            ? target.btqCriteria
+            : target.hafalanCriteria;
+
+    const nextScores = normalizeCriteriaScores(existingCriteria);
+    nextScores[criterionIndex] = scoreValue;
+    const calc = calculateCriteriaAverageAndPredicate(nextScores);
+
+    if (subjectKey === 'english') {
+      target.englishCriteria = calc.scores;
+      target.englishScore = calc.averageScore;
+      target.englishPredicate = calc.predicate;
+      target.englishAssessed = calc.isComplete;
+    } else if (subjectKey === 'arabic') {
+      target.arabicCriteria = calc.scores;
+      target.arabicScore = calc.averageScore;
+      target.arabicPredicate = calc.predicate;
+      target.arabicAssessed = calc.isComplete;
+    } else if (subjectKey === 'btq') {
+      target.btqCriteria = calc.scores;
+      target.btqScore = calc.averageScore;
+      target.btqPredicate = calc.predicate;
+    } else {
+      target.hafalanCriteria = calc.scores;
+      target.hafalanScore = calc.averageScore;
+      target.hafalanPredicate = calc.predicate;
+    }
+
+    updatedStudents[studentIndex] = target;
+    setCurrentSession({ ...currentSession, students: updatedStudents });
+    setIsDirty(true);
+  };
+
+  const handleCriterionScoreChange = (
+    studentIndex: number,
+    subjectKey: OralExamSubjectScoreKey,
+    criterionIndex: 0 | 1 | 2,
     valStr: string
   ) => {
     if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
     const student = currentSession.students[studentIndex];
-    const draftKey = `${student.studentId}:${field}`;
+    const draftKey = `${student.studentId}:${subjectKey}:${criterionIndex}`;
     const trimmed = valStr.trim();
 
     if (trimmed === '') {
@@ -554,18 +619,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
         delete next[draftKey];
         return next;
       });
-      const updatedStudents = [...currentSession.students];
-      const target = { ...updatedStudents[studentIndex] };
-      if (field === 'btqScore') {
-        target.btqScore = null;
-        target.btqPredicate = null;
-      } else {
-        target.hafalanScore = null;
-        target.hafalanPredicate = null;
-      }
-      updatedStudents[studentIndex] = target;
-      setCurrentSession({ ...currentSession, students: updatedStudents });
-      setIsDirty(true);
+      applySubjectCriteriaValue(studentIndex, subjectKey, criterionIndex, null);
       return;
     }
 
@@ -585,26 +639,15 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     }
 
     const clamped = Math.round(Math.max(0, Math.min(100, numeric)) * 100) / 100;
-    const predicate = calculateDirectScorePredicate(clamped);
-
-    const updatedStudents = [...currentSession.students];
-    const target = { ...updatedStudents[studentIndex] };
-
-    if (field === 'btqScore') {
-      target.btqScore = clamped;
-      target.btqPredicate = predicate;
-    } else {
-      target.hafalanScore = clamped;
-      target.hafalanPredicate = predicate;
-    }
-
-    updatedStudents[studentIndex] = target;
-    setCurrentSession({ ...currentSession, students: updatedStudents });
-    setIsDirty(true);
+    applySubjectCriteriaValue(studentIndex, subjectKey, criterionIndex, clamped);
   };
 
-  const handleDirectScoreBlur = (studentId: string, field: 'btqScore' | 'hafalanScore') => {
-    const draftKey = `${studentId}:${field}`;
+  const handleCriterionScoreBlur = (
+    studentId: string,
+    subjectKey: OralExamSubjectScoreKey,
+    criterionIndex: 0 | 1 | 2
+  ) => {
+    const draftKey = `${studentId}:${subjectKey}:${criterionIndex}`;
     setScoreDrafts((prev) => {
       if (!(draftKey in prev)) return prev;
       const next = { ...prev };
@@ -613,30 +656,58 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     });
   };
 
-  const handleApplyQuickScore = (
+  const handleApplyCriterionQuickScore = (
     studentIndex: number,
-    field: 'btqScore' | 'hafalanScore',
+    subjectKey: OralExamSubjectScoreKey,
+    criterionIndex: 0 | 1 | 2,
     scoreValue: number
   ) => {
     if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
     const student = currentSession.students[studentIndex];
-    const draftKey = `${student.studentId}:${field}`;
+    const draftKey = `${student.studentId}:${subjectKey}:${criterionIndex}`;
     setScoreDrafts((prev) => {
       if (!(draftKey in prev)) return prev;
       const next = { ...prev };
       delete next[draftKey];
       return next;
     });
+    applySubjectCriteriaValue(studentIndex, subjectKey, criterionIndex, scoreValue);
+  };
 
-    const predicate = calculateDirectScorePredicate(scoreValue);
+  const handleClearSubjectCriteria = (
+    studentIndex: number,
+    subjectKey: OralExamSubjectScoreKey
+  ) => {
+    if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
+    const student = currentSession.students[studentIndex];
+    setScoreDrafts((prev) => {
+      const next = { ...prev };
+      for (const idx of [0, 1, 2] as const) {
+        delete next[`${student.studentId}:${subjectKey}:${idx}`];
+      }
+      return next;
+    });
+
     const updatedStudents = [...currentSession.students];
     const target = { ...updatedStudents[studentIndex] };
-    if (field === 'btqScore') {
-      target.btqScore = scoreValue;
-      target.btqPredicate = predicate;
+    if (subjectKey === 'english') {
+      target.englishCriteria = [null, null, null];
+      target.englishScore = null;
+      target.englishPredicate = null;
+      target.englishAssessed = false;
+    } else if (subjectKey === 'arabic') {
+      target.arabicCriteria = [null, null, null];
+      target.arabicScore = null;
+      target.arabicPredicate = null;
+      target.arabicAssessed = false;
+    } else if (subjectKey === 'btq') {
+      target.btqCriteria = [null, null, null];
+      target.btqScore = null;
+      target.btqPredicate = null;
     } else {
-      target.hafalanScore = scoreValue;
-      target.hafalanPredicate = predicate;
+      target.hafalanCriteria = [null, null, null];
+      target.hafalanScore = null;
+      target.hafalanPredicate = null;
     }
     updatedStudents[studentIndex] = target;
     setCurrentSession({ ...currentSession, students: updatedStudents });
@@ -651,61 +722,6 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     setIsDirty(true);
   };
 
-  const updateChecklistTrack = (
-    studentIndex: number,
-    subject: 'english' | 'arabic',
-    nextChecklist: boolean[],
-    assessedFlag: boolean
-  ) => {
-    if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
-    const calc = calculateChecklistScoreAndPredicate(nextChecklist, 15);
-    const updatedStudents = [...currentSession.students];
-    const target = { ...updatedStudents[studentIndex] };
-
-    if (subject === 'english') {
-      target.englishChecklist = nextChecklist;
-      target.englishCorrectCount = assessedFlag ? calc.correctCount : null;
-      target.englishScore = assessedFlag ? calc.score : null;
-      target.englishPredicate = assessedFlag ? calc.predicate : null;
-      target.englishAssessed = assessedFlag;
-    } else {
-      target.arabicChecklist = nextChecklist;
-      target.arabicCorrectCount = assessedFlag ? calc.correctCount : null;
-      target.arabicScore = assessedFlag ? calc.score : null;
-      target.arabicPredicate = assessedFlag ? calc.predicate : null;
-      target.arabicAssessed = assessedFlag;
-    }
-
-    updatedStudents[studentIndex] = target;
-    setCurrentSession({ ...currentSession, students: updatedStudents });
-    setIsDirty(true);
-  };
-
-  const handleToggleChecklist = (
-    studentIndex: number,
-    subject: 'english' | 'arabic',
-    qIndex: number
-  ) => {
-    if (!currentSession) return;
-    const target = currentSession.students[studentIndex];
-    if (!target) return;
-    const currentArr =
-      subject === 'english'
-        ? (target.englishChecklist ? [...target.englishChecklist] : new Array(15).fill(false))
-        : (target.arabicChecklist ? [...target.arabicChecklist] : new Array(15).fill(false));
-    currentArr[qIndex] = !currentArr[qIndex];
-    updateChecklistTrack(studentIndex, subject, currentArr, true);
-  };
-
-  const handleBulkChecklist = (
-    studentIndex: number,
-    subject: 'english' | 'arabic',
-    fillAll: boolean
-  ) => {
-    const arr = new Array(15).fill(fillAll);
-    updateChecklistTrack(studentIndex, subject, arr, fillAll);
-  };
-
   const handleConfirmAddStudent = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!currentSession) return;
@@ -715,27 +731,27 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       return;
     }
 
-    const isChecklist = currentSession.templateType === 'BAHASA_INGGRIS_ARAB';
+    const isBahasa = currentSession.templateType === 'BAHASA_INGGRIS_ARAB';
     const newRecord: OralExamStudentRecord = {
       studentId: `manual_${Date.now()}`,
       studentName: trimmed,
       className: currentSession.className,
-      ...(isChecklist
+      ...(isBahasa
         ? {
-            englishChecklist: new Array(15).fill(false),
-            englishCorrectCount: null,
+            englishCriteria: [null, null, null],
             englishScore: null,
             englishPredicate: null,
             englishAssessed: false,
-            arabicChecklist: new Array(15).fill(false),
-            arabicCorrectCount: null,
+            arabicCriteria: [null, null, null],
             arabicScore: null,
             arabicPredicate: null,
             arabicAssessed: false,
           }
         : {
+            btqCriteria: [null, null, null],
             btqScore: null,
             btqPredicate: null,
+            hafalanCriteria: [null, null, null],
             hafalanScore: null,
             hafalanPredicate: null,
           }),
@@ -928,7 +944,23 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     [currentSession]
   );
 
-  const isChecklistSession = currentSession?.templateType === 'BAHASA_INGGRIS_ARAB';
+  const isBahasaSession = currentSession?.templateType === 'BAHASA_INGGRIS_ARAB';
+
+  const activeSessionCriteriaLabels = useMemo(
+    () =>
+      currentSession
+        ? resolveCriteriaLabels(currentSession.criteriaLabels, getOralExamSessionTrack(currentSession))
+        : getDefaultCriteriaLabels(activeTrack),
+    [currentSession, activeTrack]
+  );
+
+  const activeSessionCriteriaHelpers = useMemo(
+    () =>
+      getDefaultCriteriaHelpers(
+        currentSession ? getOralExamSessionTrack(currentSession) : activeTrack
+      ),
+    [currentSession, activeTrack]
+  );
 
   const summaryStats = useMemo(() => {
     if (!currentSession) return null;
@@ -961,25 +993,241 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
   if (!isOpen || typeof document === 'undefined') return null;
 
-  const renderChecklistAssessmentBody = (student: OralExamStudentRecord, studentIdx: number) => {
+  const getSubjectCriteriaSnapshot = (
+    student: OralExamStudentRecord,
+    subjectKey: OralExamSubjectScoreKey
+  ) => {
+    const rawCriteria =
+      subjectKey === 'english'
+        ? student.englishCriteria
+        : subjectKey === 'arabic'
+          ? student.arabicCriteria
+          : subjectKey === 'btq'
+            ? student.btqCriteria
+            : student.hafalanCriteria;
+    const storedScore =
+      subjectKey === 'english'
+        ? student.englishScore
+        : subjectKey === 'arabic'
+          ? student.arabicScore
+          : subjectKey === 'btq'
+            ? student.btqScore
+            : student.hafalanScore;
+    const storedPred =
+      subjectKey === 'english'
+        ? student.englishPredicate
+        : subjectKey === 'arabic'
+          ? student.arabicPredicate
+          : subjectKey === 'btq'
+            ? student.btqPredicate
+            : student.hafalanPredicate;
+    const calc = calculateCriteriaAverageAndPredicate(rawCriteria);
+    const hasLegacyOnly =
+      calc.filledCount === 0 &&
+      typeof storedScore === 'number' &&
+      !Number.isNaN(storedScore) &&
+      (subjectKey === 'english'
+        ? student.englishAssessed !== false
+        : subjectKey === 'arabic'
+          ? student.arabicAssessed !== false
+          : true);
+    const effectiveScore = calc.filledCount > 0 ? calc.averageScore : hasLegacyOnly ? storedScore : null;
+    const effectivePredicate =
+      calc.filledCount > 0
+        ? calc.predicate
+        : hasLegacyOnly
+          ? storedPred || calculateDirectScorePredicate(storedScore)
+          : null;
+
+    return {
+      scores: calc.scores,
+      filledCount: calc.filledCount,
+      isComplete: calc.isComplete || hasLegacyOnly,
+      hasLegacyOnly,
+      effectiveScore,
+      effectivePredicate,
+    };
+  };
+
+  const renderCriteriaSubjectCard = (
+    student: OralExamStudentRecord,
+    studentIdx: number,
+    subjectKey: OralExamSubjectScoreKey,
+    subjectTitle: string
+  ) => {
+    const snapshot = getSubjectCriteriaSnapshot(student, subjectKey);
+    const badge = getOralExamPredicateBadgeStyle(snapshot.effectivePredicate);
+    const accentBg = isBahasaSession ? 'bg-[#023246]' : 'bg-[#0D7A5F]';
+    const focusRing = isBahasaSession ? 'focus:ring-[#023246]' : 'focus:ring-[#0D7A5F]';
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="min-w-0">
+            <h4 className="text-xs sm:text-sm font-extrabold text-slate-900">{subjectTitle}</h4>
+            <p className="text-[11px] text-slate-500">
+              Penguji langsung isi nilai skala 0–100 untuk 3 kriteria penilaian:
+            </p>
+          </div>
+          {snapshot.filledCount > 0 && (
+            <button
+              type="button"
+              onClick={() => handleClearSubjectCriteria(studentIdx, subjectKey)}
+              className="h-9 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-[11px] font-bold text-slate-600 inline-flex items-center gap-1 cursor-pointer shrink-0"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Ulangi</span>
+            </button>
+          )}
+        </div>
+
+        {snapshot.hasLegacyOnly && (
+          <div className="p-2.5 rounded-xl bg-sky-50 border border-sky-200 text-xs text-sky-900 font-medium">
+            Data tersimpan sebelumnya: <strong>Nilai {snapshot.effectiveScore}</strong> ({snapshot.effectivePredicate || '-'}).
+            Isi 3 kriteria di bawah jika ingin memperbarui rincian penilaian.
+          </div>
+        )}
+
+        <div className="space-y-2.5">
+          {([0, 1, 2] as const).map((criterionIdx) => {
+            const draftKey = `${student.studentId}:${subjectKey}:${criterionIdx}`;
+            const currentVal = snapshot.scores[criterionIdx];
+            const displayValue =
+              draftKey in scoreDrafts
+                ? scoreDrafts[draftKey]
+                : currentVal !== null && currentVal !== undefined
+                  ? String(currentVal)
+                  : '';
+            const criterionLabel = activeSessionCriteriaLabels[criterionIdx];
+            const defaultLabels = getDefaultCriteriaLabels(isBahasaSession ? 'BAHASA' : 'BTQ');
+            const isDefaultLabel = criterionLabel === defaultLabels[criterionIdx];
+
+            return (
+              <div
+                key={`${subjectKey}_crit_${criterionIdx}`}
+                className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                      <span
+                        className={`w-5 h-5 rounded-md ${accentBg} text-white text-[11px] font-extrabold inline-flex items-center justify-center shrink-0`}
+                      >
+                        {criterionIdx + 1}
+                      </span>
+                      <span className="truncate">{criterionLabel}</span>
+                    </span>
+                    {isDefaultLabel && (
+                      <span className="text-[11px] text-slate-500 block mt-0.5 leading-snug">
+                        {activeSessionCriteriaHelpers[criterionIdx]}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200 shrink-0">
+                    0–100
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    aria-label={`${subjectTitle} - Kriteria ${criterionIdx + 1} ${criterionLabel}`}
+                    value={displayValue}
+                    onChange={(e) =>
+                      handleCriterionScoreChange(studentIdx, subjectKey, criterionIdx, e.target.value)
+                    }
+                    onBlur={() => handleCriterionScoreBlur(student.studentId, subjectKey, criterionIdx)}
+                    placeholder="Ketik nilai 0 – 100"
+                    className={`flex-1 h-11 px-3 bg-white border border-slate-300 rounded-xl text-center text-base sm:text-lg font-extrabold text-slate-900 focus:outline-none focus:ring-2 ${focusRing}`}
+                  />
+                  {displayValue !== '' && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleCriterionScoreChange(studentIdx, subjectKey, criterionIdx, '')
+                      }
+                      className="h-11 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-600 cursor-pointer shrink-0"
+                    >
+                      Hapus
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-4 gap-1.5">
+                  {QUICK_CRITERIA_SCORES.map((val) => {
+                    const isSelected = currentVal === val;
+                    return (
+                      <button
+                        key={`${subjectKey}_${criterionIdx}_${val}`}
+                        type="button"
+                        onClick={() =>
+                          handleApplyCriterionQuickScore(studentIdx, subjectKey, criterionIdx, val)
+                        }
+                        className={`min-h-10 rounded-lg border text-xs sm:text-sm font-bold transition-colors cursor-pointer active:scale-95 ${
+                          isSelected
+                            ? `${accentBg} border-transparent text-white`
+                            : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-100'
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Ringkasan Rata-rata 3 Kriteria Otomatis */}
+        <div className="p-3.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+          <div className="space-y-0.5">
+            <span className="text-[11px] font-semibold text-slate-500 block">
+              Nilai Akhir (Rata-rata 3 Kriteria)
+            </span>
+            <p className="text-sm font-extrabold text-slate-900">
+              {snapshot.effectiveScore !== null
+                ? snapshot.isComplete
+                  ? `Nilai ${snapshot.effectiveScore} (3/3 Kriteria)`
+                  : `Sementara ${snapshot.effectiveScore} (${snapshot.filledCount}/3 Kriteria)`
+                : 'Belum ada kriteria yang diisi'}
+            </p>
+          </div>
+          <span
+            className={`px-3 py-1 rounded-lg text-xs font-bold border ${badge.bgClass} ${badge.textClass} ${badge.borderClass}`}
+          >
+            {snapshot.effectivePredicate
+              ? snapshot.isComplete
+                ? badge.badgeLabel
+                : `Sementara ${snapshot.effectivePredicate}`
+              : 'Belum Dinilai'}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  const renderBahasaAssessmentBody = (student: OralExamStudentRecord, studentIdx: number) => {
     const showEnglishTab = effectiveScope !== 'ARABIC_ONLY';
     const showArabicTab = effectiveScope !== 'ENGLISH_ONLY';
     const currentLang: 'english' | 'arabic' =
       showEnglishTab && showArabicTab ? activeLanguageTab : showEnglishTab ? 'english' : 'arabic';
 
-    const checklistArr =
-      currentLang === 'english'
-        ? (student.englishChecklist || new Array(15).fill(false))
-        : (student.arabicChecklist || new Array(15).fill(false));
-    const isAssessed =
-      currentLang === 'english'
-        ? isChecklistTrackAssessed(student.englishScore, student.englishChecklist, student.englishAssessed)
-        : isChecklistTrackAssessed(student.arabicScore, student.arabicChecklist, student.arabicAssessed);
-    const correctCount =
-      currentLang === 'english' ? (student.englishCorrectCount ?? 0) : (student.arabicCorrectCount ?? 0);
-    const score = currentLang === 'english' ? student.englishScore : student.arabicScore;
-    const predicate = currentLang === 'english' ? student.englishPredicate : student.arabicPredicate;
-    const badge = getOralExamPredicateBadgeStyle(isAssessed ? predicate : null);
+    const engDone = isOralSubjectAssessed(
+      student.englishScore,
+      student.englishCriteria,
+      student.englishChecklist,
+      student.englishAssessed,
+      false
+    );
+    const araDone = isOralSubjectAssessed(
+      student.arabicScore,
+      student.arabicCriteria,
+      student.arabicChecklist,
+      student.arabicAssessed,
+      false
+    );
 
     return (
       <div className="space-y-4">
@@ -995,7 +1243,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
               }`}
             >
               <span>Bahasa Inggris</span>
-              {isChecklistTrackAssessed(student.englishScore, student.englishChecklist, student.englishAssessed) && (
+              {engDone && (
                 <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-[10px]">
                   {student.englishScore} ({student.englishPredicate})
                 </span>
@@ -1011,7 +1259,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
               }`}
             >
               <span>Bahasa Arab</span>
-              {isChecklistTrackAssessed(student.arabicScore, student.arabicChecklist, student.arabicAssessed) && (
+              {araDone && (
                 <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-[10px]">
                   {student.arabicScore} ({student.arabicPredicate})
                 </span>
@@ -1020,141 +1268,24 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
           </div>
         )}
 
-        <div className="space-y-2.5">
-          <p className="text-xs font-semibold text-slate-600">
-            Sentuh nomor soal <strong className="text-slate-900">{currentLang === 'english' ? 'Bahasa Inggris' : 'Bahasa Arab'}</strong> yang dijawab <strong className="text-emerald-700">BENAR</strong> oleh siswa:
-          </p>
+        {renderCriteriaSubjectCard(
+          student,
+          studentIdx,
+          currentLang,
+          currentLang === 'english' ? 'Nilai Ujian Lisan Bahasa Inggris' : 'Nilai Ujian Lisan Bahasa Arab'
+        )}
 
-          <div className="grid grid-cols-5 gap-2">
-            {Array.from({ length: 15 }, (_, qIdx) => {
-              const isTrue = Boolean(checklistArr[qIdx]);
-              return (
-                <button
-                  key={`${currentLang}_q_${qIdx}`}
-                  type="button"
-                  onClick={() => handleToggleChecklist(studentIdx, currentLang, qIdx)}
-                  className={`min-h-12 rounded-xl border text-base font-bold transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 ${
-                    isTrue
-                      ? 'bg-[#023246] border-[#023246] text-white shadow-xs'
-                      : 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100'
-                  }`}
-                  aria-pressed={isTrue}
-                  aria-label={`Soal ${qIdx + 1} ${isTrue ? 'Benar' : 'Belum Benar'}`}
-                >
-                  {isTrue && <Check className="w-3.5 h-3.5 text-emerald-300 shrink-0" />}
-                  <span>{qIdx + 1}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Instant Score Summary */}
-        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2 flex-wrap">
-          <div className="space-y-0.5">
-            <span className="text-[11px] font-semibold text-slate-500 block">Hasil Otomatis</span>
-            <p className="text-sm font-extrabold text-slate-900">
-              {isAssessed
-                ? `Benar ${correctCount}/15 Soal • Nilai ${score ?? 0}`
-                : 'Belum ada soal dicentang'}
-            </p>
-          </div>
-          <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${badge.bgClass} ${badge.textClass} ${badge.borderClass}`}>
-            {isAssessed ? badge.badgeLabel : 'Belum Dinilai'}
-          </span>
-        </div>
-
-        {/* Easy helper buttons */}
-        <div className="grid grid-cols-2 gap-2.5">
-          <button
-            type="button"
-            onClick={() => handleBulkChecklist(studentIdx, currentLang, true)}
-            className="min-h-11 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold cursor-pointer transition-colors"
-          >
-            Benar Semua (15)
-          </button>
-          <button
-            type="button"
-            onClick={() => handleBulkChecklist(studentIdx, currentLang, false)}
-            className="min-h-11 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold cursor-pointer transition-colors"
-          >
-            Kosongkan / Ulangi
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderDirectScoreInputBlock = (
-    student: OralExamStudentRecord,
-    studentIdx: number,
-    field: 'btqScore' | 'hafalanScore',
-    label: string
-  ) => {
-    const draftKey = `${student.studentId}:${field}`;
-    const currentScore = field === 'btqScore' ? student.btqScore : student.hafalanScore;
-    const currentPred = field === 'btqScore' ? student.btqPredicate : student.hafalanPredicate;
-    const badge = getOralExamPredicateBadgeStyle(currentPred);
-    const displayValue =
-      draftKey in scoreDrafts
-        ? scoreDrafts[draftKey]
-        : currentScore !== null && currentScore !== undefined
-          ? String(currentScore)
-          : '';
-
-    return (
-      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs sm:text-sm font-bold text-slate-900">{label}</span>
-          <span className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold border ${badge.bgClass} ${badge.textClass} ${badge.borderClass}`}>
-            {currentPred ? badge.badgeLabel : 'Belum diisi'}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
+        <div className="space-y-1">
+          <label className="text-xs font-bold text-slate-700 block">
+            Catatan Penguji (Opsional)
+          </label>
           <input
             type="text"
-            inputMode="decimal"
-            value={displayValue}
-            onChange={(e) => handleDirectScoreChange(studentIdx, field, e.target.value)}
-            onBlur={() => handleDirectScoreBlur(student.studentId, field)}
-            placeholder="Ketik nilai 0 – 100"
-            className="flex-1 h-12 px-3 bg-white border border-slate-300 rounded-xl text-center text-lg font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+            value={student.notes || ''}
+            onChange={(e) => handleNotesChange(studentIdx, e.target.value)}
+            placeholder="Contoh: Pelafalan jelas, kosakata perlu diperkaya..."
+            className="w-full h-11 px-3.5 bg-white border border-slate-200 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
           />
-          {displayValue !== '' && (
-            <button
-              type="button"
-              onClick={() => handleDirectScoreChange(studentIdx, field, '')}
-              className="h-12 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-600 cursor-pointer shrink-0"
-            >
-              Hapus
-            </button>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <span className="text-[11px] font-semibold text-slate-500 block">
-            Atau sentuh cepat angka nilai:
-          </span>
-          <div className="grid grid-cols-4 gap-2">
-            {QUICK_BTQ_SCORES.map((val) => {
-              const isSelected = currentScore === val;
-              return (
-                <button
-                  key={`${field}_${val}`}
-                  type="button"
-                  onClick={() => handleApplyQuickScore(studentIdx, field, val)}
-                  className={`min-h-11 rounded-xl border text-sm font-bold transition-colors cursor-pointer active:scale-95 ${
-                    isSelected
-                      ? 'bg-[#023246] border-[#023246] text-white'
-                      : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-100'
-                  }`}
-                >
-                  {val}
-                </button>
-              );
-            })}
-          </div>
         </div>
       </div>
     );
@@ -1165,9 +1296,9 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     const showHafalan = effectiveScope !== 'BTQ_ONLY';
 
     return (
-      <div className="space-y-3.5">
-        {showBtq && renderDirectScoreInputBlock(student, studentIdx, 'btqScore', "Nilai BTQ (Baca Tulis Qur'an)")}
-        {showHafalan && renderDirectScoreInputBlock(student, studentIdx, 'hafalanScore', 'Nilai Hafalan (Tahfidz)')}
+      <div className="space-y-4">
+        {showBtq && renderCriteriaSubjectCard(student, studentIdx, 'btq', "Nilai BTQ (Baca Tulis Qur'an)")}
+        {showHafalan && renderCriteriaSubjectCard(student, studentIdx, 'hafalan', 'Nilai Hafalan (Tahfidz)')}
         <div className="space-y-1">
           <label className="text-xs font-bold text-slate-700 block">
             Catatan Penguji (Opsional)
@@ -1177,7 +1308,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
             value={student.notes || ''}
             onChange={(e) => handleNotesChange(studentIdx, e.target.value)}
             placeholder="Contoh: Bacaan lancar, perbaiki makhraj..."
-            className="w-full h-11 px-3.5 bg-white border border-slate-200 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+            className="w-full h-11 px-3.5 bg-white border border-slate-200 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
           />
         </div>
       </div>
@@ -1218,7 +1349,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
           <p className={`text-[11px] mt-1 ${
             !canBahasa ? 'text-slate-400' : activeTrack === 'BAHASA' ? 'text-slate-200' : 'text-slate-500'
           }`}>
-            {canBahasa ? 'Inggris / Arab • 15 Soal' : 'Tidak ditugaskan'}
+            {canBahasa ? 'Inggris / Arab • 3 Kriteria' : 'Tidak ditugaskan'}
           </p>
         </button>
 
@@ -1250,7 +1381,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
           <p className={`text-[11px] mt-1 ${
             !canBtq ? 'text-slate-400' : activeTrack === 'BTQ' ? 'text-emerald-100' : 'text-slate-500'
           }`}>
-            {canBtq ? 'BTQ & Hafalan • 0–100' : 'Tidak ditugaskan'}
+            {canBtq ? 'BTQ & Hafalan • 3 Kriteria' : 'Tidak ditugaskan'}
           </p>
         </button>
       </div>
@@ -1738,40 +1869,42 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                   </div>
 
                   {activeTrack === 'BAHASA' ? (
-                    <div className="space-y-2">
-                      {[
-                        { scope: 'ENGLISH_ONLY' as const, title: 'Bahasa Inggris Saja (15 Soal)', desc: 'Fokus menilai 15 soal lisan Bahasa Inggris saja.' },
-                        { scope: 'ARABIC_ONLY' as const, title: 'Bahasa Arab Saja (15 Soal)', desc: 'Fokus menilai 15 soal lisan Bahasa Arab saja.' },
-                        { scope: 'BOTH' as const, title: 'Bahasa Inggris & Bahasa Arab', desc: 'Menguji keduanya dalam 1 sesi penilaian.' },
-                      ].map((opt) => (
-                        <label
-                          key={opt.scope}
-                          className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                            subjectScopeDraft === opt.scope
-                              ? 'border-[#023246] bg-sky-50/60'
-                              : 'border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="subjectScope"
-                            checked={subjectScopeDraft === opt.scope}
-                            onChange={() => setSubjectScopeDraft(opt.scope)}
-                            className="mt-1 accent-[#023246] w-4 h-4 shrink-0"
-                          />
-                          <div>
-                            <span className="text-xs sm:text-sm font-bold text-slate-900 block">{opt.title}</span>
-                            <span className="text-[11px] text-slate-500 block">{opt.desc}</span>
-                          </div>
-                        </label>
-                      ))}
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        {[
+                          { scope: 'ENGLISH_ONLY' as const, title: 'Bahasa Inggris Saja (3 Kriteria • 0–100)', desc: 'Penguji langsung menilai 3 kriteria Bahasa Inggris skala 0–100.' },
+                          { scope: 'ARABIC_ONLY' as const, title: 'Bahasa Arab Saja (3 Kriteria • 0–100)', desc: 'Penguji langsung menilai 3 kriteria Bahasa Arab skala 0–100.' },
+                          { scope: 'BOTH' as const, title: 'Bahasa Inggris & Bahasa Arab', desc: 'Menguji keduanya dalam 1 sesi penilaian (masing-masing 3 kriteria).' },
+                        ].map((opt) => (
+                          <label
+                            key={opt.scope}
+                            className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                              subjectScopeDraft === opt.scope
+                                ? 'border-[#023246] bg-sky-50/60'
+                                : 'border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="subjectScope"
+                              checked={subjectScopeDraft === opt.scope}
+                              onChange={() => setSubjectScopeDraft(opt.scope)}
+                              className="mt-1 accent-[#023246] w-4 h-4 shrink-0"
+                            />
+                            <div>
+                              <span className="text-xs sm:text-sm font-bold text-slate-900 block">{opt.title}</span>
+                              <span className="text-[11px] text-slate-500 block">{opt.desc}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       {[
-                        { scope: 'BTQ_ONLY' as const, title: 'BTQ Saja (Nilai 0–100)', desc: "Lebih ringkas bila hanya menguji Baca Tulis Qur'an." },
-                        { scope: 'BOTH' as const, title: 'BTQ & Hafalan (Keduanya)', desc: 'Menguji nilai BTQ sekaligus nilai Hafalan / Tahfidz.' },
-                        { scope: 'HAFALAN_ONLY' as const, title: 'Hafalan Saja (Nilai 0–100)', desc: 'Khusus menilai setoran hafalan / tahfidz siswa.' },
+                        { scope: 'BTQ_ONLY' as const, title: 'BTQ Saja (3 Kriteria • 0–100)', desc: "Lebih ringkas bila hanya menguji Baca Tulis Qur'an." },
+                        { scope: 'BOTH' as const, title: 'BTQ & Hafalan (Keduanya)', desc: 'Menguji nilai BTQ sekaligus nilai Hafalan / Tahfidz (3 kriteria).' },
+                        { scope: 'HAFALAN_ONLY' as const, title: 'Hafalan Saja (3 Kriteria • 0–100)', desc: 'Khusus menilai setoran hafalan / tahfidz siswa.' },
                       ].map((opt) => (
                         <label
                           key={opt.scope}
@@ -1796,6 +1929,41 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                       ))}
                     </div>
                   )}
+
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-slate-700">
+                        3 Kriteria Penilaian (Skala 0–100 per Kriteria)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCriteriaLabelsDraft(getDefaultCriteriaLabels(activeTrack))}
+                        className="text-[11px] font-semibold text-[#023246] hover:underline cursor-pointer"
+                      >
+                        Reset Default
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {[0, 1, 2].map((idx) => (
+                        <input
+                          key={`create_crit_${idx}`}
+                          type="text"
+                          value={criteriaLabelsDraft[idx] ?? ''}
+                          onChange={(e) => {
+                            const next: OralExamCriteriaLabels = [
+                              criteriaLabelsDraft[0],
+                              criteriaLabelsDraft[1],
+                              criteriaLabelsDraft[2],
+                            ];
+                            next[idx] = e.target.value;
+                            setCriteriaLabelsDraft(next);
+                          }}
+                          placeholder={`Kriteria ${idx + 1}`}
+                          className="w-full h-10 px-2.5 bg-white border border-slate-300 rounded-lg text-base sm:text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Langkah 2: Pilih Daftar Siswa / Penguji */}
@@ -1989,7 +2157,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                 <div className="p-3.5 rounded-xl bg-white border border-slate-200 space-y-2.5">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold ${
-                      isChecklistSession ? 'bg-[#023246] text-white' : 'bg-[#0D7A5F] text-white'
+                      isBahasaSession ? 'bg-[#023246] text-white' : 'bg-[#0D7A5F] text-white'
                     }`}>
                       {getScopeLabel(currentSession.templateType, effectiveScope)}
                     </span>
@@ -2004,23 +2172,35 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                     onClick={() => setShowRubricGuide((prev) => !prev)}
                     className="w-full py-1.5 px-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 flex items-center justify-between cursor-pointer"
                   >
-                    <span>Panduan Kategori Nilai (A / B / C / D)</span>
+                    <span>Panduan 3 Kriteria &amp; Predikat (A / B / C / D)</span>
                     {showRubricGuide ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
 
                   {showRubricGuide && (
-                    <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                      <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 font-bold">
-                        A ({isChecklistSession ? '14–15 Benar' : '91–100'}) • Sangat Baik
+                    <div className="space-y-2 pt-1">
+                      <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1">
+                        <span className="font-bold text-slate-900 block">
+                          3 Kriteria Sesi Ini (Rata-rata ke Nilai Akhir 0–100):
+                        </span>
+                        <p>
+                          1. <strong>{activeSessionCriteriaLabels[0]}</strong> • 2.{' '}
+                          <strong>{activeSessionCriteriaLabels[1]}</strong> • 3.{' '}
+                          <strong>{activeSessionCriteriaLabels[2]}</strong>
+                        </p>
                       </div>
-                      <div className="p-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 font-bold">
-                        B ({isChecklistSession ? '11–13 Benar' : '81–90'}) • Baik
-                      </div>
-                      <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 font-bold">
-                        C ({isChecklistSession ? '6–10 Benar' : '61–80'}) • Cukup
-                      </div>
-                      <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 font-bold">
-                        D ({isChecklistSession ? '0–5 Benar' : '0–60'}) • Perlu Bimbingan
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 font-bold">
+                          A (91–100) • Sangat Baik
+                        </div>
+                        <div className="p-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 font-bold">
+                          B (81–90) • Baik
+                        </div>
+                        <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 font-bold">
+                          C (61–80) • Cukup
+                        </div>
+                        <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 font-bold">
+                          D (0–60) • Perlu Bimbingan
+                        </div>
                       </div>
                     </div>
                   )}
@@ -2152,8 +2332,8 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                             </div>
                           </div>
 
-                          {isChecklistSession
-                            ? renderChecklistAssessmentBody(activeFocusStudent, activeStudentIndex)
+                          {isBahasaSession
+                            ? renderBahasaAssessmentBody(activeFocusStudent, activeStudentIndex)
                             : renderBtqAssessmentBody(activeFocusStudent, activeStudentIndex)}
                         </div>
 
@@ -2256,27 +2436,38 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                       <div className="space-y-2">
                         {filteredStudentsWithIndex.map(({ student, originalIndex }) => {
                           const done = isStudentOralExamCompleted(student, currentSession.templateType, effectiveScope);
-                          const summaryText = isChecklistSession
+                          const engSnap = getSubjectCriteriaSnapshot(student, 'english');
+                          const araSnap = getSubjectCriteriaSnapshot(student, 'arabic');
+                          const btqSnap = getSubjectCriteriaSnapshot(student, 'btq');
+                          const hafSnap = getSubjectCriteriaSnapshot(student, 'hafalan');
+                          const formatSnapLabel = (label: string, snap: ReturnType<typeof getSubjectCriteriaSnapshot>) => {
+                            if (snap.isComplete && snap.effectiveScore !== null) {
+                              return `${label}: ${snap.effectiveScore} (${snap.effectivePredicate || '-'})`;
+                            }
+                            if (snap.filledCount > 0) {
+                              return `${label}: ${snap.filledCount}/3 kriteria`;
+                            }
+                            return `${label}: -`;
+                          };
+                          const summaryText = isBahasaSession
                             ? [
-                                effectiveScope !== 'ARABIC_ONLY'
-                                  ? `Inggris: ${isChecklistTrackAssessed(student.englishScore, student.englishChecklist, student.englishAssessed) ? `${student.englishScore} (${student.englishPredicate})` : '-'}`
-                                  : '',
-                                effectiveScope !== 'ENGLISH_ONLY'
-                                  ? `Arab: ${isChecklistTrackAssessed(student.arabicScore, student.arabicChecklist, student.arabicAssessed) ? `${student.arabicScore} (${student.arabicPredicate})` : '-'}`
-                                  : '',
+                                effectiveScope !== 'ARABIC_ONLY' ? formatSnapLabel('Inggris', engSnap) : '',
+                                effectiveScope !== 'ENGLISH_ONLY' ? formatSnapLabel('Arab', araSnap) : '',
                               ]
                                 .filter(Boolean)
                                 .join(' • ')
                             : [
-                                effectiveScope !== 'HAFALAN_ONLY'
-                                  ? `BTQ: ${student.btqScore !== null && student.btqScore !== undefined ? `${student.btqScore} (${student.btqPredicate})` : '-'}`
-                                  : '',
-                                effectiveScope !== 'BTQ_ONLY'
-                                  ? `Hafalan: ${student.hafalanScore !== null && student.hafalanScore !== undefined ? `${student.hafalanScore} (${student.hafalanPredicate})` : '-'}`
-                                  : '',
+                                effectiveScope !== 'HAFALAN_ONLY' ? formatSnapLabel('BTQ', btqSnap) : '',
+                                effectiveScope !== 'BTQ_ONLY' ? formatSnapLabel('Hafalan', hafSnap) : '',
                               ]
                                 .filter(Boolean)
                                 .join(' • ');
+
+                          const hasPartialProgress =
+                            engSnap.filledCount > 0 ||
+                            araSnap.filledCount > 0 ||
+                            btqSnap.filledCount > 0 ||
+                            hafSnap.filledCount > 0;
 
                           return (
                             <div
@@ -2287,8 +2478,14 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                                 <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
                                   {originalIndex + 1}. {student.studentName}
                                 </p>
-                                <p className={`text-[11px] mt-0.5 ${done ? 'text-emerald-700 font-semibold' : 'text-slate-500'}`}>
-                                  {done ? summaryText : 'Belum dinilai'}
+                                <p className={`text-[11px] mt-0.5 ${
+                                  done
+                                    ? 'text-emerald-700 font-semibold'
+                                    : hasPartialProgress
+                                      ? 'text-amber-700 font-semibold'
+                                      : 'text-slate-500'
+                                }`}>
+                                  {done || hasPartialProgress ? summaryText : 'Belum dinilai'}
                                 </p>
                               </div>
 

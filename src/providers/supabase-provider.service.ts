@@ -8640,6 +8640,15 @@ export class SupabaseProvider implements IDataProvider {
               id: String(row.id),
               templateType: row.template_type === 'BAHASA_INGGRIS_ARAB' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN',
               ...(row.subject_scope ? { subjectScope: row.subject_scope } : {}),
+              ...(Array.isArray(row.criteria_labels) && row.criteria_labels.length >= 3
+                ? {
+                    criteriaLabels: [
+                      String(row.criteria_labels[0] || ''),
+                      String(row.criteria_labels[1] || ''),
+                      String(row.criteria_labels[2] || ''),
+                    ],
+                  }
+                : {}),
               ...(row.group_id !== undefined && row.group_id !== null ? { groupId: String(row.group_id) } : {}),
               title: String(row.title || ''),
               academicYear: String(row.academic_year || '2026/2027'),
@@ -8650,7 +8659,7 @@ export class SupabaseProvider implements IDataProvider {
               roomNumber: String(row.room_number || 'Ruang 01'),
               className: String(row.class_name || '7'),
               date: String(row.exam_date || ''),
-              totalQuestions: Number(row.total_questions) || 15,
+              totalQuestions: Number(row.total_questions) || 3,
               students: Array.isArray(row.students) ? row.students : [],
               createdAt: String(row.created_at || new Date().toISOString()),
               updatedAt: String(row.updated_at || new Date().toISOString()),
@@ -8665,16 +8674,35 @@ export class SupabaseProvider implements IDataProvider {
         const { data: kvRows, error: kvErr } = await this.client
           .from('system_settings')
           .select('key, value')
-          .like('key', 'oral_exam_session_%');
+          .like('key', 'oral_exam_%');
         if (!kvErr && Array.isArray(kvRows)) {
           for (const row of kvRows) {
             if (!row?.value) continue;
+            const keyStr = String(row.key || '');
             try {
-              const parsed: OralExamSession = JSON.parse(row.value);
-              if (parsed && parsed.id) {
-                if (targetYear && parsed.academicYear !== targetYear) continue;
-                if (!sessionMap.has(parsed.id)) {
-                  sessionMap.set(parsed.id, parsed);
+              if (keyStr.startsWith('oral_exam_criteria_')) {
+                const sessId = keyStr.slice('oral_exam_criteria_'.length);
+                const parsedLabels = JSON.parse(row.value);
+                const targetSess = sessionMap.get(sessId);
+                if (targetSess && Array.isArray(parsedLabels) && parsedLabels.length >= 3) {
+                  sessionMap.set(sessId, {
+                    ...targetSess,
+                    criteriaLabels: [
+                      String(parsedLabels[0] || ''),
+                      String(parsedLabels[1] || ''),
+                      String(parsedLabels[2] || ''),
+                    ],
+                  });
+                }
+                continue;
+              }
+              if (keyStr.startsWith('oral_exam_session_')) {
+                const parsed: OralExamSession = JSON.parse(row.value);
+                if (parsed && parsed.id) {
+                  if (targetYear && parsed.academicYear !== targetYear) continue;
+                  if (!sessionMap.has(parsed.id)) {
+                    sessionMap.set(parsed.id, parsed);
+                  }
                 }
               }
             } catch {}

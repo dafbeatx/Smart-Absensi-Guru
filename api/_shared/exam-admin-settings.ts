@@ -409,6 +409,21 @@ export async function handleSaveOralExamAssignments(body: any, auth: AuthSuccess
             }))
         : [];
 
+      const bahasaCriteria = Array.isArray(a.bahasaCriteria)
+        ? [
+            String(a.bahasaCriteria[0] || '').trim() || 'Pelafalan',
+            String(a.bahasaCriteria[1] || '').trim() || 'Kelancaran',
+            String(a.bahasaCriteria[2] || '').trim() || 'Pemahaman & Kosakata',
+          ]
+        : ['Pelafalan', 'Kelancaran', 'Pemahaman & Kosakata'];
+      const btqCriteria = Array.isArray(a.btqCriteria)
+        ? [
+            String(a.btqCriteria[0] || '').trim() || 'Tajwid & Makhraj',
+            String(a.btqCriteria[1] || '').trim() || 'Kelancaran Bacaan',
+            String(a.btqCriteria[2] || '').trim() || 'Hafalan & Adab',
+          ]
+        : ['Tajwid & Makhraj', 'Kelancaran Bacaan', 'Hafalan & Adab'];
+
       return {
         id: typeof a.id === 'string' && a.id.trim() ? a.id.trim() : `oral_grp_${Date.now()}_${idx + 1}`,
         examinerUserId: typeof a.examinerUserId === 'string' && a.examinerUserId.trim() ? a.examinerUserId.trim() : null,
@@ -419,6 +434,8 @@ export async function handleSaveOralExamAssignments(body: any, auth: AuthSuccess
         examTracks: tracks.length > 0 ? tracks : ['BAHASA', 'BTQ'],
         bahasaScope,
         btqScope,
+        bahasaCriteria,
+        btqCriteria,
         students,
         academicYear,
         isActive: a.isActive !== false,

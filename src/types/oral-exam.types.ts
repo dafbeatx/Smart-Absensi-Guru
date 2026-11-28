@@ -1,8 +1,8 @@
 /**
  * SMART ABSENSI GURU - ORAL EXAM (UJIAN LISAN) TYPES
- * Mendukung 2 Format Standar Resmi:
- * 1. BTQ & Hafalan (Model Nilai Langsung 0-100 & Predikat A/B/C/D)
- * 2. Bahasa Inggris & Bahasa Arab (Model Checklist 15 Butir Soal Lisan & Konversi Nilai)
+ * Mendukung 2 Jalur Penilaian Lisan Resmi Berbasis 3 Kriteria Langsung (Skala 0-100 & Predikat A/B/C/D):
+ * 1. Ujian Bahasa (Bahasa Inggris & Bahasa Arab — 3 Kriteria: Pelafalan, Kelancaran, Pemahaman & Kosakata)
+ * 2. Ujian BTQ & Hafalan (3 Kriteria: Tajwid & Makhraj, Kelancaran Bacaan, Hafalan & Adab)
  */
 
 export type OralExamTemplateType = 'BTQ_HAFALAN' | 'BAHASA_INGGRIS_ARAB' | 'CUSTOM';
@@ -18,6 +18,41 @@ export type OralExamSubjectScope =
 
 export type OralExamBahasaScope = 'ENGLISH_ONLY' | 'ARABIC_ONLY' | 'BOTH';
 export type OralExamBtqScope = 'BTQ_ONLY' | 'HAFALAN_ONLY' | 'BOTH';
+
+export type OralExamCriteriaLabels = [string, string, string];
+export type OralExamCriteriaScores = [number | null, number | null, number | null];
+
+export type OralExamCriteriaScoreField =
+  | 'englishCriteria'
+  | 'arabicCriteria'
+  | 'btqCriteria'
+  | 'hafalanCriteria';
+
+export type OralExamSubjectScoreKey = 'english' | 'arabic' | 'btq' | 'hafalan';
+
+export const DEFAULT_BAHASA_CRITERIA: OralExamCriteriaLabels = [
+  'Pelafalan',
+  'Kelancaran',
+  'Pemahaman & Kosakata',
+];
+
+export const DEFAULT_BAHASA_CRITERIA_HELPERS: OralExamCriteriaLabels = [
+  'Ketepatan pengucapan / pronunciation / makhraj kata',
+  'Alur berbicara, intonasi & kepercayaan diri menjawab',
+  'Pemahaman pertanyaan & ketepatan pilihan kosakata',
+];
+
+export const DEFAULT_BTQ_CRITERIA: OralExamCriteriaLabels = [
+  'Tajwid & Makhraj',
+  'Kelancaran Bacaan',
+  'Hafalan & Adab',
+];
+
+export const DEFAULT_BTQ_CRITERIA_HELPERS: OralExamCriteriaLabels = [
+  'Kaidah hukum tajwid & ketepatan tempat keluarnya huruf',
+  'Kefasihan membaca ayat, panjang-pendek (mad) & waqaf',
+  'Ketepatan hafalan surat/doa serta adab saat mengaji',
+];
 
 export interface OralExamAssignmentStudent {
   studentId: string;
@@ -36,6 +71,8 @@ export interface OralExamAssignment {
   examTracks: OralExamTrack[];
   bahasaScope: OralExamBahasaScope;
   btqScope: OralExamBtqScope;
+  bahasaCriteria?: OralExamCriteriaLabels;
+  btqCriteria?: OralExamCriteriaLabels;
   students: OralExamAssignmentStudent[];
   academicYear?: string;
   isActive: boolean;
@@ -58,24 +95,33 @@ export interface OralExamStudentRecord {
   nisn?: string;
   className?: string;
 
-  // --- Format Model 1: BTQ & Hafalan (Nilai Langsung) ---
+  // --- Jalur BTQ & Hafalan (3 Kriteria Langsung 0-100 & Rata-rata Nilai Akhir) ---
+  btqCriteria?: OralExamCriteriaScores;
   btqScore?: number | null;
   btqPredicate?: OralExamGrade | null;
+  hafalanCriteria?: OralExamCriteriaScores;
   hafalanScore?: number | null;
   hafalanPredicate?: OralExamGrade | null;
 
-  // --- Format Model 2: Bahasa Inggris & Bahasa Arab (Checklist 15 Butir Soal) ---
-  englishChecklist?: boolean[]; // Array boolean 15 elemen
-  englishCorrectCount?: number | null;
-  englishScore?: number | null; // Konversi ke skala 0-100 (null jika belum dinilai)
+  // --- Jalur Bahasa Inggris & Bahasa Arab (3 Kriteria Langsung 0-100 & Rata-rata Nilai Akhir) ---
+  englishCriteria?: OralExamCriteriaScores;
+  englishScore?: number | null; // Rata-rata 3 kriteria pada skala 0-100 (null jika belum dinilai)
   englishPredicate?: OralExamGrade | null;
   englishAssessed?: boolean;
 
-  arabicChecklist?: boolean[]; // Array boolean 15 elemen
-  arabicCorrectCount?: number | null;
-  arabicScore?: number | null; // Konversi ke skala 0-100 (null jika belum dinilai)
+  arabicCriteria?: OralExamCriteriaScores;
+  arabicScore?: number | null; // Rata-rata 3 kriteria pada skala 0-100 (null jika belum dinilai)
   arabicPredicate?: OralExamGrade | null;
   arabicAssessed?: boolean;
+
+  /** @deprecated Legacy 15-soal checklist read-compatibility only */
+  englishChecklist?: boolean[];
+  /** @deprecated Legacy 15-soal count read-compatibility only */
+  englishCorrectCount?: number | null;
+  /** @deprecated Legacy 15-soal checklist read-compatibility only */
+  arabicChecklist?: boolean[];
+  /** @deprecated Legacy 15-soal count read-compatibility only */
+  arabicCorrectCount?: number | null;
 
   notes?: string;
 }
@@ -84,6 +130,7 @@ export interface OralExamSession {
   id: string;
   templateType: OralExamTemplateType;
   subjectScope?: OralExamSubjectScope;
+  criteriaLabels?: OralExamCriteriaLabels;
   groupId?: string | null;
   title: string;
   academicYear: string; // e.g. '2026/2027'
@@ -94,7 +141,7 @@ export interface OralExamSession {
   roomNumber?: string; // e.g. 'Ruang 01'
   className: string; // e.g. '7A', '7B', '8A', '9A', 'SMA'
   date: string; // YYYY-MM-DD
-  totalQuestions: number; // Default 15 untuk model bahasa
+  totalQuestions: number; // Default 3 (3 kriteria penilaian langsung); kompatibel dengan sesi lama
   students: OralExamStudentRecord[];
   createdAt: string;
   updatedAt: string;
@@ -108,6 +155,42 @@ export function getOralExamSessionTrack(
 ): OralExamTrack {
   const tpl = typeof templateOrSession === 'string' ? templateOrSession : templateOrSession.templateType;
   return tpl === 'BAHASA_INGGRIS_ARAB' ? 'BAHASA' : 'BTQ';
+}
+
+/**
+ * Mengembalikan 3 nama kriteria bawaan untuk jalur Bahasa atau BTQ.
+ */
+export function getDefaultCriteriaLabels(
+  trackOrTemplate: OralExamTrack | OralExamTemplateType
+): OralExamCriteriaLabels {
+  const isBahasa = trackOrTemplate === 'BAHASA' || trackOrTemplate === 'BAHASA_INGGRIS_ARAB';
+  return isBahasa ? [...DEFAULT_BAHASA_CRITERIA] : [...DEFAULT_BTQ_CRITERIA];
+}
+
+/**
+ * Mengembalikan 3 deskripsi panduan kriteria bawaan untuk membantu penguji.
+ */
+export function getDefaultCriteriaHelpers(
+  trackOrTemplate: OralExamTrack | OralExamTemplateType
+): OralExamCriteriaLabels {
+  const isBahasa = trackOrTemplate === 'BAHASA' || trackOrTemplate === 'BAHASA_INGGRIS_ARAB';
+  return isBahasa ? [...DEFAULT_BAHASA_CRITERIA_HELPERS] : [...DEFAULT_BTQ_CRITERIA_HELPERS];
+}
+
+/**
+ * Menormalkan 3 label kriteria (mengisi fallback bawaan jika kosong/kurang dari 3).
+ */
+export function resolveCriteriaLabels(
+  customLabels: ReadonlyArray<string | null | undefined> | null | undefined,
+  trackOrTemplate: OralExamTrack | OralExamTemplateType
+): OralExamCriteriaLabels {
+  const defaults = getDefaultCriteriaLabels(trackOrTemplate);
+  if (!Array.isArray(customLabels)) return defaults;
+  return [
+    String(customLabels[0] || '').trim() || defaults[0],
+    String(customLabels[1] || '').trim() || defaults[1],
+    String(customLabels[2] || '').trim() || defaults[2],
+  ];
 }
 
 /**
@@ -129,29 +212,17 @@ export function getEffectiveSubjectScope(
 }
 
 /**
- * Kriteria Standar Penilaian BTQ & Hafalan (Berdasarkan Dokumen Fisik Resmi):
+ * Kriteria Standar Nilai Akhir & Predikat Ujian Lisan (3 Kriteria Skala 0 - 100):
  * A: 91 - 100 (Sangat Baik)
- * B: 81 - 90 (Baik)
- * C: 61 - 80 (Cukup)
- * D: 0 - 60 (Perlu Bimbingan)
+ * B: 81 - 90  (Baik)
+ * C: 61 - 80  (Cukup)
+ * D: 0 - 60   (Perlu Bimbingan)
  */
-export const KRITERIA_BTQ_HAFALAN: OralExamGradeKriteria[] = [
+export const KRITERIA_PENILAIAN_LISAN: OralExamGradeKriteria[] = [
   { grade: 'A', min: 91, max: 100, label: 'Sangat Baik', colorClass: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
   { grade: 'B', min: 81, max: 90, label: 'Baik', colorClass: 'bg-blue-100 text-blue-800 border-blue-300' },
   { grade: 'C', min: 61, max: 80, label: 'Cukup', colorClass: 'bg-amber-100 text-amber-800 border-amber-300' },
   { grade: 'D', min: 0, max: 60, label: 'Perlu Bimbingan', colorClass: 'bg-rose-100 text-rose-800 border-rose-300' },
 ];
 
-/**
- * Kriteria Standar Penilaian Ujian Lisan Bahasa (Berdasarkan 15 Soal Benar):
- * A: 14 - 15 jawaban benar (Sangat Baik)
- * B: 11 - 13 jawaban benar (Baik)
- * C: 6 - 10 jawaban benar (Cukup - Minimal 6 jawaban benar)
- * D: 0 - 5 jawaban benar (Perlu Bimbingan)
- */
-export const KRITERIA_BAHASA_CHECKLIST: OralExamGradeKriteria[] = [
-  { grade: 'A', min: 14, max: 15, label: 'Sangat Baik (14-15 Benar)', colorClass: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
-  { grade: 'B', min: 11, max: 13, label: 'Baik (11-13 Benar)', colorClass: 'bg-blue-100 text-blue-800 border-blue-300' },
-  { grade: 'C', min: 6, max: 10, label: 'Cukup (6-10 Benar)', colorClass: 'bg-amber-100 text-amber-800 border-amber-300' },
-  { grade: 'D', min: 0, max: 5, label: 'Perlu Bimbingan (0-5 Benar)', colorClass: 'bg-rose-100 text-rose-800 border-rose-300' },
-];
+export const KRITERIA_BTQ_HAFALAN: OralExamGradeKriteria[] = KRITERIA_PENILAIAN_LISAN;

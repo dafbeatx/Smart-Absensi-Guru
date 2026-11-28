@@ -1,7 +1,7 @@
 /**
  * SMART ABSENSI GURU - ORAL EXAM EXPORT SERVICE (PDF & EXCEL)
  * Menghasilkan berkas cetak PDF resmi berstandar A4 dan file Excel (.xlsx)
- * berdasarkan format fisik sekolah SMP Terpadu Al-Ittihadiyah Ciampea - Bogor.
+ * berbasis 3 kriteria penilaian langsung (skala 0–100 & rata-rata otomatis predikat A/B/C/D).
  */
 
 import * as XLSXModule from 'xlsx-js-style';
@@ -9,19 +9,82 @@ const XLSX: any = (XLSXModule as any).default || XLSXModule;
 import { exportHtmlToPdf } from './pdf-export.lib';
 import { resolveSchoolLevel } from '../utils/class.utils';
 import { escapeHtml, formatNppHtmlLine, getLevelSchoolBranding } from '../utils/html.utils';
-import { getEffectiveSubjectScope, type OralExamSession } from '../types/oral-exam.types';
+import {
+  getEffectiveSubjectScope,
+  getOralExamSessionTrack,
+  resolveCriteriaLabels,
+  type OralExamCriteriaScores,
+  type OralExamGrade,
+  type OralExamSession,
+} from '../types/oral-exam.types';
+import {
+  calculateCriteriaAverageAndPredicate,
+  calculateDirectScorePredicate,
+} from '../utils/oral-exam-scoring.utils';
+
+interface SubjectExportData {
+  c1: number | string;
+  c2: number | string;
+  c3: number | string;
+  finalScore: number | string;
+  predicate: string;
+}
+
+function resolveSubjectExportData(
+  criteria: OralExamCriteriaScores | undefined,
+  storedScore: number | null | undefined,
+  storedPredicate: OralExamGrade | null | undefined,
+  assessedFlag: boolean | undefined,
+  allowLegacyZeroWithoutFlag: boolean
+): SubjectExportData {
+  const calc = calculateCriteriaAverageAndPredicate(criteria);
+  if (calc.filledCount > 0) {
+    return {
+      c1: calc.scores[0] ?? '-',
+      c2: calc.scores[1] ?? '-',
+      c3: calc.scores[2] ?? '-',
+      finalScore: calc.averageScore ?? '-',
+      predicate: calc.predicate || '-',
+    };
+  }
+
+  const hasLegacyScore =
+    assessedFlag !== false &&
+    typeof storedScore === 'number' &&
+    !Number.isNaN(storedScore) &&
+    (allowLegacyZeroWithoutFlag || assessedFlag === true || storedScore > 0);
+
+  if (hasLegacyScore) {
+    return {
+      c1: '-',
+      c2: '-',
+      c3: '-',
+      finalScore: storedScore as number,
+      predicate: storedPredicate || calculateDirectScorePredicate(storedScore) || '-',
+    };
+  }
+
+  return {
+    c1: '-',
+    c2: '-',
+    c3: '-',
+    finalScore: '-',
+    predicate: '-',
+  };
+}
 
 export class OralExamExportService {
   /**
-   * Menghasilkan string HTML dokumen cetak A4 resmi untuk ujian lisan
+   * Menghasilkan string HTML dokumen cetak A4 resmi untuk ujian lisan berbasis 3 kriteria
    */
   public static generatePrintHtml(session: OralExamSession): string {
-    const isChecklist = session.templateType === 'BAHASA_INGGRIS_ARAB';
+    const isBahasa = session.templateType === 'BAHASA_INGGRIS_ARAB';
     const scope = getEffectiveSubjectScope(session);
-    const showEnglish = isChecklist && scope !== 'ARABIC_ONLY';
-    const showArabic = isChecklist && scope !== 'ENGLISH_ONLY';
-    const showBtq = !isChecklist && scope !== 'HAFALAN_ONLY';
-    const showHafalan = !isChecklist && scope !== 'BTQ_ONLY';
+    const criteriaLabels = resolveCriteriaLabels(session.criteriaLabels, getOralExamSessionTrack(session));
+    const showEnglish = isBahasa && scope !== 'ARABIC_ONLY';
+    const showArabic = isBahasa && scope !== 'ENGLISH_ONLY';
+    const showBtq = !isBahasa && scope !== 'HAFALAN_ONLY';
+    const showHafalan = !isBahasa && scope !== 'BTQ_ONLY';
 
     const level = resolveSchoolLevel(session.className);
     const levelBranding = getLevelSchoolBranding(level);
@@ -33,149 +96,98 @@ export class OralExamExportService {
       timeZone: 'Asia/Jakarta',
     });
 
-    // Kriteria Box HTML
-    const kriteriaHtml = isChecklist
-      ? `
-        <div style="border: 1px solid #15803d; border-radius: 8px; padding: 10px 14px; background-color: #f0fdf4; margin-bottom: 14px; font-size: 11px;">
-          <strong style="color: #14532d; display: block; margin-bottom: 4px; font-size: 11.5px;">KRITERIA PENILAIAN (DARI 15 BUTIR SOAL):</strong>
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-            <div style="background: #ffffff; border: 1px solid #86efac; padding: 4px 6px; border-radius: 4px; text-align: center;">
-              <strong style="color: #166534;">A (14 – 15 Benar)</strong><br><span style="font-size: 10px; color: #4b5563;">Sangat Baik</span>
-            </div>
-            <div style="background: #ffffff; border: 1px solid #93c5fd; padding: 4px 6px; border-radius: 4px; text-align: center;">
-              <strong style="color: #1e40af;">B (11 – 13 Benar)</strong><br><span style="font-size: 10px; color: #4b5563;">Baik</span>
-            </div>
-            <div style="background: #ffffff; border: 1px solid #fde047; padding: 4px 6px; border-radius: 4px; text-align: center;">
-              <strong style="color: #854d0e;">C (6 – 10 Benar)</strong><br><span style="font-size: 10px; color: #4b5563;">Cukup (Min 6 Benar)</span>
-            </div>
-            <div style="background: #ffffff; border: 1px solid #fca5a5; padding: 4px 6px; border-radius: 4px; text-align: center;">
-              <strong style="color: #991b1b;">D (0 – 5 Benar)</strong><br><span style="font-size: 10px; color: #4b5563;">Perlu Bimbingan</span>
-            </div>
+    const accentBorder = isBahasa ? '#1e40af' : '#0d9488';
+    const accentBg = isBahasa ? '#eff6ff' : '#f0fdfa';
+    const accentText = isBahasa ? '#1e3a8a' : '#115e59';
+
+    // Kriteria Box HTML (3 Kriteria + Konversi Predikat Skala 0 - 100)
+    const kriteriaHtml = `
+      <div style="border: 1px solid ${accentBorder}; border-radius: 8px; padding: 10px 14px; background-color: ${accentBg}; margin-bottom: 14px; font-size: 11px;">
+        <div style="margin-bottom: 6px; color: ${accentText};">
+          <strong style="display: block; font-size: 11.5px; margin-bottom: 2px;">KRITERIA PENILAIAN UJIAN LISAN (3 KRITERIA • SKALA 0 – 100):</strong>
+          <span style="font-size: 10.5px; font-weight: 600;">
+            1. ${escapeHtml(criteriaLabels[0])} &nbsp;|&nbsp; 2. ${escapeHtml(criteriaLabels[1])} &nbsp;|&nbsp; 3. ${escapeHtml(criteriaLabels[2])} &nbsp;(Nilai Akhir = Rata-rata 3 Kriteria)
+          </span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+          <div style="background: #ffffff; border: 1px solid #86efac; padding: 4px 6px; border-radius: 4px; text-align: center;">
+            <strong style="color: #166534;">A (91 – 100)</strong><br><span style="font-size: 10px; color: #4b5563;">Sangat Baik</span>
+          </div>
+          <div style="background: #ffffff; border: 1px solid #93c5fd; padding: 4px 6px; border-radius: 4px; text-align: center;">
+            <strong style="color: #1e40af;">B (81 – 90)</strong><br><span style="font-size: 10px; color: #4b5563;">Baik</span>
+          </div>
+          <div style="background: #ffffff; border: 1px solid #fde047; padding: 4px 6px; border-radius: 4px; text-align: center;">
+            <strong style="color: #854d0e;">C (61 – 80)</strong><br><span style="font-size: 10px; color: #4b5563;">Cukup</span>
+          </div>
+          <div style="background: #ffffff; border: 1px solid #fca5a5; padding: 4px 6px; border-radius: 4px; text-align: center;">
+            <strong style="color: #991b1b;">D (0 – 60)</strong><br><span style="font-size: 10px; color: #4b5563;">Perlu Bimbingan</span>
           </div>
         </div>
-      `
-      : `
-        <div style="border: 1px solid #0d9488; border-radius: 8px; padding: 10px 14px; background-color: #f0fdfa; margin-bottom: 14px; font-size: 11px;">
-          <strong style="color: #115e59; display: block; margin-bottom: 4px; font-size: 11.5px;">KRITERIA PENILAIAN (SKALA 0 – 100):</strong>
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-            <div style="background: #ffffff; border: 1px solid #86efac; padding: 4px 6px; border-radius: 4px; text-align: center;">
-              <strong style="color: #166534;">A (91 – 100)</strong><br><span style="font-size: 10px; color: #4b5563;">Sangat Baik</span>
-            </div>
-            <div style="background: #ffffff; border: 1px solid #93c5fd; padding: 4px 6px; border-radius: 4px; text-align: center;">
-              <strong style="color: #1e40af;">B (81 – 90)</strong><br><span style="font-size: 10px; color: #4b5563;">Baik</span>
-            </div>
-            <div style="background: #ffffff; border: 1px solid #fde047; padding: 4px 6px; border-radius: 4px; text-align: center;">
-              <strong style="color: #854d0e;">C (61 – 80)</strong><br><span style="font-size: 10px; color: #4b5563;">Cukup</span>
-            </div>
-            <div style="background: #ffffff; border: 1px solid #fca5a5; padding: 4px 6px; border-radius: 4px; text-align: center;">
-              <strong style="color: #991b1b;">D (0 – 60)</strong><br><span style="font-size: 10px; color: #4b5563;">Perlu Bimbingan</span>
-            </div>
-          </div>
-        </div>
+      </div>
+    `;
+
+    const buildMetricSubHeaders = () => `
+      <th style="border: 1px solid #000; font-size: 9px; padding: 4px 3px; min-width: 44px;">${escapeHtml(criteriaLabels[0])}</th>
+      <th style="border: 1px solid #000; font-size: 9px; padding: 4px 3px; min-width: 44px;">${escapeHtml(criteriaLabels[1])}</th>
+      <th style="border: 1px solid #000; font-size: 9px; padding: 4px 3px; min-width: 44px;">${escapeHtml(criteriaLabels[2])}</th>
+      <th style="border: 1px solid #000; font-size: 9px; padding: 4px 3px; width: 38px; background: #f3f4f6;">Nilai Akhir</th>
+      <th style="border: 1px solid #000; font-size: 9px; padding: 4px 3px; width: 32px; background: #f3f4f6;">Pred</th>
+    `;
+
+    const renderSubjectCells = (data: SubjectExportData) => `
+      <td style="border: 1px solid #000; text-align: center; font-size: 10px;">${escapeHtml(String(data.c1))}</td>
+      <td style="border: 1px solid #000; text-align: center; font-size: 10px;">${escapeHtml(String(data.c2))}</td>
+      <td style="border: 1px solid #000; text-align: center; font-size: 10px;">${escapeHtml(String(data.c3))}</td>
+      <td style="border: 1px solid #000; text-align: center; font-size: 10.5px; font-weight: bold; background: #f9fafb;">${escapeHtml(String(data.finalScore))}</td>
+      <td style="border: 1px solid #000; text-align: center; font-size: 10.5px; font-weight: bold;">${escapeHtml(data.predicate)}</td>
+    `;
+
+    let rowsHtml = '';
+    session.students.forEach((s, idx) => {
+      const engData = resolveSubjectExportData(s.englishCriteria, s.englishScore, s.englishPredicate, s.englishAssessed, false);
+      const araData = resolveSubjectExportData(s.arabicCriteria, s.arabicScore, s.arabicPredicate, s.arabicAssessed, false);
+      const btqData = resolveSubjectExportData(s.btqCriteria, s.btqScore, s.btqPredicate, undefined, true);
+      const hafData = resolveSubjectExportData(s.hafalanCriteria, s.hafalanScore, s.hafalanPredicate, undefined, true);
+
+      rowsHtml += `
+        <tr style="height: 24px;">
+          <td style="border: 1px solid #000; text-align: center; font-size: 10px;">${idx + 1}</td>
+          <td style="border: 1px solid #000; padding: 3px 6px; font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">${escapeHtml(s.studentName)}</td>
+          ${showEnglish ? renderSubjectCells(engData) : ''}
+          ${showArabic ? renderSubjectCells(araData) : ''}
+          ${showBtq ? renderSubjectCells(btqData) : ''}
+          ${showHafalan ? renderSubjectCells(hafData) : ''}
+          <td style="border: 1px solid #000; padding: 3px 6px; font-size: 9.5px; font-style: italic; color: #4b5563;">${escapeHtml(s.notes || '-')}</td>
+        </tr>
       `;
+    });
 
-    // Table Header & Rows
-    let tableHtml = '';
-    if (isChecklist) {
-      let rowsHtml = '';
-      session.students.forEach((s, idx) => {
-        const engDone = s.englishAssessed ?? (s.englishScore !== null && s.englishScore !== undefined && (s.englishScore > 0 || (s.englishChecklist || []).some(Boolean)));
-        const arabDone = s.arabicAssessed ?? (s.arabicScore !== null && s.arabicScore !== undefined && (s.arabicScore > 0 || (s.arabicChecklist || []).some(Boolean)));
-        const engChecks = (s.englishChecklist || new Array(15).fill(false))
-          .map((c) => `<td style="border: 1px solid #000; text-align: center; font-size: 10px; width: 14px;">${c ? '✓' : ''}</td>`)
-          .join('');
-        const arabChecks = (s.arabicChecklist || new Array(15).fill(false))
-          .map((c) => `<td style="border: 1px solid #000; text-align: center; font-size: 10px; width: 14px;">${c ? '✓' : ''}</td>`)
-          .join('');
-
-        const engCells = showEnglish
-          ? `${engChecks}
-             <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold; background: #f9fafb;">${engDone ? (s.englishCorrectCount ?? 0) : '-'}</td>
-             <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold; background: #f9fafb;">${engDone && s.englishScore !== null && s.englishScore !== undefined ? s.englishScore : '-'}</td>
-             <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold;">${engDone ? escapeHtml(s.englishPredicate || '-') : '-'}</td>`
-          : '';
-
-        const arabCells = showArabic
-          ? `${arabChecks}
-             <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold; background: #f9fafb;">${arabDone ? (s.arabicCorrectCount ?? 0) : '-'}</td>
-             <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold; background: #f9fafb;">${arabDone && s.arabicScore !== null && s.arabicScore !== undefined ? s.arabicScore : '-'}</td>
-             <td style="border: 1px solid #000; text-align: center; font-size: 10px; font-weight: bold;">${arabDone ? escapeHtml(s.arabicPredicate || '-') : '-'}</td>`
-          : '';
-
-        rowsHtml += `
-          <tr style="height: 22px;">
-            <td style="border: 1px solid #000; text-align: center; font-size: 10px;">${idx + 1}</td>
-            <td style="border: 1px solid #000; padding: 2px 6px; font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">${escapeHtml(s.studentName)}</td>
-            ${engCells}
-            ${arabCells}
+    const tableHtml = `
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 10px; border: 1px solid #000;">
+        <thead>
+          <tr style="background-color: #f3f4f6; text-align: center;">
+            <th rowspan="2" style="border: 1px solid #000; width: 26px; padding: 4px;">No</th>
+            <th rowspan="2" style="border: 1px solid #000; padding: 4px; min-width: 140px;">Nama Peserta</th>
+            ${showEnglish ? '<th colspan="5" style="border: 1px solid #000; padding: 4px; background: #eff6ff;">🇬🇧 BAHASA INGGRIS (3 KRITERIA)</th>' : ''}
+            ${showArabic ? '<th colspan="5" style="border: 1px solid #000; padding: 4px; background: #f0fdf4;">🇸🇦 BAHASA ARAB (3 KRITERIA)</th>' : ''}
+            ${showBtq ? '<th colspan="5" style="border: 1px solid #000; padding: 4px; background: #ecfdf5;">📖 BTQ (3 KRITERIA)</th>' : ''}
+            ${showHafalan ? '<th colspan="5" style="border: 1px solid #000; padding: 4px; background: #eff6ff;">📖 HAFALAN (3 KRITERIA)</th>' : ''}
+            <th rowspan="2" style="border: 1px solid #000; padding: 4px; min-width: 90px;">Keterangan</th>
           </tr>
-        `;
-      });
-
-      const qHeaders = Array.from({ length: 15 }, (_, i) => `<th style="border: 1px solid #000; font-size: 8.5px; width: 14px; text-align: center; padding: 2px 0;">${i + 1}</th>`).join('');
-      const trackMetricHeaders = `
-        ${qHeaders}
-        <th style="border: 1px solid #000; font-size: 9px; width: 22px; padding: 2px;">Jml</th>
-        <th style="border: 1px solid #000; font-size: 9px; width: 26px; padding: 2px;">Nilai</th>
-        <th style="border: 1px solid #000; font-size: 9px; width: 22px; padding: 2px;">Pred</th>
-      `;
-
-      tableHtml = `
-        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 10px; border: 1px solid #000;">
-          <thead>
-            <tr style="background-color: #f3f4f6; text-align: center;">
-              <th rowspan="2" style="border: 1px solid #000; width: 24px; padding: 4px;">No</th>
-              <th rowspan="2" style="border: 1px solid #000; padding: 4px; min-width: 130px;">Nama Peserta</th>
-              ${showEnglish ? '<th colspan="18" style="border: 1px solid #000; padding: 3px; background: #eff6ff;">🇬🇧 BAHASA INGGRIS</th>' : ''}
-              ${showArabic ? '<th colspan="18" style="border: 1px solid #000; padding: 3px; background: #f0fdf4;">🇸🇦 BAHASA ARAB</th>' : ''}
-            </tr>
-            <tr style="background-color: #f9fafb; text-align: center;">
-              ${showEnglish ? trackMetricHeaders : ''}
-              ${showArabic ? trackMetricHeaders : ''}
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-      `;
-    } else {
-      let rowsHtml = '';
-      session.students.forEach((s, idx) => {
-        rowsHtml += `
-          <tr style="height: 24px;">
-            <td style="border: 1px solid #000; text-align: center; font-size: 11px;">${idx + 1}</td>
-            <td style="border: 1px solid #000; padding: 4px 8px; font-size: 11px; font-weight: 600;">${escapeHtml(s.studentName)}</td>
-            ${showBtq ? `<td style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${s.btqScore ?? '-'}</td><td style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${escapeHtml(s.btqPredicate ?? '-')}</td>` : ''}
-            ${showHafalan ? `<td style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${s.hafalanScore ?? '-'}</td><td style="border: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${escapeHtml(s.hafalanPredicate ?? '-')}</td>` : ''}
-            <td style="border: 1px solid #000; padding: 4px 8px; font-size: 10px; font-style: italic; color: #4b5563;">${escapeHtml(s.notes || '-')}</td>
+          <tr style="background-color: #f9fafb; text-align: center;">
+            ${showEnglish ? buildMetricSubHeaders() : ''}
+            ${showArabic ? buildMetricSubHeaders() : ''}
+            ${showBtq ? buildMetricSubHeaders() : ''}
+            ${showHafalan ? buildMetricSubHeaders() : ''}
           </tr>
-        `;
-      });
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    `;
 
-      tableHtml = `
-        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11px; border: 1px solid #000;">
-          <thead>
-            <tr style="background-color: #f3f4f6; text-align: center;">
-              <th rowspan="2" style="border: 1px solid #000; width: 32px; padding: 6px;">No</th>
-              <th rowspan="2" style="border: 1px solid #000; padding: 6px; min-width: 180px;">Nama Siswa</th>
-              ${showBtq ? '<th colspan="2" style="border: 1px solid #000; padding: 4px; background: #ecfdf5;">📖 BTQ</th>' : ''}
-              ${showHafalan ? '<th colspan="2" style="border: 1px solid #000; padding: 4px; background: #eff6ff;">📖 HAFALAN</th>' : ''}
-              <th rowspan="2" style="border: 1px solid #000; padding: 6px; width: 140px;">Keterangan</th>
-            </tr>
-            <tr style="background-color: #f9fafb; text-align: center;">
-              ${showBtq ? '<th style="border: 1px solid #000; width: 60px; padding: 4px;">Nilai</th><th style="border: 1px solid #000; width: 60px; padding: 4px;">Predikat</th>' : ''}
-              ${showHafalan ? '<th style="border: 1px solid #000; width: 60px; padding: 4px;">Nilai</th><th style="border: 1px solid #000; width: 60px; padding: 4px;">Predikat</th>' : ''}
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-      `;
-    }
-
-    const defaultDocTitle = isChecklist
+    const defaultDocTitle = isBahasa
       ? (showEnglish && showArabic
         ? 'DAFTAR PENILAIAN UJIAN LISAN BAHASA INGGRIS & BAHASA ARAB'
         : showEnglish
@@ -246,29 +258,29 @@ export class OralExamExportService {
    * Mengunduh berkas PDF A4 siap cetak
    */
   public static async exportToPdf(session: OralExamSession): Promise<void> {
-    const isChecklist = session.templateType === 'BAHASA_INGGRIS_ARAB';
     const scope = getEffectiveSubjectScope(session);
     const html = this.generatePrintHtml(session);
     const filename = `Penilaian_Lisan_${session.className}_${session.templateType}_${scope}_${session.academicYear.replace('/', '-')}`;
 
     await exportHtmlToPdf(html, {
       filename,
-      orientation: isChecklist && scope === 'BOTH' ? 'landscape' : 'portrait',
+      orientation: scope === 'BOTH' ? 'landscape' : 'portrait',
       format: 'a4',
       scale: 2,
     });
   }
 
   /**
-   * Mengunduh rekap Excel (.xlsx) rapi
+   * Mengunduh rekap Excel (.xlsx) rapi dengan rincian 3 kriteria per mata uji
    */
   public static exportToExcel(session: OralExamSession): void {
-    const isChecklist = session.templateType === 'BAHASA_INGGRIS_ARAB';
+    const isBahasa = session.templateType === 'BAHASA_INGGRIS_ARAB';
     const scope = getEffectiveSubjectScope(session);
-    const showEnglish = isChecklist && scope !== 'ARABIC_ONLY';
-    const showArabic = isChecklist && scope !== 'ENGLISH_ONLY';
-    const showBtq = !isChecklist && scope !== 'HAFALAN_ONLY';
-    const showHafalan = !isChecklist && scope !== 'BTQ_ONLY';
+    const criteriaLabels = resolveCriteriaLabels(session.criteriaLabels, getOralExamSessionTrack(session));
+    const showEnglish = isBahasa && scope !== 'ARABIC_ONLY';
+    const showArabic = isBahasa && scope !== 'ENGLISH_ONLY';
+    const showBtq = !isBahasa && scope !== 'HAFALAN_ONLY';
+    const showHafalan = !isBahasa && scope !== 'BTQ_ONLY';
 
     const level = resolveSchoolLevel(session.className);
     const levelBranding = getLevelSchoolBranding(level);
@@ -277,71 +289,60 @@ export class OralExamExportService {
       : `${levelBranding.institutionName} CIAMPEA - BOGOR`;
     const wb = XLSX.utils.book_new();
 
+    const makeSubjectHeaders = (prefix: string) => [
+      `${prefix} - ${criteriaLabels[0]}`,
+      `${prefix} - ${criteriaLabels[1]}`,
+      `${prefix} - ${criteriaLabels[2]}`,
+      `${prefix} - Nilai Akhir`,
+      `${prefix} - Predikat`,
+    ];
+
     const rows: any[] = [];
+    rows.push([headerSchoolLine]);
+    rows.push([session.title || (isBahasa ? 'DAFTAR PENILAIAN UJIAN LISAN BAHASA' : 'DAFTAR PENILAIAN BTQ DAN HAFALAN')]);
+    rows.push([`Tahun Ajaran: ${session.academicYear}`, `Semester: ${session.semester}`, `Kelas: ${session.className}`, `Ruang: ${session.roomNumber || '-'}`]);
+    rows.push([`Penguji: ${session.examinerName}`, `Tanggal: ${session.date}`]);
+    rows.push([`3 Kriteria: 1) ${criteriaLabels[0]}, 2) ${criteriaLabels[1]}, 3) ${criteriaLabels[2]}`]);
+    rows.push([]);
 
-    if (isChecklist) {
-      rows.push([headerSchoolLine]);
-      rows.push([session.title || 'DAFTAR PENILAIAN UJIAN LISAN BAHASA']);
-      rows.push([`Tahun Ajaran: ${session.academicYear}`, `Semester: ${session.semester}`, `Kelas: ${session.className}`, `Ruang: ${session.roomNumber || '-'}`]);
-      rows.push([`Penguji: ${session.examinerName}`, `Tanggal: ${session.date}`]);
-      rows.push([]);
+    rows.push([
+      'No',
+      'Nama Siswa',
+      'NISN',
+      'Kelas',
+      ...(showEnglish ? makeSubjectHeaders('B.Inggris') : []),
+      ...(showArabic ? makeSubjectHeaders('B.Arab') : []),
+      ...(showBtq ? makeSubjectHeaders('BTQ') : []),
+      ...(showHafalan ? makeSubjectHeaders('Hafalan') : []),
+      'Keterangan',
+    ]);
 
-      const qColsEng = Array.from({ length: 15 }, (_, i) => `ENG_Q${i + 1}`);
-      const qColsArab = Array.from({ length: 15 }, (_, i) => `ARB_Q${i + 1}`);
+    const toSubjectRowSlice = (data: SubjectExportData) => [
+      data.c1,
+      data.c2,
+      data.c3,
+      data.finalScore,
+      data.predicate,
+    ];
 
-      rows.push([
-        'No',
-        'Nama Siswa',
-        'NISN',
-        'Kelas',
-        ...(showEnglish ? [...qColsEng, 'ENG_Benar', 'ENG_Nilai', 'ENG_Predikat'] : []),
-        ...(showArabic ? [...qColsArab, 'ARB_Benar', 'ARB_Nilai', 'ARB_Predikat'] : []),
-      ]);
-
-      session.students.forEach((s, idx) => {
-        const engDone = s.englishAssessed ?? (s.englishScore !== null && s.englishScore !== undefined && (s.englishScore > 0 || (s.englishChecklist || []).some(Boolean)));
-        const arabDone = s.arabicAssessed ?? (s.arabicScore !== null && s.arabicScore !== undefined && (s.arabicScore > 0 || (s.arabicChecklist || []).some(Boolean)));
-        const engChecks = (s.englishChecklist || new Array(15).fill(false)).map((v) => (v ? 1 : 0));
-        const arabChecks = (s.arabicChecklist || new Array(15).fill(false)).map((v) => (v ? 1 : 0));
-
-        rows.push([
-          idx + 1,
-          s.studentName,
-          s.nisn || '-',
-          s.className || session.className,
-          ...(showEnglish ? [...engChecks, engDone ? (s.englishCorrectCount ?? 0) : '-', engDone && s.englishScore !== null && s.englishScore !== undefined ? s.englishScore : '-', engDone ? (s.englishPredicate || '-') : '-'] : []),
-          ...(showArabic ? [...arabChecks, arabDone ? (s.arabicCorrectCount ?? 0) : '-', arabDone && s.arabicScore !== null && s.arabicScore !== undefined ? s.arabicScore : '-', arabDone ? (s.arabicPredicate || '-') : '-'] : []),
-        ]);
-      });
-    } else {
-      rows.push([headerSchoolLine]);
-      rows.push([session.title || 'DAFTAR PENILAIAN BTQ DAN HAFALAN']);
-      rows.push([`Tahun Ajaran: ${session.academicYear}`, `Semester: ${session.semester}`, `Kelas: ${session.className}`, `Ruang: ${session.roomNumber || '-'}`]);
-      rows.push([`Penguji: ${session.examinerName}`, `Tanggal: ${session.date}`]);
-      rows.push([]);
+    session.students.forEach((s, idx) => {
+      const engData = resolveSubjectExportData(s.englishCriteria, s.englishScore, s.englishPredicate, s.englishAssessed, false);
+      const araData = resolveSubjectExportData(s.arabicCriteria, s.arabicScore, s.arabicPredicate, s.arabicAssessed, false);
+      const btqData = resolveSubjectExportData(s.btqCriteria, s.btqScore, s.btqPredicate, undefined, true);
+      const hafData = resolveSubjectExportData(s.hafalanCriteria, s.hafalanScore, s.hafalanPredicate, undefined, true);
 
       rows.push([
-        'No',
-        'Nama Siswa',
-        'NISN',
-        'Kelas',
-        ...(showBtq ? ['BTQ_Nilai', 'BTQ_Predikat'] : []),
-        ...(showHafalan ? ['Hafalan_Nilai', 'Hafalan_Predikat'] : []),
-        'Keterangan',
+        idx + 1,
+        s.studentName,
+        s.nisn || '-',
+        s.className || session.className,
+        ...(showEnglish ? toSubjectRowSlice(engData) : []),
+        ...(showArabic ? toSubjectRowSlice(araData) : []),
+        ...(showBtq ? toSubjectRowSlice(btqData) : []),
+        ...(showHafalan ? toSubjectRowSlice(hafData) : []),
+        s.notes || '',
       ]);
-
-      session.students.forEach((s, idx) => {
-        rows.push([
-          idx + 1,
-          s.studentName,
-          s.nisn || '-',
-          s.className || session.className,
-          ...(showBtq ? [s.btqScore ?? '-', s.btqPredicate ?? '-'] : []),
-          ...(showHafalan ? [s.hafalanScore ?? '-', s.hafalanPredicate ?? '-'] : []),
-          s.notes || '',
-        ]);
-      });
-    }
+    });
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     XLSX.utils.book_append_sheet(wb, ws, 'Penilaian_Lisan');

@@ -6,7 +6,9 @@
 
 import {
   getOralExamSessionTrack,
+  resolveCriteriaLabels,
   type OralExamAssignment,
+  type OralExamCriteriaLabels,
   type OralExamSession,
   type OralExamTemplateType,
   type OralExamStudentRecord,
@@ -95,6 +97,7 @@ export class OralExamRepository {
     params: {
       templateType: OralExamTemplateType;
       subjectScope?: OralExamSubjectScope;
+      criteriaLabels?: OralExamCriteriaLabels;
       groupId?: string | null;
       title: string;
       academicYear: string;
@@ -111,6 +114,7 @@ export class OralExamRepository {
   ): Promise<OralExamSession> {
     const now = new Date().toISOString();
     const id = `oral_session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const resolvedCriteria = resolveCriteriaLabels(params.criteriaLabels, params.templateType);
 
     const initialStudents: OralExamStudentRecord[] = params.students.map((st) => {
       if (params.templateType === 'BAHASA_INGGRIS_ARAB') {
@@ -119,13 +123,11 @@ export class OralExamRepository {
           studentName: st.studentName,
           nisn: st.nisn,
           className: st.className || params.className,
-          englishChecklist: new Array(15).fill(false),
-          englishCorrectCount: null,
+          englishCriteria: [null, null, null],
           englishScore: null,
           englishPredicate: null,
           englishAssessed: false,
-          arabicChecklist: new Array(15).fill(false),
-          arabicCorrectCount: null,
+          arabicCriteria: [null, null, null],
           arabicScore: null,
           arabicPredicate: null,
           arabicAssessed: false,
@@ -137,8 +139,10 @@ export class OralExamRepository {
         studentName: st.studentName,
         nisn: st.nisn,
         className: st.className || params.className,
+        btqCriteria: [null, null, null],
         btqScore: null,
         btqPredicate: null,
+        hafalanCriteria: [null, null, null],
         hafalanScore: null,
         hafalanPredicate: null,
       };
@@ -148,6 +152,7 @@ export class OralExamRepository {
       id,
       templateType: params.templateType,
       ...(params.subjectScope ? { subjectScope: params.subjectScope } : {}),
+      criteriaLabels: resolvedCriteria,
       ...(params.groupId !== undefined ? { groupId: params.groupId } : {}),
       title: params.title,
       academicYear: params.academicYear,
@@ -158,7 +163,7 @@ export class OralExamRepository {
       roomNumber: params.roomNumber || 'Ruang 01',
       className: params.className,
       date: params.date,
-      totalQuestions: 15,
+      totalQuestions: 3,
       students: initialStudents,
       createdAt: now,
       updatedAt: now,
@@ -170,7 +175,7 @@ export class OralExamRepository {
   /**
    * Mencari sesi ujian lisan yang sesuai penugasan Admin di Supabase untuk penguji & track (BAHASA / BTQ),
    * atau langsung membuatnya secara otomatis tanpa langkah manual dari guru.
-   * Jika Admin memperbarui penugasan siswa/ruang/scope, nilai siswa yang sudah tersimpan di cloud tetap dipertahankan.
+   * Jika Admin memperbarui penugasan siswa/ruang/scope/kriteria, nilai siswa yang sudah tersimpan di cloud tetap dipertahankan.
    */
   public static async openOrSyncAssignedSession(
     params: {
@@ -188,6 +193,10 @@ export class OralExamRepository {
       track === 'BAHASA' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN';
     const subjectScope: OralExamSubjectScope =
       track === 'BAHASA' ? assignment.bahasaScope : assignment.btqScope;
+    const assignedCriteria = resolveCriteriaLabels(
+      track === 'BAHASA' ? assignment.bahasaCriteria : assignment.btqCriteria,
+      track
+    );
 
     const allSessions = await this.getAllSessions(academicYear, token);
     const existing = allSessions.find(
@@ -214,6 +223,7 @@ export class OralExamRepository {
         {
           templateType,
           subjectScope,
+          criteriaLabels: assignedCriteria,
           groupId: assignment.id,
           title: defaultTitle,
           academicYear,
@@ -256,13 +266,11 @@ export class OralExamRepository {
           studentName: as.studentName,
           nisn: as.nisn,
           className: as.className || assignment.className,
-          englishChecklist: new Array(15).fill(false),
-          englishCorrectCount: null,
+          englishCriteria: [null, null, null],
           englishScore: null,
           englishPredicate: null,
           englishAssessed: false,
-          arabicChecklist: new Array(15).fill(false),
-          arabicCorrectCount: null,
+          arabicCriteria: [null, null, null],
           arabicScore: null,
           arabicPredicate: null,
           arabicAssessed: false,
@@ -274,8 +282,10 @@ export class OralExamRepository {
         studentName: as.studentName,
         nisn: as.nisn,
         className: as.className || assignment.className,
+        btqCriteria: [null, null, null],
         btqScore: null,
         btqPredicate: null,
+        hafalanCriteria: [null, null, null],
         hafalanScore: null,
         hafalanPredicate: null,
       };
@@ -284,11 +294,13 @@ export class OralExamRepository {
     const syncedSession: OralExamSession = {
       ...existing,
       subjectScope,
+      criteriaLabels: assignedCriteria,
       examinerUserId: assignment.examinerUserId ?? existing.examinerUserId ?? null,
       examinerName: assignment.examinerName,
       examinerNpp: examinerNpp ?? assignment.examinerNpp ?? existing.examinerNpp ?? null,
       roomNumber: assignment.roomNumber,
       className: assignment.className,
+      totalQuestions: 3,
       students: syncedStudents,
     };
 

@@ -1,10 +1,12 @@
 /**
  * SMART ABSENSI GURU - ORAL EXAM SCORING UTILITY
- * Berisi kalkulator skor, konversi checklist ke skala 100, dan pemetaan predikat resmi A/B/C/D.
+ * Kalkulator penilaian ujian lisan berbasis 3 kriteria (skala 0-100),
+ * perhitungan rata-rata otomatis menjadi Nilai Akhir, dan pemetaan predikat resmi A/B/C/D.
  */
 
 import {
   getEffectiveSubjectScope,
+  type OralExamCriteriaScores,
   type OralExamGrade,
   type OralExamStudentRecord,
   type OralExamSubjectScope,
@@ -12,7 +14,7 @@ import {
 } from '../types/oral-exam.types';
 
 /**
- * Menghitung predikat untuk nilai angka langsung (BTQ & Hafalan)
+ * Menghitung predikat untuk nilai akhir skala 0 - 100
  * Rentang Kriteria:
  * - 91 - 100: A (Sangat Baik)
  * - 81 - 90:  B (Baik)
@@ -20,7 +22,7 @@ import {
  * - 0 - 60:   D (Perlu Bimbingan)
  */
 export function calculateDirectScorePredicate(score: number | null | undefined): OralExamGrade | null {
-  if (score === null || score === undefined || isNaN(score)) {
+  if (score === null || score === undefined || Number.isNaN(score) || !Number.isFinite(score)) {
     return null;
   }
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
@@ -31,42 +33,60 @@ export function calculateDirectScorePredicate(score: number | null | undefined):
 }
 
 /**
- * Menghitung skor dan predikat dari array checklist butir soal lisan (Bahasa Inggris & Arab)
- * Rentang Kriteria (Berdasarkan 15 Soal):
- * - 14 - 15 Benar: A (Sangat Baik)
- * - 11 - 13 Benar: B (Baik)
- * - 6 - 10 Benar:  C (Cukup)
- * - 0 - 5 Benar:   D (Perlu Bimbingan)
- *
- * Konversi Skor: (Jumlah Benar / Total Soal) * 100 (Dibulatkan ke integer terdekat)
+ * Menormalkan array nilai 3 kriteria menjadi tuple tetap [K1, K2, K3] bernilai 0-100 atau null.
  */
-export function calculateChecklistScoreAndPredicate(
-  checklist: boolean[] | undefined,
-  totalQuestions = 15
-): {
-  correctCount: number;
-  score: number;
-  predicate: OralExamGrade;
-} {
-  const safeChecklist = checklist || [];
-  const correctCount = safeChecklist.filter(Boolean).length;
-  const safeTotal = totalQuestions > 0 ? totalQuestions : 15;
-  const score = Math.round((correctCount / safeTotal) * 100);
+export function normalizeCriteriaScores(
+  criteria: ReadonlyArray<number | null | undefined> | null | undefined
+): OralExamCriteriaScores {
+  const out: OralExamCriteriaScores = [null, null, null];
+  if (!Array.isArray(criteria)) return out;
+  for (let i = 0; i < 3; i++) {
+    const val = criteria[i];
+    if (typeof val === 'number' && !Number.isNaN(val) && Number.isFinite(val)) {
+      out[i] = Math.round(Math.max(0, Math.min(100, val)) * 100) / 100;
+    }
+  }
+  return out;
+}
 
-  let predicate: OralExamGrade = 'D';
-  if (correctCount >= 14) {
-    predicate = 'A';
-  } else if (correctCount >= 11) {
-    predicate = 'B';
-  } else if (correctCount >= 6) {
-    predicate = 'C';
-  } else {
-    predicate = 'D';
+/**
+ * Menghitung rata-rata Nilai Akhir & Predikat (A/B/C/D) dari 3 kriteria penilaian langsung.
+ * Nilai Akhir dibulatkan ke bilangan bulat 0-100 dari kriteria yang telah terisi,
+ * sedangkan status lengkap (`isComplete`) bernilai true bila ketiga kriteria terisi.
+ */
+export function calculateCriteriaAverageAndPredicate(
+  criteria: ReadonlyArray<number | null | undefined> | null | undefined
+): {
+  scores: OralExamCriteriaScores;
+  filledCount: number;
+  isComplete: boolean;
+  averageScore: number | null;
+  predicate: OralExamGrade | null;
+} {
+  const scores = normalizeCriteriaScores(criteria);
+  const filledValues = scores.filter((v): v is number => v !== null);
+  const filledCount = filledValues.length;
+  const isComplete = filledCount === 3;
+
+  if (filledCount === 0) {
+    return {
+      scores,
+      filledCount: 0,
+      isComplete: false,
+      averageScore: null,
+      predicate: null,
+    };
   }
 
+  const sum = filledValues.reduce((acc, v) => acc + v, 0);
+  const averageScore = Math.round(sum / filledCount);
+  const predicate = calculateDirectScorePredicate(averageScore);
+
   return {
-    correctCount,
-    score: Math.min(100, Math.max(0, score)),
+    scores,
+    filledCount,
+    isComplete,
+    averageScore,
     predicate,
   };
 }
@@ -120,21 +140,28 @@ export function getOralExamPredicateBadgeStyle(grade: OralExamGrade | null | und
 }
 
 /**
- * Membedakan apakah komponen checklist (Bahasa Inggris / Bahasa Arab) benar-benar
- * sudah dinilai oleh penguji vs baris baru/lama yang belum disentuh sama sekali.
+ * Memeriksa apakah 1 mata uji (Inggris/Arab/BTQ/Hafalan) sudah selesai dinilai:
+ * - Jika menggunakan input 3 kriteria (minimal 1 kriteria diisi): lengkap hanya jika ketiga kriteria diisi.
+ * - Jika data lama (belum memiliki rincian kriteria): memakai kompatibilitas mundur nilai langsung / flag assessed.
  */
-export function isChecklistTrackAssessed(
+export function isOralSubjectAssessed(
   score: number | null | undefined,
-  checklist: boolean[] | undefined,
-  assessedFlag: boolean | undefined
+  criteria: ReadonlyArray<number | null | undefined> | undefined,
+  legacyChecklist?: boolean[],
+  legacyAssessedFlag?: boolean,
+  allowLegacyZeroWithoutFlag = true
 ): boolean {
-  if (assessedFlag === true) return true;
-  if (assessedFlag === false) return false;
+  const calc = calculateCriteriaAverageAndPredicate(criteria);
+  if (calc.filledCount > 0) {
+    return calc.isComplete;
+  }
+
+  if (legacyAssessedFlag === false) return false;
   if (score === null || score === undefined || Number.isNaN(score)) return false;
-  // Kompatibilitas mundur sesi lama localStorage: jika belum ada flag assessed,
-  // skor 0 dengan checklist kosong seluruhnya dianggap belum dinilai.
+  if (legacyAssessedFlag === true) return true;
+  if (allowLegacyZeroWithoutFlag) return true;
   if (score > 0) return true;
-  return Boolean(checklist && checklist.some(Boolean));
+  return Boolean(legacyChecklist && legacyChecklist.some(Boolean));
 }
 
 /**
@@ -149,8 +176,24 @@ export function isStudentOralExamCompleted(
   if (templateType === 'BAHASA_INGGRIS_ARAB') {
     const checkEng = scope !== 'ARABIC_ONLY';
     const checkAra = scope !== 'ENGLISH_ONLY';
-    const engDone = checkEng && isChecklistTrackAssessed(student.englishScore, student.englishChecklist, student.englishAssessed);
-    const araDone = checkAra && isChecklistTrackAssessed(student.arabicScore, student.arabicChecklist, student.arabicAssessed);
+    const engDone =
+      checkEng &&
+      isOralSubjectAssessed(
+        student.englishScore,
+        student.englishCriteria,
+        student.englishChecklist,
+        student.englishAssessed,
+        false
+      );
+    const araDone =
+      checkAra &&
+      isOralSubjectAssessed(
+        student.arabicScore,
+        student.arabicCriteria,
+        student.arabicChecklist,
+        student.arabicAssessed,
+        false
+      );
     if (scope === 'ENGLISH_ONLY') return engDone;
     if (scope === 'ARABIC_ONLY') return araDone;
     return engDone || araDone;
@@ -158,19 +201,23 @@ export function isStudentOralExamCompleted(
 
   const checkBtq = scope !== 'HAFALAN_ONLY';
   const checkHaf = scope !== 'BTQ_ONLY';
-  const hasBtq = checkBtq && student.btqScore !== null && student.btqScore !== undefined && !Number.isNaN(student.btqScore);
-  const hasHaf = checkHaf && student.hafalanScore !== null && student.hafalanScore !== undefined && !Number.isNaN(student.hafalanScore);
+  const hasBtq =
+    checkBtq &&
+    isOralSubjectAssessed(student.btqScore, student.btqCriteria, undefined, undefined, true);
+  const hasHaf =
+    checkHaf &&
+    isOralSubjectAssessed(student.hafalanScore, student.hafalanCriteria, undefined, undefined, true);
   if (scope === 'BTQ_ONLY') return hasBtq;
   if (scope === 'HAFALAN_ONLY') return hasHaf;
   return hasBtq || hasHaf;
 }
 
 /**
- * Menghitung ringkasan statistik sesi ujian lisan (rata-rata, persentase kelulusan/kategori)
+ * Menghitung ringkasan statistik sesi ujian lisan (rata-rata & distribusi predikat A/B/C/D).
  */
 export function calculateOralExamSummaryStats(
   students: OralExamStudentRecord[],
-  isChecklistMode: boolean,
+  isBahasaTemplate: boolean,
   subjectScope: OralExamSubjectScope = 'BOTH'
 ) {
   const totalStudents = students.length;
@@ -191,13 +238,17 @@ export function calculateOralExamSummaryStats(
   let countScore2 = 0;
   const gradeDistribution: Record<OralExamGrade, number> = { A: 0, B: 0, C: 0, D: 0 };
 
-  const includeFirst = isChecklistMode ? subjectScope !== 'ARABIC_ONLY' : subjectScope !== 'HAFALAN_ONLY';
-  const includeSecond = isChecklistMode ? subjectScope !== 'ENGLISH_ONLY' : subjectScope !== 'BTQ_ONLY';
+  const includeFirst = isBahasaTemplate ? subjectScope !== 'ARABIC_ONLY' : subjectScope !== 'HAFALAN_ONLY';
+  const includeSecond = isBahasaTemplate ? subjectScope !== 'ENGLISH_ONLY' : subjectScope !== 'BTQ_ONLY';
 
   for (const s of students) {
-    if (isChecklistMode) {
-      const engDone = includeFirst && isChecklistTrackAssessed(s.englishScore, s.englishChecklist, s.englishAssessed);
-      const arabDone = includeSecond && isChecklistTrackAssessed(s.arabicScore, s.arabicChecklist, s.arabicAssessed);
+    if (isBahasaTemplate) {
+      const engDone =
+        includeFirst &&
+        isOralSubjectAssessed(s.englishScore, s.englishCriteria, s.englishChecklist, s.englishAssessed, false);
+      const arabDone =
+        includeSecond &&
+        isOralSubjectAssessed(s.arabicScore, s.arabicCriteria, s.arabicChecklist, s.arabicAssessed, false);
 
       if (engDone || arabDone) {
         completedStudents++;
@@ -205,28 +256,36 @@ export function calculateOralExamSummaryStats(
       if (engDone && s.englishScore !== null && s.englishScore !== undefined && !Number.isNaN(s.englishScore)) {
         totalScore1 += s.englishScore;
         countScore1++;
-        if (s.englishPredicate) gradeDistribution[s.englishPredicate]++;
+        const pred = s.englishPredicate || calculateDirectScorePredicate(s.englishScore);
+        if (pred) gradeDistribution[pred]++;
       }
       if (arabDone && s.arabicScore !== null && s.arabicScore !== undefined && !Number.isNaN(s.arabicScore)) {
         totalScore2 += s.arabicScore;
         countScore2++;
-        if (s.arabicPredicate) gradeDistribution[s.arabicPredicate]++;
+        const pred = s.arabicPredicate || calculateDirectScorePredicate(s.arabicScore);
+        if (pred) gradeDistribution[pred]++;
       }
     } else {
-      const hasBtq = includeFirst && s.btqScore !== null && s.btqScore !== undefined && !Number.isNaN(s.btqScore);
-      const hasHaf = includeSecond && s.hafalanScore !== null && s.hafalanScore !== undefined && !Number.isNaN(s.hafalanScore);
+      const hasBtq =
+        includeFirst &&
+        isOralSubjectAssessed(s.btqScore, s.btqCriteria, undefined, undefined, true);
+      const hasHaf =
+        includeSecond &&
+        isOralSubjectAssessed(s.hafalanScore, s.hafalanCriteria, undefined, undefined, true);
       if (hasBtq || hasHaf) {
         completedStudents++;
       }
-      if (hasBtq && s.btqScore !== null && s.btqScore !== undefined) {
+      if (hasBtq && s.btqScore !== null && s.btqScore !== undefined && !Number.isNaN(s.btqScore)) {
         totalScore1 += s.btqScore;
         countScore1++;
-        if (s.btqPredicate) gradeDistribution[s.btqPredicate]++;
+        const pred = s.btqPredicate || calculateDirectScorePredicate(s.btqScore);
+        if (pred) gradeDistribution[pred]++;
       }
-      if (hasHaf && s.hafalanScore !== null && s.hafalanScore !== undefined) {
+      if (hasHaf && s.hafalanScore !== null && s.hafalanScore !== undefined && !Number.isNaN(s.hafalanScore)) {
         totalScore2 += s.hafalanScore;
         countScore2++;
-        if (s.hafalanPredicate) gradeDistribution[s.hafalanPredicate]++;
+        const pred = s.hafalanPredicate || calculateDirectScorePredicate(s.hafalanScore);
+        if (pred) gradeDistribution[pred]++;
       }
     }
   }

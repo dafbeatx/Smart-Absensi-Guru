@@ -165,7 +165,7 @@ export class MasterTestRunner {
       { name: 'Exam Period Settings & Auto-Expiry Engine (Phase 5.2)', fn: runExamPeriodToggleTestSuite },
       { name: 'GradeMaster Score Sync Suite (TA 2026/2027)', fn: runGradeMasterScoreSyncTestSuite },
       { name: 'Universal Excel Grading & Auto Session Importer Suite', fn: runUniversalExcelGradingTestSuite },
-      { name: 'Oral Exam Assessment Engine (BTQ, Hafalan, English & Arabic Checklist)', fn: runOralExamAssessmentTestSuite },
+      { name: 'Oral Exam Assessment Engine (3 Kriteria: Bahasa & BTQ/Hafalan)', fn: runOralExamAssessmentTestSuite },
       { name: 'Kotak Aspirasi & Keluhan Guru Cross-Device Sync Suite (Phase 5.3)', fn: runComplaintRepositorySyncTestSuite },
       { name: 'Online Attendance Geofence Sanitization & 500m Safety Buffer Suite (Fix Penolakan Data)', fn: runOnlineAttendanceGeofenceFixTestSuite },
       { name: 'Pengumuman Notifikasi Push Guru & Anti-Spam Safeguards Suite (Phase 5.4)', fn: runAnnouncementBroadcastTestSuite },

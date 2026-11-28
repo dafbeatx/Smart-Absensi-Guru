@@ -100,7 +100,7 @@ export const DEFAULT_ADMINISTRATION_MODULES: AdministrationModuleItem[] = [
     id: 'oral_exam_assessment',
     title: 'Penilaian Ujian Lisan',
     category: 'UJIAN',
-    description: 'Format penilaian lisan resmi: BTQ & Hafalan serta Bahasa Inggris & Arab (Checklist 15 Soal)',
+    description: 'Penilaian langsung 3 kriteria (skala 0–100 & otomatis predikat A–D) untuk Ujian Bahasa & BTQ',
     icon: '🗣️',
     colorClass: 'from-emerald-700 to-teal-900',
     badge: 'Lisan & BTQ',

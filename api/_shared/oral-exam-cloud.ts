@@ -16,6 +16,17 @@ function sanitizeKeySegment(value: unknown, fallback = ''): string {
   return raw.replace(/[^\w.-]/g, '_');
 }
 
+const DEFAULT_BAHASA_CRITERIA: [string, string, string] = [
+  'Pelafalan',
+  'Kelancaran',
+  'Pemahaman & Kosakata',
+];
+const DEFAULT_BTQ_CRITERIA: [string, string, string] = [
+  'Tajwid & Makhraj',
+  'Kelancaran Bacaan',
+  'Hafalan & Adab',
+];
+
 function isMissingTableError(error: any): boolean {
   if (!error) return false;
   const code = String(error.code || '');
@@ -27,6 +38,26 @@ function isMissingTableError(error: any): boolean {
     msg.includes('could not find the table') ||
     msg.includes('schema cache')
   );
+}
+
+function isMissingColumnError(error: any, columnName: string): boolean {
+  if (!error) return false;
+  const code = String(error.code || '');
+  const msg = String(error.message || '').toLowerCase();
+  return (
+    (code === '42703' || code === 'PGRST204' || msg.includes('column')) &&
+    msg.includes(columnName.toLowerCase())
+  );
+}
+
+function sanitizeCriteriaLabels(rawLabels: any, templateType: string): [string, string, string] {
+  const defaults = templateType === 'BAHASA_INGGRIS_ARAB' ? DEFAULT_BAHASA_CRITERIA : DEFAULT_BTQ_CRITERIA;
+  if (!Array.isArray(rawLabels)) return [...defaults];
+  return [
+    String(rawLabels[0] || '').trim() || defaults[0],
+    String(rawLabels[1] || '').trim() || defaults[1],
+    String(rawLabels[2] || '').trim() || defaults[2],
+  ];
 }
 
 function normalizePersonName(name: unknown): string {
@@ -58,10 +89,12 @@ function isMatchingExaminerPerson(nameA: unknown, nameB: unknown): boolean {
 }
 
 function mapDbRowToOralSession(row: any) {
+  const tpl = row.template_type === 'BAHASA_INGGRIS_ARAB' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN';
   return {
     id: String(row.id),
-    templateType: row.template_type === 'BAHASA_INGGRIS_ARAB' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN',
+    templateType: tpl,
     ...(row.subject_scope ? { subjectScope: row.subject_scope } : {}),
+    criteriaLabels: sanitizeCriteriaLabels(row.criteria_labels, tpl),
     ...(row.group_id !== undefined && row.group_id !== null ? { groupId: String(row.group_id) } : {}),
     title: String(row.title || ''),
     academicYear: String(row.academic_year || '2026/2027'),
@@ -72,7 +105,7 @@ function mapDbRowToOralSession(row: any) {
     roomNumber: String(row.room_number || 'Ruang 01'),
     className: String(row.class_name || '7'),
     date: String(row.exam_date || ''),
-    totalQuestions: Number(row.total_questions) || 15,
+    totalQuestions: Number(row.total_questions) || 3,
     students: Array.isArray(row.students) ? row.students : [],
     createdAt: String(row.created_at || new Date().toISOString()),
     updatedAt: String(row.updated_at || new Date().toISOString()),
@@ -159,22 +192,41 @@ async function fetchAllCloudOralSessions(academicYear?: string): Promise<{ sessi
     // Will merge from system_settings below
   }
 
-  // Always check pre-migration system_settings keys (`oral_exam_session_%`) so nothing is ever lost across migrations
+  // Merge companion criteria labels if Migration 74 column is not yet added, plus pre-migration sessions
+  const criteriaOverrides = new Map<string, [string, string, string]>();
   try {
     const { data: kvRows, error: kvErr } = await serverSupabase
       .from('system_settings')
       .select('key, value')
-      .like('key', 'oral_exam_session_%');
+      .like('key', 'oral_exam_%');
 
     if (!kvErr && Array.isArray(kvRows)) {
       for (const row of kvRows) {
         if (!row?.value) continue;
+        const keyStr = String(row.key || '');
         try {
-          const parsed = JSON.parse(row.value);
-          if (parsed && parsed.id) {
-            if (academicYear && parsed.academicYear !== academicYear) continue;
-            if (!sessionMap.has(parsed.id)) {
-              sessionMap.set(parsed.id, parsed);
+          if (keyStr.startsWith('oral_exam_criteria_')) {
+            const sessId = keyStr.slice('oral_exam_criteria_'.length);
+            const parsedLabels = JSON.parse(row.value);
+            if (Array.isArray(parsedLabels) && parsedLabels.length >= 3 && sessId) {
+              criteriaOverrides.set(sessId, [
+                String(parsedLabels[0] || '').trim(),
+                String(parsedLabels[1] || '').trim(),
+                String(parsedLabels[2] || '').trim(),
+              ]);
+            }
+            continue;
+          }
+          if (keyStr.startsWith('oral_exam_session_')) {
+            const parsed = JSON.parse(row.value);
+            if (parsed && parsed.id) {
+              if (academicYear && parsed.academicYear !== academicYear) continue;
+              if (!sessionMap.has(parsed.id)) {
+                sessionMap.set(parsed.id, {
+                  ...parsed,
+                  criteriaLabels: sanitizeCriteriaLabels(parsed.criteriaLabels, parsed.templateType),
+                });
+              }
             }
           }
         } catch {
@@ -184,6 +236,16 @@ async function fetchAllCloudOralSessions(academicYear?: string): Promise<{ sessi
     }
   } catch {
     // ignore
+  }
+
+  for (const [sessId, labels] of criteriaOverrides.entries()) {
+    const existing = sessionMap.get(sessId);
+    if (existing) {
+      sessionMap.set(sessId, {
+        ...existing,
+        criteriaLabels: sanitizeCriteriaLabels(labels, existing.templateType),
+      });
+    }
   }
 
   const list = Array.from(sessionMap.values()).sort((a, b) =>
@@ -312,10 +374,14 @@ export async function handleSaveOralExamSession(body: any, auth: AuthSuccessCont
     existing?.examinerUserId ||
     (!isAdminOrCommittee ? auth.userId : null);
 
+  const normalizedTemplate = raw.templateType === 'BAHASA_INGGRIS_ARAB' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN';
+  const normalizedCriteriaLabels = sanitizeCriteriaLabels(raw.criteriaLabels, normalizedTemplate);
+
   const normalizedSession = {
     id: cleanId,
-    templateType: raw.templateType === 'BAHASA_INGGRIS_ARAB' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN',
+    templateType: normalizedTemplate,
     ...(raw.subjectScope ? { subjectScope: String(raw.subjectScope) } : {}),
+    criteriaLabels: normalizedCriteriaLabels,
     ...(raw.groupId !== undefined ? { groupId: raw.groupId ? String(raw.groupId) : null } : {}),
     title: String(raw.title || 'Penilaian Ujian Lisan').trim(),
     academicYear,
@@ -326,19 +392,20 @@ export async function handleSaveOralExamSession(body: any, auth: AuthSuccessCont
     roomNumber: String(raw.roomNumber || 'Ruang 01').trim(),
     className: String(raw.className || '7').trim(),
     date: String(raw.date || nowIso.slice(0, 10)).trim(),
-    totalQuestions: Number(raw.totalQuestions) || 15,
+    totalQuestions: Number(raw.totalQuestions) || 3,
     students: raw.students,
     createdAt: existing?.createdAt || raw.createdAt || nowIso,
     updatedAt: nowIso,
   };
 
   // Try dedicated `public.oral_exam_sessions` table first
-  const dbRow = {
+  const dbRow: Record<string, any> = {
     id: normalizedSession.id,
     academic_year: normalizedSession.academicYear,
     semester: normalizedSession.semester,
     template_type: normalizedSession.templateType,
     subject_scope: normalizedSession.subjectScope || null,
+    criteria_labels: normalizedSession.criteriaLabels,
     group_id: normalizedSession.groupId ?? null,
     title: normalizedSession.title,
     examiner_user_id: normalizedSession.examinerUserId,
@@ -354,9 +421,20 @@ export async function handleSaveOralExamSession(body: any, auth: AuthSuccessCont
     updated_at: normalizedSession.updatedAt,
   };
 
-  const { error: relErr } = await serverSupabase
+  let { error: relErr } = await serverSupabase
     .from('oral_exam_sessions')
     .upsert(dbRow, { onConflict: 'id' });
+
+  let persistedCriteriaInCompanionKv = false;
+  if (relErr && isMissingColumnError(relErr, 'criteria_labels')) {
+    const legacyRow = { ...dbRow };
+    delete legacyRow.criteria_labels;
+    const retryRes = await serverSupabase
+      .from('oral_exam_sessions')
+      .upsert(legacyRow, { onConflict: 'id' });
+    relErr = retryRes.error;
+    persistedCriteriaInCompanionKv = !retryRes.error;
+  }
 
   if (relErr) {
     if (!isMissingTableError(relErr)) {
@@ -382,7 +460,23 @@ export async function handleSaveOralExamSession(body: any, auth: AuthSuccessCont
       };
     }
   } else {
-    // Keep system_settings mirror removed once saved to relational table so no stale duplicate remains
+    if (persistedCriteriaInCompanionKv) {
+      try {
+        await serverSupabase
+          .from('system_settings')
+          .upsert(
+            {
+              key: `oral_exam_criteria_${cleanId}`,
+              value: JSON.stringify(normalizedSession.criteriaLabels),
+              updated_at: nowIso,
+            },
+            { onConflict: 'key' }
+          );
+      } catch {
+        // ignore companion metadata write error
+      }
+    }
+    // Keep system_settings session mirror removed once saved to relational table so no stale duplicate remains
     try {
       await serverSupabase.from('system_settings').delete().eq('key', `oral_exam_session_${cleanId}`);
     } catch {
@@ -429,6 +523,7 @@ export async function handleDeleteOralExamSession(body: any, auth: AuthSuccessCo
 
   try {
     await serverSupabase.from('system_settings').delete().eq('key', `oral_exam_session_${sessionId}`);
+    await serverSupabase.from('system_settings').delete().eq('key', `oral_exam_criteria_${sessionId}`);
   } catch {
     // ignore
   }

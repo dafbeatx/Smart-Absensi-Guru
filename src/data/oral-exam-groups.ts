@@ -1,5 +1,9 @@
 import type { UserProfile } from '../types/database.types';
-import type { OralExamAssignment } from '../types/oral-exam.types';
+import {
+  DEFAULT_BAHASA_CRITERIA,
+  DEFAULT_BTQ_CRITERIA,
+  type OralExamAssignment,
+} from '../types/oral-exam.types';
 
 /**
  * SMART ABSENSI GURU - KELOMPOK PENGUJI & PESERTA UJIAN LISAN RESMI
@@ -453,6 +457,8 @@ export function getDefaultOralExamAssignments(
     examTracks: ['BAHASA', 'BTQ'],
     bahasaScope: 'ENGLISH_ONLY',
     btqScope: 'BOTH',
+    bahasaCriteria: [...DEFAULT_BAHASA_CRITERIA],
+    btqCriteria: [...DEFAULT_BTQ_CRITERIA],
     students: grp.students.map((st) => ({
       studentId: st.studentId,
       studentName: st.studentName,
