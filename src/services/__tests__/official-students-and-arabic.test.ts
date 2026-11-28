@@ -32,15 +32,28 @@ export async function runOfficialStudentsAndArabicTestSuite(): Promise<TestSuite
     const countSMA = OFFICIAL_STUDENTS_2026_2027.filter((s) => s.className === 'SMA').length;
     const totalStudents = OFFICIAL_STUDENTS_2026_2027.length;
 
+    const hasNazriel8B = OFFICIAL_STUDENTS_2026_2027.some(
+      (s) => s.className === '8B' && s.fullName === 'MUHAMAD NAZRIEL ADHA'
+    );
+    const hasFadliSma = OFFICIAL_STUDENTS_2026_2027.some(
+      (s) => s.className === 'SMA' && s.fullName === 'FADLI ADRIANSYAH'
+    );
+    const hasTahfidzSma = OFFICIAL_STUDENTS_2026_2027.some(
+      (s) => s.className === 'SMA' && s.fullName === 'MUHAMAD TAHFIDZ'
+    );
+
     assert(
-      'Official Students 01: Exactly 144 students partitioned across 6 classes matching official Excel',
-      totalStudents === 144 &&
+      'Official Students 01: Exactly 147 students partitioned across 6 classes synced with oral exam fix list',
+      totalStudents === 147 &&
         count7 === 31 &&
         count8A === 15 &&
-        count8B === 29 &&
+        count8B === 30 &&
         count9A === 20 &&
         count9B === 26 &&
-        countSMA === 23,
+        countSMA === 25 &&
+        hasNazriel8B &&
+        hasFadliSma &&
+        hasTahfidzSma,
       `Total: ${totalStudents}, 7: ${count7}, 8A: ${count8A}, 8B: ${count8B}, 9A: ${count9A}, 9B: ${count9B}, SMA: ${countSMA}`
     );
 
@@ -56,14 +69,14 @@ export async function runOfficialStudentsAndArabicTestSuite(): Promise<TestSuite
       `8A P: ${is8AAllFemale}, 9A P: ${is9AAllFemale}, 8B L: ${is8BAllMale}, 9B L: ${is9BAllMale}`
     );
 
-    // Test 3: MockProvider syncStudentsFromGradeMaster loads all 144 official students
+    // Test 3: MockProvider syncStudentsFromGradeMaster loads all 147 official students
     const mockProvider = new MockProvider();
     const syncRes = await mockProvider.syncStudentsFromGradeMaster('2026/2027');
     const loadedStudents = await mockProvider.getStudents();
 
     assert(
-      'Official Students 03: MockProvider syncStudentsFromGradeMaster loads all 144 students',
-      loadedStudents.length === 144 && syncRes.syncedCount === 144,
+      'Official Students 03: MockProvider syncStudentsFromGradeMaster loads all 147 students',
+      loadedStudents.length === 147 && syncRes.syncedCount === 147,
       `Loaded: ${loadedStudents.length}, Synced: ${syncRes.syncedCount}`
     );
 
@@ -81,10 +94,10 @@ export async function runOfficialStudentsAndArabicTestSuite(): Promise<TestSuite
       studentsClass7.length === 31 &&
         studentsClass7Alias.length === 31 &&
         studentsClass8A.length === 15 &&
-        studentsClass8B.length === 29 &&
+        studentsClass8B.length === 30 &&
         studentsClass9A.length === 20 &&
         studentsClass9B.length === 26 &&
-        studentsClassSMA.length === 23,
+        studentsClassSMA.length === 25,
       `7: ${studentsClass7.length}, 7A: ${studentsClass7Alias.length}, 8A: ${studentsClass8A.length}, 8B: ${studentsClass8B.length}, 9A: ${studentsClass9A.length}, 9B: ${studentsClass9B.length}, SMA: ${studentsClassSMA.length}`
     );
 

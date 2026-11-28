@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { StudentItem } from '../../../types/database.types';
+import { OFFICIAL_STUDENTS_2026_2027 } from '../../../data/official-students-2026-2027';
 import { StudentRepository, STUDENTS_UPDATED_EVENT, getStudentNaturalKey } from '../../../repositories/StudentRepository';
 import { formatClassDisplay } from '../../../utils/class.utils';
 import { Button } from '../../../components/ui/Button';
@@ -461,7 +462,7 @@ export const StudentManagement: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Master data 149 siswa aktif, penautan nomor kartu RFID, dan sinkronisasi presensi harian GradeMaster.
+              Master data {students.length > 0 ? students.length : OFFICIAL_STUDENTS_2026_2027.length} siswa aktif, penautan nomor kartu RFID, dan sinkronisasi presensi harian GradeMaster.
             </p>
           </div>
         </div>
@@ -696,7 +697,7 @@ export const StudentManagement: React.FC = () => {
               <>
                 <h4 className="text-sm font-bold text-slate-800">Direktori Siswa Masih Kosong</h4>
                 <p className="text-xs text-slate-500 max-w-sm">
-                  Tarik 149 siswa aktif tahun ajaran 2026/2027 langsung dari web nilai GradeMaster.
+                  Tarik {OFFICIAL_STUDENTS_2026_2027.length} siswa aktif tahun ajaran 2026/2027 langsung dari master sekolah &amp; web nilai GradeMaster.
                 </p>
                 <button
                   type="button"

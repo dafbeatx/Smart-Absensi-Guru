@@ -138,3 +138,37 @@ export function deduplicateStudents(students: StudentItem[], deletedKeys?: Set<s
 
   return Array.from(map.values());
 }
+
+/**
+ * Merges missing students from the official roster into an existing student list
+ * while avoiding duplicates and respecting deleted student tombstones.
+ */
+export function mergeOfficialStudentsRoster(
+  existingStudents: StudentItem[],
+  officialRoster: StudentItem[],
+  deletedKeys?: Set<string>
+): StudentItem[] {
+  const activeTombstones = deletedKeys || getDeletedStudentKeys();
+  const dedupedExisting = deduplicateStudents(existingStudents, activeTombstones);
+  const existingKeys = new Set(
+    dedupedExisting.map((s) => getStudentNaturalKey(s.className, s.fullName))
+  );
+
+  const missingOfficial: StudentItem[] = [];
+  for (const std of officialRoster) {
+    if (!std || !std.fullName) continue;
+    const key = getStudentNaturalKey(std.className, std.fullName);
+    if (activeTombstones.has(key) || existingKeys.has(key)) continue;
+    existingKeys.add(key);
+    missingOfficial.push(std);
+  }
+
+  if (missingOfficial.length === 0) {
+    return dedupedExisting;
+  }
+
+  return [...dedupedExisting, ...missingOfficial].sort(
+    (a, b) =>
+      a.className.localeCompare(b.className) || a.fullName.localeCompare(b.fullName)
+  );
+}

@@ -9,7 +9,8 @@
  */
 
 import { StudentRepository, clearDeletedStudentKeys, getDeletedStudentKeys } from '../../repositories/StudentRepository';
-import { deduplicateStudents, getStudentNaturalKey, safeSetStorage } from '../../utils/student-dedup.utils';
+import { deduplicateStudents, mergeOfficialStudentsRoster, getStudentNaturalKey, safeSetStorage } from '../../utils/student-dedup.utils';
+import { OFFICIAL_STUDENTS_2026_2027 } from '../../data/official-students-2026-2027';
 import { ExamAdministrativeDocsService } from '../exam-administrative-docs.service';
 import type { TestResultItem } from '../test-runner.service';
 import type { StudentItem } from '../../types/database.types';
@@ -294,6 +295,26 @@ export const runStudentSyncDedupTestSuite = async (): Promise<{
       'Exam 01: Deleted student is completely excluded from exam room rosters and seating',
       !containsDeletedInExam && r2Resolved.some((s) => s.fullName.includes('BILQIS')),
       `Contains deleted: ${containsDeletedInExam}, R2 count: ${r2Resolved.length}`
+    );
+
+    // =========================================================================
+    // Test 9: mergeOfficialStudentsRoster appends missing official students while honoring tombstones
+    // =========================================================================
+    const partialCloudRows: StudentItem[] = OFFICIAL_STUDENTS_2026_2027.filter(
+      (s) => s.fullName !== 'MUHAMAD NAZRIEL ADHA' && s.fullName !== 'FADLI ADRIANSYAH'
+    );
+    const mergedWithoutTombstone = mergeOfficialStudentsRoster(
+      partialCloudRows,
+      OFFICIAL_STUDENTS_2026_2027,
+      new Set(['SMA|||MUHAMAD TAHFIDZ'])
+    );
+    assert(
+      'Merge 01: Missing official students are added cleanly while tombstoned students remain excluded',
+      mergedWithoutTombstone.length === OFFICIAL_STUDENTS_2026_2027.length - 1 &&
+        mergedWithoutTombstone.some((s) => s.fullName === 'MUHAMAD NAZRIEL ADHA' && s.className === '8B') &&
+        mergedWithoutTombstone.some((s) => s.fullName === 'FADLI ADRIANSYAH' && s.className === 'SMA') &&
+        !mergedWithoutTombstone.some((s) => s.fullName === 'MUHAMAD TAHFIDZ'),
+      `Merged length: ${mergedWithoutTombstone.length}`
     );
 
   } catch (err: unknown) {

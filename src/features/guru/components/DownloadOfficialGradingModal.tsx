@@ -91,10 +91,10 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
     const templateDefaults: Array<{ name: string; count: number; level: string }> = [
       { name: '7', count: 31, level: 'SMP' },
       { name: '8A', count: 15, level: 'SMP' },
-      { name: '8B', count: 29, level: 'SMP' },
+      { name: '8B', count: 30, level: 'SMP' },
       { name: '9A', count: 20, level: 'SMP' },
       { name: '9B', count: 26, level: 'SMP' },
-      { name: 'SMA', count: 23, level: 'SMA' },
+      { name: 'SMA', count: 25, level: 'SMA' },
     ];
     if (!liveClassCounts) return templateDefaults;
     return templateDefaults.map((item) => ({

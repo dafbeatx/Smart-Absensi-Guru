@@ -132,7 +132,9 @@ import {
   recordDeletedStudentKey,
   removeDeletedStudentKey,
   deduplicateStudents,
+  mergeOfficialStudentsRoster,
 } from '../utils/student-dedup.utils';
+import { OFFICIAL_STUDENTS_2026_2027 } from '../data/official-students-2026-2027';
 import { getSafeInitialTeacherPointLogs } from '../utils/teacher-point-seed.utils';
 import { resolveBehaviorLogType } from '../utils/student-behavior.utils';
 import { buildAuthenticatedFetchOptions, detectClientPlatformHeader, resolveClientAuthToken } from '../utils/api-auth.utils';
@@ -5007,7 +5009,11 @@ export class SupabaseProvider implements IDataProvider {
             updated_at: row.updated_at,
           }));
 
-          const cleanList = deduplicateStudents(rawStudents, deletedKeys);
+          const cleanList = mergeOfficialStudentsRoster(
+            rawStudents,
+            OFFICIAL_STUDENTS_2026_2027,
+            deletedKeys
+          );
           return cleanList;
         }
 
@@ -5044,8 +5050,10 @@ export class SupabaseProvider implements IDataProvider {
           }
         });
 
-        const activeList = deduplicateStudents(Array.from(uniqueMap.values()), deletedKeys).sort((a, b) =>
-          a.className.localeCompare(b.className) || a.fullName.localeCompare(b.fullName)
+        const activeList = mergeOfficialStudentsRoster(
+          Array.from(uniqueMap.values()),
+          OFFICIAL_STUDENTS_2026_2027,
+          deletedKeys
         );
 
         if (activeList.length > 0) {
@@ -5360,6 +5368,7 @@ export class SupabaseProvider implements IDataProvider {
 
       (behaviors || []).forEach((b: any) => processEntry(b.student_name, b.class_name));
       (accounts || []).forEach((a: any) => processEntry(a.student_name, a.class_name));
+      OFFICIAL_STUDENTS_2026_2027.forEach((s) => processEntry(s.fullName, s.className));
 
       // 5. Query existing students from students table to match IDs and find duplicates
       const { data: existingRows } = await this.client
@@ -5412,17 +5421,23 @@ export class SupabaseProvider implements IDataProvider {
         }
       }
 
-      // 7. Construct syncedList
+      // 7. Construct syncedList (combining GradeMaster, official roster, and existing non-deleted rows)
+      const officialByKey = new Map<string, StudentItem>();
+      OFFICIAL_STUDENTS_2026_2027.forEach((s) => {
+        officialByKey.set(getStudentNaturalKey(s.className, s.fullName), s);
+      });
+
       const syncedList: StudentItem[] = Array.from(mergedMap.entries()).map(([naturalKey, item]) => {
         const existing = primaryExistingMap.get(naturalKey);
+        const official = officialByKey.get(naturalKey);
         const isFemaleClass = item.className === '8A' || item.className === '9A';
-        const defaultGender: 'L' | 'P' = existing?.gender || (isFemaleClass ? 'P' : 'L');
+        const defaultGender: 'L' | 'P' = existing?.gender || official?.gender || (isFemaleClass ? 'P' : 'L');
 
         // Deterministic stable ID if genuinely new
         const safeHash = Math.abs(
           item.fullName.split('').reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0) | 0, 0)
         ).toString(36);
-        const deterministicId = `std_${item.className.toLowerCase()}_${safeHash}`;
+        const deterministicId = official?.id || `std_${item.className.toLowerCase()}_${safeHash}`;
 
         return {
           id: existing?.id || deterministicId,
@@ -5440,6 +5455,25 @@ export class SupabaseProvider implements IDataProvider {
           updated_at: new Date().toISOString(),
         };
       });
+
+      for (const [naturalKey, existing] of primaryExistingMap.entries()) {
+        if (mergedMap.has(naturalKey) || deletedKeys.has(naturalKey)) continue;
+        syncedList.push({
+          id: existing.id,
+          nisn: existing.nisn || '',
+          fullName: existing.full_name,
+          className: normalizeClassCode(existing.class_name) || existing.class_name,
+          academicYear: existing.academic_year || academicYear,
+          gender: existing.gender || 'L',
+          rfidUid: existing.rfid_uid || undefined,
+          cardStatus: existing.card_status || 'ACTIVE',
+          attendanceRate: existing.attendance_rate != null ? Number(existing.attendance_rate) : 100,
+          address: existing.address || undefined,
+          notes: existing.notes || undefined,
+          created_at: existing.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      }
 
       // 8. Save syncedList using saveStudents
       await this.saveStudents(syncedList);

@@ -1,16 +1,16 @@
 import type { StudentItem } from '../types/database.types';
 
 /**
- * SMART ABSENSI GURU - DATA MASTER RESMI 144 SISWA TAHUN AJARAN 2026/2027
- * Sumber: File/FORMAT PENILAIAN ASTS & ASAS.xlsx
+ * SMART ABSENSI GURU - DATA MASTER RESMI 147 SISWA TAHUN AJARAN 2026/2027
+ * Sumber: File/FORMAT PENILAIAN ASTS & ASAS.xlsx + sinkronisasi UJIAN MENGAJI DAN BILINGUAL fix.docx
  * Rincian:
  * - Kelas 7: 31 siswa
  * - Kelas 8A: 15 siswa
- * - Kelas 8B: 29 siswa
+ * - Kelas 8B: 30 siswa
  * - Kelas 9A: 20 siswa
  * - Kelas 9B: 26 siswa
- * - Kelas SMA: 23 siswa
- * Total: 144 siswa
+ * - Kelas SMA: 25 siswa
+ * Total: 147 siswa
  */
 export const OFFICIAL_STUDENTS_2026_2027: StudentItem[] = [
   {
@@ -764,6 +764,16 @@ export const OFFICIAL_STUDENTS_2026_2027: StudentItem[] = [
     "attendanceRate": 100
   },
   {
+    "id": "std_2026_8b_nazriel1",
+    "nisn": "",
+    "fullName": "MUHAMAD NAZRIEL ADHA",
+    "className": "8B",
+    "academicYear": "2026/2027",
+    "gender": "L",
+    "cardStatus": "ACTIVE",
+    "attendanceRate": 100
+  },
+  {
     "id": "std_2026_9a_j7eeok",
     "nisn": "",
     "fullName": "ADELIA ZAFIRAH BILQIZ",
@@ -1257,6 +1267,26 @@ export const OFFICIAL_STUDENTS_2026_2027: StudentItem[] = [
     "id": "std_2026_sma_iyj8oz",
     "nisn": "",
     "fullName": "ZAKII AHMAD ALFARIDZI",
+    "className": "SMA",
+    "academicYear": "2026/2027",
+    "gender": "L",
+    "cardStatus": "ACTIVE",
+    "attendanceRate": 100
+  },
+  {
+    "id": "std_2026_sma_fadli1",
+    "nisn": "",
+    "fullName": "FADLI ADRIANSYAH",
+    "className": "SMA",
+    "academicYear": "2026/2027",
+    "gender": "L",
+    "cardStatus": "ACTIVE",
+    "attendanceRate": 100
+  },
+  {
+    "id": "std_2026_sma_tahfidz1",
+    "nisn": "",
+    "fullName": "MUHAMAD TAHFIDZ",
     "className": "SMA",
     "academicYear": "2026/2027",
     "gender": "L",
