@@ -19,9 +19,10 @@ import {
 
 const DEFAULT_PIN_HASH = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92'; // SHA-256('123456')
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const MAX_TOTAL_ATTEMPTS_PER_IP = 40;
-const MAX_FAILED_ATTEMPTS_PER_IP = 12;
-const MAX_NATIVE_FAILED_ATTEMPTS_PER_IP = 6;
+const MAX_TOTAL_ATTEMPTS_PER_IP = 150;
+const MAX_FAILED_ATTEMPTS_PER_IP = 40;
+const MAX_NATIVE_FAILED_ATTEMPTS_PER_IP = 30;
+const MAX_FAILED_ATTEMPTS_PER_IP_IDENTITY = 10;
 
 interface IpRateEntry {
   totalCount: number;
@@ -29,10 +30,20 @@ interface IpRateEntry {
   windowStart: number;
 }
 
-const ipRateLimitMap = new Map<string, IpRateEntry>();
+interface IpIdentityRateEntry {
+  failedCount: number;
+  windowStart: number;
+}
 
-function checkIpRateLimit(ip: string, isNativeBypass: boolean): { allowed: boolean; retryAfterSec: number } {
-  if (!ip) return { allowed: true, retryAfterSec: 0 };
+const ipRateLimitMap = new Map<string, IpRateEntry>();
+const ipIdentityRateMap = new Map<string, IpIdentityRateEntry>();
+
+function checkIpRateLimit(
+  ip: string,
+  identityKey: string,
+  isNativeBypass: boolean
+): { allowed: boolean; retryAfterSec: number; scope: 'IP' | 'IDENTITY' } {
+  if (!ip) return { allowed: true, retryAfterSec: 0, scope: 'IP' };
   const now = Date.now();
 
   // Periodic cleanup to prevent unbounded memory growth
@@ -40,6 +51,13 @@ function checkIpRateLimit(ip: string, isNativeBypass: boolean): { allowed: boole
     for (const [k, entry] of ipRateLimitMap.entries()) {
       if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
         ipRateLimitMap.delete(k);
+      }
+    }
+  }
+  if (ipIdentityRateMap.size > 1000) {
+    for (const [k, entry] of ipIdentityRateMap.entries()) {
+      if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+        ipIdentityRateMap.delete(k);
       }
     }
   }
@@ -55,13 +73,22 @@ function checkIpRateLimit(ip: string, isNativeBypass: boolean): { allowed: boole
 
   if (entry.totalCount > MAX_TOTAL_ATTEMPTS_PER_IP || entry.failedCount >= maxFailures) {
     const retryAfterSec = Math.max(1, Math.ceil((entry.windowStart + RATE_LIMIT_WINDOW_MS - now) / 1000));
-    return { allowed: false, retryAfterSec };
+    return { allowed: false, retryAfterSec, scope: 'IP' };
   }
 
-  return { allowed: true, retryAfterSec: 0 };
+  if (identityKey) {
+    const pairKey = `${ip}|${identityKey}`;
+    const idEntry = ipIdentityRateMap.get(pairKey);
+    if (idEntry && now - idEntry.windowStart <= RATE_LIMIT_WINDOW_MS && idEntry.failedCount >= MAX_FAILED_ATTEMPTS_PER_IP_IDENTITY) {
+      const retryAfterSec = Math.max(1, Math.ceil((idEntry.windowStart + RATE_LIMIT_WINDOW_MS - now) / 1000));
+      return { allowed: false, retryAfterSec, scope: 'IDENTITY' };
+    }
+  }
+
+  return { allowed: true, retryAfterSec: 0, scope: 'IP' };
 }
 
-function recordIpAuthFailure(ip: string): void {
+function recordIpAuthFailure(ip: string, identityKey = ''): void {
   if (!ip) return;
   const now = Date.now();
   const entry = ipRateLimitMap.get(ip);
@@ -70,6 +97,21 @@ function recordIpAuthFailure(ip: string): void {
   } else {
     entry.failedCount += 1;
   }
+
+  if (identityKey) {
+    const pairKey = `${ip}|${identityKey}`;
+    const idEntry = ipIdentityRateMap.get(pairKey);
+    if (!idEntry || now - idEntry.windowStart > RATE_LIMIT_WINDOW_MS) {
+      ipIdentityRateMap.set(pairKey, { failedCount: 1, windowStart: now });
+    } else {
+      idEntry.failedCount += 1;
+    }
+  }
+}
+
+function clearIpIdentityFailure(ip: string, identityKey: string): void {
+  if (!ip || !identityKey) return;
+  ipIdentityRateMap.delete(`${ip}|${identityKey}`);
 }
 
 function timingSafeMatch(a: string | null | undefined, b: string | null | undefined): boolean {
@@ -83,6 +125,54 @@ function isSafePostgrestIdentity(value: string): boolean {
   if (!value || value.length > 64) return false;
   // Disallow PostgREST filter operators/delimiters (, ( ) " ' \ ; * % < > newline)
   return /^[a-zA-Z0-9_@+\-\s.]+$/.test(value);
+}
+
+/**
+ * Menormalkan variasi penulisan Nomor WhatsApp (08..., +628..., 628..., 8..., spasi/strip)
+ * agar guru non-teknis tidak gagal login hanya karena format nomor berbeda dengan database.
+ */
+function buildIdentityLookupInfo(cleanIdentity: string): {
+  phoneCandidates: string[];
+  idCandidates: string[];
+  canonicalKey: string;
+} {
+  const compact = cleanIdentity.replace(/[\s-]+/g, '');
+  const phoneSet = new Set<string>([cleanIdentity]);
+  const idSet = new Set<string>([cleanIdentity]);
+  if (compact && isSafePostgrestIdentity(compact)) {
+    phoneSet.add(compact);
+    idSet.add(compact);
+  }
+
+  let canonicalKey = (compact || cleanIdentity).toLowerCase();
+
+  if (/^\+?\d{8,16}$/.test(compact)) {
+    const digits = compact.startsWith('+') ? compact.slice(1) : compact;
+    if (digits.startsWith('0') && digits.length >= 9) {
+      const core = digits.slice(1);
+      phoneSet.add(digits);
+      phoneSet.add(`62${core}`);
+      phoneSet.add(`+62${core}`);
+      canonicalKey = digits;
+    } else if (digits.startsWith('62') && digits.length >= 10) {
+      const core = digits.slice(2);
+      phoneSet.add(digits);
+      phoneSet.add(`+62${core}`);
+      phoneSet.add(`0${core}`);
+      canonicalKey = `0${core}`;
+    } else if (digits.startsWith('8') && digits.length >= 8) {
+      phoneSet.add(`0${digits}`);
+      phoneSet.add(`62${digits}`);
+      phoneSet.add(`+62${digits}`);
+      canonicalKey = `0${digits}`;
+    }
+  }
+
+  return {
+    phoneCandidates: Array.from(phoneSet).filter(isSafePostgrestIdentity),
+    idCandidates: Array.from(idSet).filter(isSafePostgrestIdentity),
+    canonicalKey,
+  };
 }
 
 function resolveAction(req: any): string {
@@ -395,15 +485,20 @@ export default async function handler(req: any, res: any) {
   const turnstileToken = req.body?.['cf-turnstile-response'] || req.body?.turnstile_token;
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
   const isNativeExempt = isStrictNativeAppRequest(req, turnstileToken, device_uuid);
+  const identityInfo = buildIdentityLookupInfo(cleanIdentity);
 
-  // 1a. Proteksi Brute-Force & Password-Spraying Berbasis IP
-  const rateCheck = checkIpRateLimit(clientIp, isNativeExempt);
+  // 1a. Proteksi Brute-Force & Password-Spraying yang Adil untuk Wi-Fi Sekolah
+  const rateCheck = checkIpRateLimit(clientIp, identityInfo.canonicalKey, isNativeExempt);
   if (!rateCheck.allowed) {
+    const waitMinutes = Math.ceil(rateCheck.retryAfterSec / 60);
     res.setHeader('Retry-After', String(rateCheck.retryAfterSec));
     return res.status(429).json({
       success: false,
       errorCode: 'RATE_LIMIT_EXCEEDED',
-      errorMessage: `Terlalu banyak percobaan login dari jaringan ini. Silakan tunggu ${Math.ceil(rateCheck.retryAfterSec / 60)} menit sebelum mencoba lagi.`,
+      errorMessage:
+        rateCheck.scope === 'IP'
+          ? `Terlalu banyak percobaan login di Wi-Fi ini. Silakan tunggu ${waitMinutes} menit, atau matikan Wi-Fi sebentar dan pakai data seluler HP.`
+          : `Terlalu banyak percobaan gagal untuk akun ini. Silakan tunggu ${waitMinutes} menit, atau hubungi Admin jika lupa PIN.`,
     });
   }
 
@@ -488,8 +583,12 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // 2. Cari Pengguna di public.users (quoted PostgREST values + sanitized identity)
-    const orFilter = `phone_number.eq.${cleanIdentity},nip.eq.${cleanIdentity},id.eq.${cleanIdentity}`;
+    // 2. Cari Pengguna di public.users (mendukung variasi format 08 / +628 / 628 / spasi / strip)
+    const orParts = [
+      ...identityInfo.phoneCandidates.map((p) => `phone_number.eq.${p}`),
+      ...identityInfo.idCandidates.flatMap((idCand) => [`nip.eq.${idCand}`, `id.eq.${idCand}`]),
+    ];
+    const orFilter = orParts.join(',');
     let userLookup = await serverSupabase
       .from('users')
       .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at, pin_hash, failed_login_count, locked_until, must_change_pin')
@@ -510,21 +609,21 @@ export default async function handler(req: any, res: any) {
       // Equalize timing and prevent account enumeration with same error response as wrong PIN
       const dummyHash = crypto.createHash('sha256').update(cleanPin).digest('hex');
       timingSafeMatch(dummyHash, DEFAULT_PIN_HASH);
-      recordIpAuthFailure(clientIp);
+      recordIpAuthFailure(clientIp, identityInfo.canonicalKey);
       return res.status(401).json({
         success: false,
         errorCode: 'AUTH_INVALID_CREDENTIALS',
-        errorMessage: 'No HP / NPP atau PIN 6-digit yang Anda masukkan tidak valid.',
+        errorMessage: 'No HP / NPP atau PIN 6-digit salah. Periksa angka Anda atau hubungi Admin bila lupa PIN.',
       });
     }
 
     // 3. Verifikasi Status Akun & Lockout
     if (user.account_status === 'LOCKED' || user.account_status === 'INACTIVE') {
-      recordIpAuthFailure(clientIp);
+      recordIpAuthFailure(clientIp, identityInfo.canonicalKey);
       return res.status(401).json({
         success: false,
         errorCode: 'AUTH_USER_INACTIVE',
-        errorMessage: 'Akun Anda sedang terblokir atau tidak aktif. Hubungi Admin Sekolah.',
+        errorMessage: 'Akun Anda belum aktif atau sedang diblokir. Hubungi Admin Sekolah.',
       });
     }
 
@@ -534,7 +633,7 @@ export default async function handler(req: any, res: any) {
       return res.status(429).json({
         success: false,
         errorCode: 'AUTH_ACCOUNT_LOCKED',
-        errorMessage: `Akun terkunci sementara karena salah PIN berulang kali. Silakan coba lagi dalam ${remainingMinutes} menit.`,
+        errorMessage: `Akun terkunci sementara ${remainingMinutes} menit karena salah PIN 5 kali. Jika lupa PIN, minta Admin mereset PIN Anda.`,
       });
     }
 
@@ -545,14 +644,14 @@ export default async function handler(req: any, res: any) {
     const isPinValid = matchedHash || matchedPlainLegacy;
 
     if (!isPinValid) {
-      recordIpAuthFailure(clientIp);
+      recordIpAuthFailure(clientIp, identityInfo.canonicalKey);
       const nextFailedCount = (user.failed_login_count || 0) + 1;
       const updates: Record<string, any> = { failed_login_count: nextFailedCount };
 
-      let lockoutMsg = 'No HP / NPP atau PIN 6-digit yang Anda masukkan tidak valid.';
+      let lockoutMsg = 'No HP / NPP atau PIN 6-digit salah. Periksa angka Anda atau hubungi Admin bila lupa PIN.';
       if (nextFailedCount >= 5) {
         updates.locked_until = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-        lockoutMsg = 'Terlalu banyak percobaan gagal (5x). Akun Anda dikunci selama 15 menit demi keamanan.';
+        lockoutMsg = 'Salah PIN 5 kali. Akun dikunci 15 menit demi keamanan — hubungi Admin jika lupa PIN.';
       }
 
       await serverSupabase.from('users').update(updates).eq('id', user.id);
@@ -563,6 +662,8 @@ export default async function handler(req: any, res: any) {
         errorMessage: lockoutMsg,
       });
     }
+
+    clearIpIdentityFailure(clientIp, identityInfo.canonicalKey);
 
     // 5. Reset Counter Gagal & Auto-Upgrade Legacy Plaintext Hash jika PIN Benar
     const successUpdates: Record<string, unknown> = {};

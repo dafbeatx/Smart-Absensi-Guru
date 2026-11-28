@@ -909,6 +909,65 @@ export async function runAuthHardeningSessionTestSuite(): Promise<TestSuiteResul
         hmacAuthTampered.errorCode === 'AUTH_SESSION_INVALID',
       `Status: ${resHmacLogin.getStatusCode()}, Prefix: ${String(hmacData?.token || '').slice(0, 9)}, ValidOk: ${hmacAuthValid.ok}, TamperedCode: ${hmacAuthTampered.errorCode}`
     );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 26. Auto Phone Format Normalization (+628 / 628 / 0812-3456)
+    // ─────────────────────────────────────────────────────────────────────────
+    const phoneFormats = ['+6281234567890', '6281234567890', '0812-3456-7890'];
+    const phoneStatuses: number[] = [];
+    for (const fmt of phoneFormats) {
+      const { req: reqFmt, res: resFmt } = createMockReqRes({
+        method: 'POST',
+        body: { identity: fmt, pin: '654321' },
+      });
+      await loginHandler(reqFmt, resFmt);
+      phoneStatuses.push(resFmt.getStatusCode());
+    }
+    const { req: reqFmtInj, res: resFmtInj } = createMockReqRes({
+      method: 'POST',
+      body: { identity: '+6281234567890,role.eq.ADMIN', pin: '654321' },
+    });
+    await loginHandler(reqFmtInj, resFmtInj);
+
+    assert(
+      'Auth Hardening 26: Indonesian phone variations (+628 / 628 / 0812-...) normalize cleanly while filter injection stays 400',
+      phoneStatuses.every((s) => s === 200) && resFmtInj.getStatusCode() === 400,
+      `Statuses: [${phoneStatuses.join(', ')}], InjStatus: ${resFmtInj.getStatusCode()}`
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 27. Fair School-Wi-Fi Rate Limit: 1 guru salah ketik tidak memblokir guru lain
+    // ─────────────────────────────────────────────────────────────────────────
+    const sharedWifiIp = '10.99.88.77';
+    for (let i = 0; i < 10; i++) {
+      const { req: reqFail, res: resFail } = createMockReqRes({
+        method: 'POST',
+        headers: { 'x-forwarded-for': sharedWifiIp },
+        body: { identity: '08999111222', pin: '999999' },
+      });
+      await loginHandler(reqFail, resFail);
+    }
+    const { req: reqSameTargetBlocked, res: resSameTargetBlocked } = createMockReqRes({
+      method: 'POST',
+      headers: { 'x-forwarded-for': sharedWifiIp },
+      body: { identity: '08999111222', pin: '999999' },
+    });
+    await loginHandler(reqSameTargetBlocked, resSameTargetBlocked);
+
+    const { req: reqOtherColleagueOk, res: resOtherColleagueOk } = createMockReqRes({
+      method: 'POST',
+      headers: { 'x-forwarded-for': sharedWifiIp },
+      body: { identity: '081234567890', pin: '654321' },
+    });
+    await loginHandler(reqOtherColleagueOk, resOtherColleagueOk);
+
+    assert(
+      'Auth Hardening 27: School Wi-Fi shared IP blocks repeated brute force on target (429) without blocking other colleagues (200)',
+      resSameTargetBlocked.getStatusCode() === 429 &&
+        resSameTargetBlocked.getData()?.errorCode === 'RATE_LIMIT_EXCEEDED' &&
+        resOtherColleagueOk.getStatusCode() === 200,
+      `TargetStatus: ${resSameTargetBlocked.getStatusCode()}, ColleagueStatus: ${resOtherColleagueOk.getStatusCode()}`
+    );
   } finally {
     resetServerSupabaseClient();
   }

@@ -437,10 +437,34 @@ export class SupabaseProvider implements IDataProvider {
       throw new Error('No HP / NPP atau PIN 6-digit yang Anda masukkan tidak valid.');
     }
 
+    const compactFallback = cleanIdentity.replace(/[\s-]+/g, '');
+    const fallbackPhoneCandidates = new Set<string>([cleanIdentity]);
+    if (compactFallback && /^[a-zA-Z0-9_@+\-.]{1,64}$/.test(compactFallback)) {
+      fallbackPhoneCandidates.add(compactFallback);
+    }
+    if (/^\+?\d{8,16}$/.test(compactFallback)) {
+      const digits = compactFallback.startsWith('+') ? compactFallback.slice(1) : compactFallback;
+      if (digits.startsWith('0') && digits.length >= 9) {
+        fallbackPhoneCandidates.add(`62${digits.slice(1)}`);
+        fallbackPhoneCandidates.add(`+62${digits.slice(1)}`);
+      } else if (digits.startsWith('62') && digits.length >= 10) {
+        fallbackPhoneCandidates.add(`0${digits.slice(2)}`);
+        fallbackPhoneCandidates.add(`+62${digits.slice(2)}`);
+      } else if (digits.startsWith('8') && digits.length >= 8) {
+        fallbackPhoneCandidates.add(`0${digits}`);
+        fallbackPhoneCandidates.add(`62${digits}`);
+      }
+    }
+    const fallbackOr = [
+      ...Array.from(fallbackPhoneCandidates).map((p) => `phone_number.eq.${p}`),
+      `nip.eq.${cleanIdentity}`,
+      ...(compactFallback !== cleanIdentity ? [`nip.eq.${compactFallback}`] : []),
+    ].join(',');
+
     const { data: user, error } = await this.client
       .from('users')
       .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, pin_hash, created_at')
-      .or(`phone_number.eq.${cleanIdentity},nip.eq.${cleanIdentity}`)
+      .or(fallbackOr)
       .single();
 
     if (error || !user) {

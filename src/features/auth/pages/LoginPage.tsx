@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
-import { getOrCreateDeviceUUID, getDeviceModelString } from '../../../utils/device.utils';
+import { detectNativeContainer, getOrCreateDeviceUUID, getDeviceModelString } from '../../../utils/device.utils';
 import { validatePIN, validateIdentity } from '../../../utils/validation.utils';
 import { AuthRepository } from '../../../repositories/AuthRepository';
 import { logger } from '../../../utils/logger.utils';
@@ -15,11 +16,18 @@ import { getCurrentTimeInJakarta, getTodayDateInJakarta } from '../../../utils/t
 export const LoginPage: React.FC = () => {
   const [identity, setIdentity] = useState('');
   const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
   const [pinError, setPinError] = useState('');
   const [identityError, setIdentityError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [isInAppBrowser] = useState(() => {
+    if (typeof navigator === 'undefined') return false;
+    const nativeInfo = detectNativeContainer();
+    if (nativeInfo.isNative) return false;
+    return /WhatsApp|FBAN|FBAV|Instagram|Line\/|TikTok/i.test(navigator.userAgent || '');
+  });
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
   const isSubmittingRef = useRef(false);
   const isMountedRef = useRef(true);
@@ -76,7 +84,9 @@ export const LoginPage: React.FC = () => {
     }
 
     if (!turnstileToken) {
-      setErrorMessage('Selesaikan verifikasi keamanan Cloudflare Turnstile terlebih dahulu.');
+      setErrorMessage(
+        'Pengecekan keamanan otomatis belum selesai centang hijau. Tunggu 2 detik, atau klik tombol "Muat Ulang Pengecekan" di atas tombol Masuk.'
+      );
       return;
     }
 
@@ -143,6 +153,15 @@ export const LoginPage: React.FC = () => {
             </div>
           </div>
 
+          {isInAppBrowser && (
+            <div className="p-3.5 rounded-2xl bg-sky-50 border border-sky-200 text-sky-900 text-xs leading-relaxed">
+              <p className="font-bold">Membuka dari dalam WhatsApp?</p>
+              <p className="mt-0.5 text-[11px] text-sky-800">
+                Agar lebih lancar, ketuk tanda <strong>titik tiga (⋮)</strong> di pojok kanan atas layar lalu pilih <strong>Buka di Chrome / Browser</strong>.
+              </p>
+            </div>
+          )}
+
           {errorMessage && (
             <div role="alert" className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold space-y-1">
               <div className="flex items-center gap-1.5 font-bold">
@@ -153,33 +172,53 @@ export const LoginPage: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Nomor WhatsApp / NPP"
-              type="tel"
-              inputMode="tel"
-              autoComplete="username"
-              placeholder="Masukkan Nomor WA / NPP"
-              value={identity}
-              onChange={(e) => setIdentity(e.target.value)}
-              error={identityError}
-              disabled={isLoading}
-              required
-            />
+            <div className="space-y-1">
+              <Input
+                label="Nomor WhatsApp / NPP"
+                type="tel"
+                inputMode="tel"
+                autoComplete="username"
+                placeholder="Contoh: 081234567890 atau NPP"
+                value={identity}
+                onChange={(e) => setIdentity(e.target.value)}
+                error={identityError}
+                disabled={isLoading}
+                required
+              />
+              <p className="text-[11px] text-slate-500">
+                Bisa mengetik awalan 08..., +628..., atau NPP tanpa perlu format khusus.
+              </p>
+            </div>
 
-            <Input
-              label="PIN 6-Digit"
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              autoComplete="current-password"
-              placeholder="••••••"
-              maxLength={6}
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              error={pinError}
-              disabled={isLoading}
-              required
-            />
+            <div className="space-y-1">
+              <Input
+                label="PIN 6-Digit"
+                type={showPin ? 'text' : 'password'}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="current-password"
+                placeholder="••••••"
+                maxLength={6}
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                error={pinError}
+                disabled={isLoading}
+                required
+                rightIcon={
+                  <button
+                    type="button"
+                    onClick={() => setShowPin((prev) => !prev)}
+                    aria-label={showPin ? 'Sembunyikan angka PIN' : 'Lihat angka PIN'}
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 cursor-pointer transition-colors"
+                  >
+                    {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                }
+              />
+              <p className="text-[11px] text-slate-500">
+                Ketuk ikon mata di sebelah kanan untuk melihat angka PIN yang Anda ketik.
+              </p>
+            </div>
 
             <TurnstileWidget
               ref={turnstileRef}
@@ -189,16 +228,21 @@ export const LoginPage: React.FC = () => {
               onError={handleTurnstileError}
             />
 
-            <div className="pt-2">
+            <div className="pt-1 space-y-2">
               <Button
                 type="submit"
                 variant="primary"
                 className="w-full"
                 isLoading={isLoading}
-                disabled={isLoading || !turnstileToken}
+                disabled={isLoading}
               >
                 MASUK KE APLIKASI
               </Button>
+              {!turnstileToken && !isLoading && (
+                <p className="text-[11px] text-center text-slate-500 font-medium">
+                  Pastikan kotak keamanan di atas sudah bertanda centang hijau sebelum menekan Masuk.
+                </p>
+              )}
             </div>
           </form>
         </div>

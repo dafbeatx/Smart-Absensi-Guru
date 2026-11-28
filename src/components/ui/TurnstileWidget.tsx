@@ -130,16 +130,27 @@ export const TurnstileWidget = React.forwardRef<TurnstileWidgetHandle, Turnstile
     }, [onVerify, onError, onExpire]);
 
     const handleTriggerReset = () => {
-      setStatus('ready');
+      const wasError = status === 'error';
+      setStatus('loading');
       onExpireRef.current?.();
-      if (widgetIdRef.current && window.turnstile) {
+      if (!wasError && widgetIdRef.current && window.turnstile) {
         try {
           window.turnstile.reset(widgetIdRef.current);
+          setStatus('ready');
           return;
         } catch {
           // Fall through to full remount if widget handle is stale
         }
       }
+      if (widgetIdRef.current && window.turnstile) {
+        try {
+          window.turnstile.remove(widgetIdRef.current);
+        } catch {
+          // ignore stale remove
+        }
+        widgetIdRef.current = null;
+      }
+      turnstileScriptPromise = null;
       setRetryTrigger((prev) => prev + 1);
     };
 
@@ -165,13 +176,24 @@ export const TurnstileWidget = React.forwardRef<TurnstileWidgetHandle, Turnstile
       let isMounted = true;
       let hasSettled = false;
 
-      // Safety load timeout (12s): clears loading state and prompts explicit user retry rather than minting fake bypass tokens
-      const timeoutTimer = setTimeout(() => {
-        if (isMounted && !hasSettled) {
-          setStatus('error');
-          onErrorRef.current?.();
+      const handleFailureOrRetry = () => {
+        if (!isMounted || hasSettled) return;
+        hasSettled = true;
+        // Coba muat ulang otomatis 1 kali secara senyap bila sinyal sempat putus
+        if (retryTrigger === 0) {
+          turnstileScriptPromise = null;
+          setStatus('loading');
+          setRetryTrigger(1);
+          return;
         }
-      }, 12000);
+        setStatus('error');
+        onErrorRef.current?.();
+      };
+
+      // Safety load timeout (10s): retries automatically once, then shows user-friendly recovery card
+      const timeoutTimer = setTimeout(() => {
+        handleFailureOrRetry();
+      }, 10000);
 
       const renderWidget = () => {
         if (!isMounted || !containerRef.current || !window.turnstile || widgetIdRef.current) return;
@@ -192,12 +214,8 @@ export const TurnstileWidget = React.forwardRef<TurnstileWidgetHandle, Turnstile
               }
             },
             'error-callback': () => {
-              hasSettled = true;
               clearTimeout(timeoutTimer);
-              if (isMounted) {
-                setStatus('error');
-                onErrorRef.current?.();
-              }
+              handleFailureOrRetry();
             },
             'expired-callback': () => {
               hasSettled = false;
@@ -215,12 +233,8 @@ export const TurnstileWidget = React.forwardRef<TurnstileWidgetHandle, Turnstile
             },
           });
         } catch {
-          hasSettled = true;
           clearTimeout(timeoutTimer);
-          if (isMounted) {
-            setStatus('error');
-            onErrorRef.current?.();
-          }
+          handleFailureOrRetry();
         }
       };
 
@@ -229,12 +243,8 @@ export const TurnstileWidget = React.forwardRef<TurnstileWidgetHandle, Turnstile
           renderWidget();
         })
         .catch(() => {
-          hasSettled = true;
           clearTimeout(timeoutTimer);
-          if (isMounted) {
-            setStatus('error');
-            onErrorRef.current?.();
-          }
+          handleFailureOrRetry();
         });
 
       return () => {
@@ -263,16 +273,16 @@ export const TurnstileWidget = React.forwardRef<TurnstileWidgetHandle, Turnstile
       );
     }
 
-    if (status === 'error') {
-      return (
-        <div className={`${className} flex-col items-center gap-2`}>
+    return (
+      <div className={`${className} flex-col items-center`}>
+        {status === 'error' && (
           <div className="w-full flex flex-col items-center gap-2 py-3 px-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs text-center">
             <div className="flex items-center gap-1.5 font-bold text-amber-800">
               <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Verifikasi Keamanan Belum Selesai</span>
+              <span>Pengecekan Keamanan Gagal Dimuat</span>
             </div>
-            <p className="text-[11px] text-amber-700 leading-relaxed">
-              Widget keamanan Cloudflare gagal dimuat atau waktu tunggu habis. Pastikan koneksi stabil lalu muat ulang.
+            <p className="text-[11px] text-amber-800 leading-relaxed">
+              Sinyal internet lambat atau terblokir (AdBlock / browser WhatsApp). Klik tombol di bawah, atau ganti Wi-Fi ke paket data HP lalu muat ulang.
             </p>
             <button
               type="button"
@@ -280,19 +290,17 @@ export const TurnstileWidget = React.forwardRef<TurnstileWidgetHandle, Turnstile
               className="min-h-11 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs inline-flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Muat Ulang Verifikasi</span>
+              <span>Muat Ulang Pengecekan</span>
             </button>
           </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className={`${className} flex-col items-center`}>
-        <div ref={containerRef} className="min-h-[65px] flex items-center justify-center" />
+        )}
+        <div
+          ref={containerRef}
+          className={status === 'error' ? 'hidden' : 'min-h-[65px] flex items-center justify-center'}
+        />
         {status === 'loading' && (
-          <p className="text-[11px] text-slate-400 font-medium mt-1">
-            Memuat verifikasi keamanan Cloudflare...
+          <p className="text-[11px] text-slate-500 font-medium mt-1">
+            Sedang mengecek keamanan koneksi... mohon tunggu sebentar.
           </p>
         )}
       </div>
