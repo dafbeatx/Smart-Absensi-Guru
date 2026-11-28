@@ -67,7 +67,7 @@ export const GuruDashboardHeader: React.FC<GuruDashboardHeaderProps> = ({
             <button
               type="button"
               onClick={onSwitchRoleMode}
-              className="min-h-11 px-2.5 sm:px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-[#0F172A] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              className="min-h-11 px-2.5 sm:px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:scale-[0.97] text-[#0F172A] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
               aria-label="Beralih mode tampilan akun"
               title="Beralih Peran (Mode Guru / Admin)"
             >
@@ -84,7 +84,7 @@ export const GuruDashboardHeader: React.FC<GuruDashboardHeaderProps> = ({
                 ? `Notifikasi, ${unreadCount} belum dibaca`
                 : 'Buka notifikasi dan pengumuman'
             }
-            className="relative w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-[#0F172A] flex items-center justify-center transition-colors cursor-pointer shrink-0 focus-visible:outline-2 focus-visible:outline-[#0D5C46]"
+            className="relative w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 text-[#0F172A] flex items-center justify-center transition-all cursor-pointer shrink-0 focus-visible:outline-2 focus-visible:outline-[#0D5C46]"
           >
             <SagaBellIcon className="w-6 h-6" />
             {unreadCount > 0 && (

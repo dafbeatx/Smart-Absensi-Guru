@@ -104,7 +104,7 @@ export const GuruAttendanceHeroCard: React.FC<GuruAttendanceHeroCardProps> = ({
         <button
           type="button"
           onClick={onScanQr}
-          className="min-h-13 rounded-xl px-2 py-2.5 bg-[#094736] hover:bg-[#07382B] active:bg-[#062D23] text-white border border-white/15 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 font-bold text-xs sm:text-sm transition-colors cursor-pointer"
+          className="min-h-13 rounded-xl px-2 py-2.5 saga-btn-hero-action border border-white/15 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 font-bold text-xs sm:text-sm transition-colors cursor-pointer"
         >
           <SagaScanQrIcon tone="dark" className="w-6.5 h-6.5 shrink-0" />
           <span className="whitespace-nowrap">Scan QR</span>
@@ -113,7 +113,7 @@ export const GuruAttendanceHeroCard: React.FC<GuruAttendanceHeroCardProps> = ({
         <button
           type="button"
           onClick={onBiometric}
-          className="min-h-13 rounded-xl px-2 py-2.5 bg-[#094736] hover:bg-[#07382B] active:bg-[#062D23] text-white border border-white/15 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 font-bold text-xs sm:text-sm transition-colors cursor-pointer"
+          className="min-h-13 rounded-xl px-2 py-2.5 saga-btn-hero-action border border-white/15 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 font-bold text-xs sm:text-sm transition-colors cursor-pointer"
         >
           <SagaFingerprintIcon tone="dark" className="w-6.5 h-6.5 shrink-0" />
           <span className="whitespace-nowrap">Sidik Jari</span>
@@ -122,7 +122,7 @@ export const GuruAttendanceHeroCard: React.FC<GuruAttendanceHeroCardProps> = ({
         <button
           type="button"
           onClick={onLeave}
-          className="min-h-13 rounded-xl px-2 py-2.5 bg-[#094736] hover:bg-[#07382B] active:bg-[#062D23] text-white border border-white/15 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 font-bold text-xs sm:text-sm transition-colors cursor-pointer"
+          className="min-h-13 rounded-xl px-2 py-2.5 saga-btn-hero-action border border-white/15 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 font-bold text-xs sm:text-sm transition-colors cursor-pointer"
         >
           <SagaLeavePermitIcon tone="dark" className="w-6.5 h-6.5 shrink-0" />
           <span className="whitespace-nowrap">Izin / Sakit</span>

@@ -273,6 +273,35 @@
   .saga-btn-primary:active {
     background-color: #07382B;
   }
+
+  .saga-btn-hero-action {
+    background-color: #094736;
+    color: #FFFFFF;
+  }
+
+  @media (hover: hover) {
+    .saga-btn-hero-action:hover {
+      background-color: #07382B;
+    }
+  }
+
+  .saga-btn-hero-action:active {
+    background-color: #062D23;
+  }
+
+  .saga-card-interactive {
+    background-color: #FFFFFF;
+  }
+
+  @media (hover: hover) {
+    .saga-card-interactive:hover {
+      background-color: #F8FAFC;
+    }
+  }
+
+  .saga-card-interactive:active {
+    background-color: #F1F5F9;
+  }
 }
 
 /* Reduced Motion Accessibility Standard */

@@ -315,7 +315,7 @@ export const GuruAdminHubTabView: React.FC<GuruAdminHubTabViewProps> = ({
             key={item.id}
             type="button"
             onClick={item.onClick}
-            className="w-full min-h-14 p-3 rounded-2xl bg-white hover:bg-slate-50 active:bg-slate-100 border border-slate-200 text-left flex items-center gap-3 transition-colors cursor-pointer"
+            className="w-full min-h-14 p-3 rounded-2xl saga-card-interactive border border-slate-200 text-left flex items-center gap-3 transition-colors cursor-pointer"
           >
             <div
               className="w-11 h-11 rounded-xl border border-slate-200 bg-[#F8FAFC] flex items-center justify-center shrink-0"

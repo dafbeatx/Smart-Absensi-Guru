@@ -4702,7 +4702,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsExportModalOpen(true)}
-                    className="w-full min-h-12 py-2.5 px-4 bg-[#0D5C46] hover:bg-[#094736] active:bg-[#07382B] text-white text-xs sm:text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full min-h-12 py-2.5 px-4 saga-btn-primary text-xs sm:text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <SagaPrinterIcon tone="dark" className="w-4 h-4 shrink-0" />
                     <span>Cetak Laporan Presensi Saya (PDF / Excel)</span>

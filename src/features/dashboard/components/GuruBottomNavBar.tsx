@@ -50,7 +50,7 @@ export const GuruDesktopNavBar: React.FC<GuruBottomNavBarProps> = ({
   return (
     <nav
       aria-label="Navigasi Utama Desktop"
-      className="hidden md:block bg-white border-b border-slate-200 sticky top-[69px] z-20"
+      className="hidden md:block bg-white border-b border-slate-200 sticky top-17.25 z-20"
     >
       <div className="max-w-3xl mx-auto px-6 h-13 flex items-center justify-between gap-4">
         <div className="flex items-center gap-1">
