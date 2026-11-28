@@ -1101,6 +1101,7 @@ export async function runAuthHardeningSessionTestSuite(): Promise<TestSuiteResul
         mockDb.users.usr_locked_001.failed_login_count === 0 &&
         mockDb.users.usr_admin_001.pin_hash === adminCustomPinHash &&
         !guruAuthAfterGlobal.ok &&
+        'errorCode' in guruAuthAfterGlobal &&
         guruAuthAfterGlobal.errorCode === 'AUTH_SESSION_REVOKED' &&
         adminAuthAfterGlobal.ok &&
         resUnlockedLogin.getStatusCode() === 200 &&
