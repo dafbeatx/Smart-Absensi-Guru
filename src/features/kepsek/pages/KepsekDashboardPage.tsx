@@ -48,6 +48,15 @@ import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinu
 import { SurveyAnalyticsView } from '../../survey/components/SurveyAnalyticsView';
 import { BroadcastAnnouncementView } from '../../admin/components/BroadcastAnnouncementView';
 import { GamePidView } from '../../guru/components/GamePidView';
+import { ArrowRight, Languages } from 'lucide-react';
+import { AdministrationRepository } from '../../../repositories/AdministrationRepository';
+import {
+  OralExamAssignmentRepository,
+  ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT,
+} from '../../../repositories/OralExamAssignmentRepository';
+import { findAssignmentsForTeacher } from '../../../data/oral-exam-groups';
+import { ORAL_EXAM_SCHEDULE_LABEL, type OralExamAssignment } from '../../../types/oral-exam.types';
+import { getOralExamPeriodStatus } from '../../../utils/oral-exam-scoring.utils';
 
 const OralExamAssessmentModal = React.lazy(() =>
   import('../../administration/components/OralExamAssessmentModal').then((m) => ({
@@ -85,6 +94,28 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const [isRewardModalOpen, setIsRewardModalOpen] = useState(false);
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
   const [savedChampionReward, setSavedChampionReward] = useState<string | null>(null);
+  const [kepsekOralAssignments, setKepsekOralAssignments] = useState<OralExamAssignment[]>([]);
+
+  useEffect(() => {
+    const syncOralAssignments = async () => {
+      try {
+        const list = await OralExamAssignmentRepository.getAssignments(
+          AdministrationRepository.getActiveAcademicYear(),
+          token || undefined
+        );
+        setKepsekOralAssignments(findAssignmentsForTeacher(list, user));
+      } catch {
+        setKepsekOralAssignments([]);
+      }
+    };
+    syncOralAssignments();
+    window.addEventListener(ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT, syncOralAssignments);
+    window.addEventListener('smart_absensi_teachers_updated', syncOralAssignments);
+    return () => {
+      window.removeEventListener(ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT, syncOralAssignments);
+      window.removeEventListener('smart_absensi_teachers_updated', syncOralAssignments);
+    };
+  }, [user, token]);
 
   // 🛡️ Mobile Hardware & Gesture Back Navigation Stack (Kepsek Dashboard)
   usePageModalBackStack([
@@ -654,7 +685,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     },
     {
       id: 'ORAL_EXAM',
-      label: 'Hasil Ujian Lisan',
+      label: 'Ujian Lisan (Nilai & Rekap)',
       icon: '🗣️',
     },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
@@ -843,18 +874,59 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
           {/* TAB 1: EXECUTIVE DASHBOARD OVERVIEW (DEFAULT) */}
           {(activeTab === 'DASHBOARD' || activeTab === 'OVERVIEW') && (
-            <ExecutiveDashboardOverview
-              roleTitle="Kepala Sekolah"
-              teachers={teachers}
-              pendingRequests={pendingRequests}
-              allLeaves={allLeaves}
-              attendanceRecords={attendanceRecords}
-              onOpenScanner={onOpenScanner}
-              onOpenBiometric={() => setIsBiometricModalOpen(true)}
-              onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
-              onSwitchToGuruView={onSwitchToGuruView}
-              onNavigateTab={(tab: string) => setActiveTab(tab)}
-            />
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('ORAL_EXAM');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className={`w-full py-3 px-4 rounded-2xl active:scale-[0.99] border text-xs font-bold flex items-center justify-between gap-3 transition-all cursor-pointer group ${
+                  kepsekOralAssignments.length > 0
+                    ? 'bg-emerald-50/90 hover:bg-emerald-100/80 border-emerald-200 text-emerald-950'
+                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-2xs'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-white ${
+                    kepsekOralAssignments.length > 0 ? 'bg-emerald-600' : 'bg-[#023246]'
+                  }`}>
+                    <Languages className="w-4 h-4" />
+                  </div>
+                  <div className="text-left min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-extrabold text-xs sm:text-sm">
+                        Penilaian &amp; Rekap Ujian Lisan (Bahasa &amp; BTQ)
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-white border border-emerald-200 text-[10px] font-extrabold text-emerald-800 shrink-0">
+                        {getOralExamPeriodStatus().badgeText}
+                      </span>
+                    </div>
+                    <span className={`block truncate text-[11px] font-medium mt-0.5 ${
+                      kepsekOralAssignments.length > 0 ? 'text-emerald-700' : 'text-slate-500'
+                    }`}>
+                      {kepsekOralAssignments.length > 0
+                        ? `Siap menguji: ${kepsekOralAssignments[0].roomNumber} (${kepsekOralAssignments[0].className === 'SMA' ? 'SMA' : `Kls ${kepsekOralAssignments[0].className}`}) & pantau semua penguji • ${ORAL_EXAM_SCHEDULE_LABEL}`
+                        : `Pantau seluruh hasil penguji & nilai tugas Anda • Jadwal: ${ORAL_EXAM_SCHEDULE_LABEL}`}
+                    </span>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 shrink-0 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+
+              <ExecutiveDashboardOverview
+                roleTitle="Kepala Sekolah"
+                teachers={teachers}
+                pendingRequests={pendingRequests}
+                allLeaves={allLeaves}
+                attendanceRecords={attendanceRecords}
+                onOpenScanner={onOpenScanner}
+                onOpenBiometric={() => setIsBiometricModalOpen(true)}
+                onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
+                onSwitchToGuruView={onSwitchToGuruView}
+                onNavigateTab={(tab: string) => setActiveTab(tab)}
+              />
+            </>
           )}
 
           {/* TAB: MY_ATTENDANCE (Absensi Pribadi Kepala Sekolah) */}
@@ -1144,7 +1216,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             </div>
           )}
 
-          {/* TAB: MONITORING HASIL PENILAIAN UJIAN LISAN (READ-ONLY) */}
+          {/* TAB: PENILAIAN & MONITORING HASIL UJIAN LISAN KEPALA SEKOLAH */}
           {activeTab === 'ORAL_EXAM' && (
             <React.Suspense
               fallback={

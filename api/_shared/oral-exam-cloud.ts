@@ -276,17 +276,6 @@ export async function handleListOralExamSessions(academicYear: string | undefine
 
 export async function handleSaveOralExamSession(body: any, auth: AuthSuccessContext) {
   const roleUpper = String(auth.user?.role || auth.role || '').trim().toUpperCase();
-  if (roleUpper === 'KEPSEK') {
-    return {
-      status: 403,
-      body: {
-        success: false,
-        errorCode: 'READ_ONLY_ACCESS',
-        errorMessage: 'Akun Kepala Sekolah hanya memiliki hak akses peninjauan (read-only).',
-      },
-    };
-  }
-
   const raw = body?.session;
   if (!raw || typeof raw.id !== 'string' || !raw.id.trim() || !Array.isArray(raw.students)) {
     return {
@@ -304,12 +293,12 @@ export async function handleSaveOralExamSession(body: any, auth: AuthSuccessCont
   const isAdminOrCommittee =
     STAFF_ADMIN_ROLES.has(roleUpper) || (await isActiveCommitteeMember(auth, academicYear));
 
-  // Verify existing session & examiner ownership for non-admin GURU
+  // Verify existing session & examiner ownership for non-admin GURU / KEPSEK examiners
   const { sessions: existingSessions } = await fetchAllCloudOralSessions(academicYear);
   const existing = existingSessions.find((s) => s.id === cleanId) || null;
 
   if (!isAdminOrCommittee) {
-    if (roleUpper !== 'GURU') {
+    if (roleUpper !== 'GURU' && roleUpper !== 'KEPSEK') {
       return {
         status: 403,
         body: {

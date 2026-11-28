@@ -49,6 +49,7 @@ import {
   findAssignmentsForTeacher,
   findMatchingOfficialOralGroup,
   hydrateOralExamAssignmentsWithTeachers,
+  isPersonNameMatch,
   resolveAssignmentDisplayForUser,
 } from '../../../data/oral-exam-groups';
 import {
@@ -305,13 +306,15 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     (session: OralExamSession | null): boolean => {
       if (!session) return false;
       if (isAdminControl) return true;
-      if (isKepsekControl) return false;
       const ownedGroupIds = new Set(guruAssignments.map((a) => a.id));
       if (session.groupId && ownedGroupIds.has(session.groupId)) return true;
       if (session.examinerUserId && user?.id && session.examinerUserId === user.id) return true;
+      if (!session.examinerUserId && user?.full_name && isPersonNameMatch(session.examinerName, user.full_name)) {
+        return true;
+      }
       return false;
     },
-    [isAdminControl, isKepsekControl, guruAssignments, user?.id]
+    [isAdminControl, guruAssignments, user?.id, user?.full_name]
   );
 
   // Determine active teacher assignment in GURU mode
@@ -2307,7 +2310,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
           </button>
           <div className="min-w-0">
             <h2 id="oral-exam-title" className="text-sm sm:text-base font-extrabold text-slate-900 truncate">
-              {screen === 'LIST' && (isKepsekControl ? 'Rekap Hasil Ujian Lisan' : 'Penilaian Ujian Lisan')}
+              {screen === 'LIST' && (isKepsekControl ? 'Penilaian & Rekap Ujian Lisan' : 'Penilaian Ujian Lisan')}
               {screen === 'CREATE' && (activeTrack === 'BAHASA' ? 'Buat Sesi Ujian Bahasa' : 'Buat Sesi Ujian BTQ')}
               {screen === 'ASSESS' && (currentSession?.title || 'Hasil Nilai Ujian Lisan')}
             </h2>
@@ -2316,7 +2319,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                 (isAdminControl
                   ? 'Kelola penguji, pantau & lihat seluruh hasil penilaian'
                   : isKepsekControl
-                    ? 'Monitoring kepala sekolah seluruh ruang & penguji (Read-Only)'
+                    ? 'Menguji kelompok Anda & pantau hasil seluruh penguji'
                     : 'Siap pakai menguji & melihat rekap nilai semua ruang')}
               {screen === 'CREATE' && 'Mode Admin: Buat atau siapkan sesi penilaian'}
               {screen === 'ASSESS' && currentSession && (
@@ -2356,8 +2359,8 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
           {inlineConfirmCard}
           {inlineAddStudentCard}
           {screen === 'LIST' && renderScheduleBanner()}
-            {/* ==================== SCREEN 1: GURU READY-TO-USE HOME + SCHOOL RECAP ==================== */}
-            {screen === 'LIST' && !isAdminControl && !isKepsekControl && (
+            {/* ==================== SCREEN 1: GURU & KEPSEK EXAMINER + ALL-EXAMINER MONITORING ==================== */}
+            {screen === 'LIST' && !isAdminControl && (
               <>
                 {isLoadingAssignments ? (
                   <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center text-xs font-semibold text-slate-500">
@@ -2366,20 +2369,46 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                 ) : !activeGuruAssignment ? (
                   <div className="p-4 rounded-2xl bg-sky-50/80 border border-sky-200 flex items-start gap-3">
                     <div className="w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center shrink-0">
-                      <UserCheck className="w-5 h-5" />
+                      {isKepsekControl ? <Eye className="w-5 h-5" /> : <UserCheck className="w-5 h-5" />}
                     </div>
                     <div className="space-y-0.5 min-w-0">
                       <h3 className="text-xs sm:text-sm font-extrabold text-slate-900">
-                        Pantau Hasil Penilaian Semua Penguji
+                        {isKepsekControl
+                          ? 'Monitoring Kepala Sekolah — Semua Penguji'
+                          : 'Pantau Hasil Penilaian Semua Penguji'}
                       </h3>
                       <p className="text-xs text-slate-600 leading-relaxed">
-                        Akun Anda (<strong>{user?.full_name}</strong>) belum ditugaskan menguji ruang tertentu, namun Anda tetap dapat melihat seluruh nilai siswa yang diinput penguji dan mengunduh rekapnya di bawah ini.
+                        {isKepsekControl ? (
+                          <>
+                            Anda dapat memantau seluruh hasil penilaian ujian lisan dari semua penguji &amp; ruang serta mengunduh PDF/Excel di bawah ini. Bila Anda juga ikut menguji peserta, minta Admin menautkan akun <strong>{user?.full_name}</strong> di menu Kelola Penguji agar kartu penilaian Anda muncul otomatis di sini.
+                          </>
+                        ) : (
+                          <>
+                            Akun Anda (<strong>{user?.full_name}</strong>) belum ditugaskan menguji ruang tertentu, namun Anda tetap dapat melihat seluruh nilai siswa yang diinput penguji dan mengunduh rekapnya di bawah ini.
+                          </>
+                        )}
                       </p>
                     </div>
                   </div>
                 ) : (
                   <>
-                    {/* Assignment Selector if Guru has >1 group */}
+                    {isKepsekControl && (
+                      <div className="p-3.5 rounded-2xl bg-sky-50/80 border border-sky-200 flex items-start gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-[#023246] text-white flex items-center justify-center shrink-0">
+                          <Eye className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-extrabold text-slate-900">
+                            Mode Kepala Sekolah: Penguji &amp; Monitoring Semua Ruang
+                          </p>
+                          <p className="text-[11px] text-slate-600 leading-snug mt-0.5">
+                            Input nilai kelompok Anda pada kartu di bawah, dan pantau hasil semua guru penguji pada bagian rekap (Read-Only untuk ruang penguji lain).
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Assignment Selector if Examiner has >1 group */}
                     {guruAssignments.length > 1 && (
                       <div className="space-y-1.5">
                         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
@@ -2404,11 +2433,13 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                       </div>
                     )}
 
-                    {/* Teacher Ready-to-Use Placement Card */}
+                    {/* Examiner Ready-to-Use Placement Card */}
                     <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2.5">
                       <div className="flex items-center justify-between gap-2">
                         <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
-                          Tugas Menguji Anda (Siap Pakai)
+                          {isKepsekControl
+                            ? 'Tugas Menguji Kepala Sekolah (Siap Pakai)'
+                            : 'Tugas Menguji Anda (Siap Pakai)'}
                         </span>
                         <span className="text-xs font-bold text-slate-600">TA {activeAcademicYear}</span>
                       </div>
@@ -2529,28 +2560,6 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                 )}
 
                 {!activeGuruAssignment && renderTrackSwitcher()}
-                {renderAllResultsSection()}
-              </>
-            )}
-
-            {/* ==================== SCREEN 1: KEPSEK READ-ONLY MONITORING ==================== */}
-            {screen === 'LIST' && isKepsekControl && (
-              <>
-                <div className="p-4 rounded-2xl bg-sky-50/80 border border-sky-200 flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center shrink-0">
-                    <Eye className="w-5 h-5" />
-                  </div>
-                  <div className="space-y-0.5 min-w-0">
-                    <h3 className="text-xs sm:text-sm font-extrabold text-slate-900">
-                      Monitoring Kepala Sekolah (Read-Only)
-                    </h3>
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      Pantau real-time hasil penilaian ujian lisan dari seluruh penguji &amp; ruang, cari nilai siswa tertentu, serta unduh laporan PDF/Excel resmi.
-                    </p>
-                  </div>
-                </div>
-
-                {renderTrackSwitcher()}
                 {renderAllResultsSection()}
               </>
             )}

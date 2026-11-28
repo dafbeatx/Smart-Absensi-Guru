@@ -932,12 +932,25 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
     let relCleanedLegacyKv = false;
     let otherGuruForbidden = 0;
     let kepsekForbidden = 0;
+    let kepsekOwnSaveStatus = 0;
     let guruDeleteForbidden = 0;
+    let kepsekDeleteForbidden = 0;
     let adiVisibleCount = 0;
     let otherVisibleCount = 0;
     let kepsekVisibleCount = 0;
     let adminVisibleCount = 0;
     let adminDeleteStatus = 0;
+
+    const kepsekOwnSessionPayload = {
+      ...cloudSessionPayload,
+      id: 'oral_session_cloud_kepsek_1',
+      groupId: 'oral_grp_kepsek_uji',
+      title: 'Ujian Lisan BTQ - Ruang Kepala Sekolah',
+      examinerUserId: kepsekAuth.userId,
+      examinerName: kepsekAuth.user.full_name,
+      examinerNpp: null,
+      roomNumber: 'Ruang Kepala Sekolah',
+    };
 
     try {
       setServerSupabaseClient(fakeCloudDb);
@@ -960,12 +973,16 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
       relSaveStatus = relRes.status;
       relCleanedLegacyKv = !kvRows.has(`oral_exam_session_${cloudSessionPayload.id}`);
 
-      // 13c: RBAC enforcement (Guru lain & Kepsek ditolak mutasi)
+      // 13c: RBAC enforcement:
+      // - Guru lain & Kepsek tetap ditolak mengubah sesi penguji lain (403)
+      // - Kepsek DAPAT menginput nilai pada sesi penguji miliknya sendiri (200), namun tetap tidak boleh menghapus sesi (403)
       otherGuruForbidden = (await handleSaveOralExamSession({ session: cloudSessionPayload }, guruOtherAuth)).status;
       kepsekForbidden = (await handleSaveOralExamSession({ session: cloudSessionPayload }, kepsekAuth)).status;
+      kepsekOwnSaveStatus = (await handleSaveOralExamSession({ session: kepsekOwnSessionPayload }, kepsekAuth)).status;
       guruDeleteForbidden = (await handleDeleteOralExamSession({ sessionId: cloudSessionPayload.id }, guruAdiAuth)).status;
+      kepsekDeleteForbidden = (await handleDeleteOralExamSession({ sessionId: kepsekOwnSessionPayload.id }, kepsekAuth)).status;
 
-      // 13d: Transparansi Baca: Semua peran (Penguji, Guru lain, Kepsek, & Admin) dapat melihat hasil penilaian,
+      // 13d: Transparansi Baca: Semua peran (Penguji, Guru lain, Kepsek, & Admin) dapat melihat seluruh hasil penilaian,
       // sedangkan mutasi tetap dikunci strictly per penguji/admin
       adiVisibleCount = (await handleListOralExamSessions('2026/2027', guruAdiAuth)).body.sessions?.length || 0;
       otherVisibleCount = (await handleListOralExamSessions('2026/2027', guruOtherAuth)).body.sessions?.length || 0;
@@ -974,26 +991,29 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
 
       // 13e: Admin delete cleans relational & fallback
       adminDeleteStatus = (await handleDeleteOralExamSession({ sessionId: cloudSessionPayload.id }, adminAuth)).status;
+      await handleDeleteOralExamSession({ sessionId: kepsekOwnSessionPayload.id }, adminAuth);
     } finally {
       resetServerSupabaseClient();
     }
 
     assert(
-      'Supabase Cloud Sessions: Semua Guru, Kepsek & Admin dapat memantau hasil (read-all), sedangkan mutasi RBAC tetap ketat per penguji',
+      'Supabase Cloud Sessions: Semua Guru & Kepsek dapat memantau semua hasil, Kepsek dapat menginput pada sesinya sendiri, dan mutasi sesi lain tetap ditolak (403)',
       kvSaveStatus === 200 &&
         kvSavedBeforeMigration &&
         relSaveStatus === 200 &&
         relCleanedLegacyKv &&
         otherGuruForbidden === 403 &&
         kepsekForbidden === 403 &&
+        kepsekOwnSaveStatus === 200 &&
         guruDeleteForbidden === 403 &&
-        adiVisibleCount === 1 &&
-        otherVisibleCount === 1 &&
-        kepsekVisibleCount === 1 &&
-        adminVisibleCount === 1 &&
+        kepsekDeleteForbidden === 403 &&
+        adiVisibleCount === 2 &&
+        otherVisibleCount === 2 &&
+        kepsekVisibleCount === 2 &&
+        adminVisibleCount === 2 &&
         adminDeleteStatus === 200 &&
         relationalRows.size === 0,
-      `kv=${kvSaveStatus}(${kvSavedBeforeMigration}), rel=${relSaveStatus}(clean=${relCleanedLegacyKv}), other403=${otherGuruForbidden}, ro403=${kepsekForbidden}, del403=${guruDeleteForbidden}, lists=${adiVisibleCount}/${otherVisibleCount}/${kepsekVisibleCount}/${adminVisibleCount}`
+      `kv=${kvSaveStatus}(${kvSavedBeforeMigration}), rel=${relSaveStatus}(clean=${relCleanedLegacyKv}), other403=${otherGuruForbidden}, kepsekOther403=${kepsekForbidden}, kepsekOwn200=${kepsekOwnSaveStatus}, del403=${guruDeleteForbidden}/${kepsekDeleteForbidden}, lists=${adiVisibleCount}/${otherVisibleCount}/${kepsekVisibleCount}/${adminVisibleCount}`
     );
 
     await OralExamAssignmentRepository.resetToOfficialDefaults('2026/2027', 'MOCK_TOKEN');

@@ -307,7 +307,7 @@ const isSimilarNameToken = (ta: string, tb: string): boolean => {
   return false;
 };
 
-const isPersonNameMatch = (nameA: string, nameB: string): boolean => {
+export const isPersonNameMatch = (nameA: string, nameB: string): boolean => {
   const normA = normalizeExaminerPersonName(nameA);
   const normB = normalizeExaminerPersonName(nameB);
   if (!normA || !normB) return false;
