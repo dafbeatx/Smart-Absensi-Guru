@@ -178,7 +178,6 @@ import { TeacherDailyChallengeWidget } from '../../guru/components/TeacherDailyC
 import { TeacherChallengeModal } from '../../guru/components/TeacherChallengeModal';
 import { GamePidView } from '../../guru/components/GamePidView';
 import { GamePidPromoModal } from '../../guru/components/GamePidPromoModal';
-import { shouldShowPidPromoToday } from '../../../config/game-pid.config';
 import { TeacherChallengeService } from '../../../services/teacher-challenge.service';
 import { CheckoutReminderBanner } from '../components/CheckoutReminderBanner';
 import { AttendancePolicyAgreementModal } from '../../guru/components/AttendancePolicyAgreementModal';
@@ -2228,15 +2227,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       }
     }
 
-    // 2. Automated Pop-up Promosi Game PID hanya setelah guru selesai absen masuk (zero interruption)
-    if (hasCheckedInToday && !isTodayOff.isOff && !isCelebrationModalOpen && shouldShowPidPromoToday(todayDateStr)) {
-      const promoTimer = setTimeout(() => {
-        setIsGamePidPromoOpen(true);
-        SoundService.play('SUCCESS');
-      }, 1200);
-      return () => clearTimeout(promoTimer);
-    }
-  }, [effectiveUser?.id, todayDateStr, hasCheckedInToday, isTodayOff.isOff, isCelebrationModalOpen]);
+    // Auto-popup PID dinonaktifkan: modal hanya dibuka melalui aksi eksplisit pengguna
+  }, [effectiveUser?.id, todayDateStr]);
 
   const hasFilledMoodToday = useMemo(() => {
     if (todayMood) return true;
