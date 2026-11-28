@@ -845,7 +845,9 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                       editingGroup.students.map((st, idx) => (
                         <div
                           key={`${st.studentId}_${idx}`}
-                          className="px-3 py-2 flex items-center justify-between gap-2 text-xs bg-white border-b border-slate-100 last:border-b-0"
+                          className={`px-3 py-2 flex items-center justify-between gap-2 text-xs bg-white ${
+                            idx < editingGroup.students.length - 1 ? 'border-b border-slate-100' : ''
+                          }`}
                         >
                           <span className="font-semibold text-slate-800 truncate">
                             {idx + 1}. {st.studentName}
