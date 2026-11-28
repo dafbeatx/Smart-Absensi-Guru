@@ -2711,7 +2711,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
             className={
               isPageMode
                 ? `${
-                    isAdminControl ? 'sticky bottom-2 max-w-3xl mx-auto' : 'sticky bottom-[68px] sm:bottom-3'
+                    isAdminControl ? 'sticky bottom-2 max-w-3xl mx-auto' : 'sticky bottom-17 sm:bottom-3'
                   } z-20 bg-white/95 backdrop-blur-xs border border-slate-200 rounded-2xl p-3 shadow-lg w-full`
                 : 'sticky bottom-0 z-20 bg-white border-t border-slate-200 p-3 pb-[max(12px,env(safe-area-inset-bottom))] shrink-0'
             }
