@@ -7,7 +7,7 @@ import { AdministrationRepository } from '../../repositories/AdministrationRepos
 import {
   DEFAULT_ADMINISTRATION_MODULES,
 } from '../../types/administration.types';
-import { ALL_QUICK_ICONS } from '../../features/guru/components/CustomizeQuickIconsModal';
+import { ALL_QUICK_ICONS, sanitizeQuickIconIds } from '../../features/guru/components/CustomizeQuickIconsModal';
 
 export const runAdministrationModulesTestSuite = async (): Promise<{
   passed: number;
@@ -221,6 +221,34 @@ export const runAdministrationModulesTestSuite = async (): Promise<{
     );
   } catch (err: any) {
     assert('Admin Hub 09: Error verifying Game PID in ALL_QUICK_ICONS', false, err?.message);
+  }
+
+  // ---------------------------------------------------------------------------
+  // TEST 10: Legacy LocalStorage Quick Icons Compatibility & Deduplication
+  // ---------------------------------------------------------------------------
+  try {
+    const hasCoreNewIds = ['riwayat', 'buat_soal_ai', 'lainnya'].every((id) =>
+      ALL_QUICK_ICONS.some((item) => item.id === id)
+    );
+    const sanitizedNonOfficer = sanitizeQuickIconIds(
+      ['kalender', 'jadwal', 'sarpras_inventory', 'jadwal', 'unknown_legacy_id', 'buat_soal_ai'],
+      false,
+      ['jadwal', 'riwayat', 'administrasi', 'oral_exam', 'buat_soal_ai', 'koreksi_soal', 'direktori_siswa', 'lainnya']
+    );
+    const hasExactEightUnique =
+      sanitizedNonOfficer.length === 8 &&
+      new Set(sanitizedNonOfficer).size === 8 &&
+      !sanitizedNonOfficer.includes('sarpras_inventory') &&
+      sanitizedNonOfficer.includes('kalender') &&
+      sanitizedNonOfficer.includes('buat_soal_ai');
+
+    assert(
+      'Admin Hub 10: Quick icons include riwayat/buat_soal_ai/lainnya and sanitize legacy localStorage without duplicates or empty slots',
+      hasCoreNewIds && hasExactEightUnique,
+      `Result: ${JSON.stringify(sanitizedNonOfficer)}`
+    );
+  } catch (err: any) {
+    assert('Admin Hub 10: Error verifying legacy quick icon sanitization', false, err?.message);
   }
 
   return { passed, failed, results };

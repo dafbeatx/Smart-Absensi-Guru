@@ -1,5 +1,13 @@
 import React from 'react';
-import { Clock, AlertTriangle, Fingerprint, QrCode, ShieldCheck, FileText } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import {
+  SagaClockStatusIcon,
+  SagaDeviceShieldIcon,
+  SagaEmergencySosIcon,
+  SagaFingerprintIcon,
+  SagaNotulenIcon,
+  SagaScanQrIcon,
+} from '../../../components/ui/SagaServiceIcons';
 import { getCurrentTimeInJakarta, getJakartaDayOfWeek } from '../../../utils/time.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { AttendancePolicyService } from '../../../services/attendance-policy.service';
@@ -57,52 +65,49 @@ export const CheckoutReminderBanner: React.FC<CheckoutReminderBannerProps> = ({
 
   return (
     <div
-      className={`rounded-2xl sm:rounded-3xl p-4 sm:p-4.5 border transition-all duration-300 shadow-sm relative overflow-hidden ${
+      className={`rounded-2xl p-4 border shadow-xs relative overflow-hidden ${
         isOverdue
-          ? 'bg-linear-to-r from-red-500/10 via-white to-amber-500/10 border-red-300/90 text-red-950'
-          : 'bg-linear-to-r from-amber-500/10 via-white to-yellow-500/10 border-amber-300/90 text-amber-950'
+          ? 'bg-rose-50 border-rose-200 text-rose-950'
+          : 'bg-amber-50 border-amber-200 text-amber-950'
       }`}
     >
-      {/* Background Accent Lines */}
-      <div className="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-amber-400/10 blur-xl pointer-events-none" />
-
       <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
         {/* Left: Icon & Message */}
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <div
-            className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ring-2 ${
-              isOverdue
-                ? 'bg-red-600 text-white ring-red-100 animate-pulse'
-                : 'bg-amber-500 text-white ring-amber-100'
+            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              isOverdue ? 'bg-rose-600' : 'bg-amber-600'
             }`}
           >
-            {isOverdue ? <AlertTriangle className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+            {isOverdue ? (
+              <SagaEmergencySosIcon tone="dark" className="w-5 h-5" />
+            ) : (
+              <SagaClockStatusIcon tone="dark" className="w-5 h-5" />
+            )}
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span
-                className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                  isOverdue
-                    ? 'bg-red-600 text-white'
-                    : 'bg-amber-600 text-white'
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                  isOverdue ? 'bg-rose-700 text-white' : 'bg-amber-700 text-white'
                 }`}
               >
                 {isOverdue ? 'Wajib Pulang Sekarang' : 'Peringatan 1 Jam Pulang'}
               </span>
 
-              <span className="text-[11px] font-bold text-slate-500">
+              <span className="text-xs font-semibold text-slate-600">
                 Kepulangan Resmi: {targetCheckoutTime} WIB
               </span>
             </div>
 
-            <h4 className="text-xs sm:text-sm font-black text-[#023246] tracking-tight mt-1 leading-snug">
+            <h4 className="text-sm font-bold text-slate-900 tracking-tight mt-1 leading-snug">
               {isOverdue
-                ? '⚠️ Anda Belum Melakukan Absen Pulang!'
-                : `⏰ Waktu Pulang Segera Tiba (Pukul ${targetCheckoutTime} WIB)`}
+                ? 'Anda Belum Melakukan Absen Pulang'
+                : `Waktu Pulang Segera Tiba (Pukul ${targetCheckoutTime} WIB)`}
             </h4>
 
-            <p className="text-[11px] text-slate-600 leading-relaxed mt-0.5">
+            <p className="text-xs text-slate-700 leading-relaxed mt-0.5">
               {isOverdue
                 ? 'Waktu kepulangan resmi telah lewat. Segera lakukan presensi pulang agar tidak terkena pemotongan 10 poin disiplin.'
                 : 'Pastikan Anda melakukan Presensi Pulang sebelum meninggalkan area sekolah agar kehadiran hari ini diakui utuh.'}
@@ -113,19 +118,20 @@ export const CheckoutReminderBanner: React.FC<CheckoutReminderBannerProps> = ({
               <button
                 type="button"
                 onClick={onOpenPolicyModal}
-                className="inline-flex items-center gap-1 text-[10.5px] font-extrabold text-[#023246] hover:underline cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0D5C46] hover:underline cursor-pointer min-h-8"
               >
                 {isAgreed ? (
                   <>
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="text-emerald-800">Pakta Integritas Disiplin Aktif</span>
+                    <SagaDeviceShieldIcon className="w-4 h-4 shrink-0" />
+                    <span className="text-[#0D5C46]">Pakta Integritas Disiplin Aktif</span>
                   </>
                 ) : (
                   <>
-                    <FileText className="w-3.5 h-3.5 text-amber-700" />
+                    <SagaNotulenIcon className="w-4 h-4 shrink-0" />
                     <span className="text-amber-900 underline decoration-amber-400">
-                      Baca &amp; Setujui Syarat &amp; Ketentuan Presensi →
+                      Baca &amp; Setujui Syarat &amp; Ketentuan Presensi
                     </span>
+                    <ArrowRight className="w-3.5 h-3.5 shrink-0" />
                   </>
                 )}
               </button>
@@ -138,20 +144,20 @@ export const CheckoutReminderBanner: React.FC<CheckoutReminderBannerProps> = ({
           <button
             type="button"
             onClick={onOpenBiometric}
-            className="flex-1 sm:flex-initial h-10 px-3.5 rounded-xl bg-[#023246] hover:bg-[#034560] active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            className="flex-1 sm:flex-initial min-h-11 px-4 rounded-xl bg-[#0D5C46] hover:bg-[#094736] active:scale-[0.98] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             title="Presensi Pulang Cepat via Sidik Jari HP"
           >
-            <Fingerprint className="w-4 h-4 text-cyan-300" />
+            <SagaFingerprintIcon tone="dark" className="w-4 h-4 shrink-0" />
             <span>Sidik Jari</span>
           </button>
 
           <button
             type="button"
             onClick={onOpenScanner}
-            className="flex-1 sm:flex-initial h-10 px-3 rounded-xl bg-white hover:bg-slate-50 active:scale-95 text-slate-700 hover:text-[#023246] border border-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+            className="flex-1 sm:flex-initial min-h-11 px-3.5 rounded-xl bg-white hover:bg-slate-50 active:scale-[0.98] text-slate-800 border border-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             title="Presensi Pulang via Scan QR Kamera"
           >
-            <QrCode className="w-4 h-4 text-slate-500" />
+            <SagaScanQrIcon className="w-4 h-4 shrink-0" />
             <span>Scan QR</span>
           </button>
         </div>

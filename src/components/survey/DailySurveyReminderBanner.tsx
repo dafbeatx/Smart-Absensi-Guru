@@ -4,7 +4,8 @@ import {
   syncSurveyCompletionFromPointLogs,
 } from '../../services/research-survey.service';
 import { useAuthStore } from '../../store/useAuthStore';
-import { Sparkles, ClipboardCheck, ArrowRight, X } from 'lucide-react';
+import { ArrowRight, X } from 'lucide-react';
+import { SagaAspirationIcon, SagaSparkAiIcon } from '../ui/SagaServiceIcons';
 
 export interface DailySurveyReminderBannerProps {
   className?: string;
@@ -78,27 +79,27 @@ export const DailySurveyReminderBanner: React.FC<DailySurveyReminderBannerProps>
     <aside
       id="daily-survey-reminder-banner"
       aria-label="Pengingat Kuesioner Evaluasi Sekolah"
-      className={`w-full bg-linear-to-r from-amber-50 via-amber-100/50 to-orange-50/80 border border-amber-300/80 rounded-2xl p-3 sm:p-4 shadow-2xs transition-all animate-fade-in ${className}`}
+      className={`w-full bg-amber-50 border border-amber-200 rounded-2xl p-3.5 sm:p-4 shadow-2xs ${className}`}
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* Konten Kiri */}
-        <div className="flex items-start gap-2.5 min-w-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 text-amber-900 flex items-center justify-center shrink-0 mt-0.5">
-            <ClipboardCheck className="w-4 h-4 text-amber-800" />
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-white border border-amber-200 flex items-center justify-center shrink-0">
+            <SagaAspirationIcon className="w-6 h-6" />
           </div>
 
           <div className="min-w-0 space-y-0.5">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <h4 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
+              <h4 className="text-sm font-bold text-slate-900 tracking-tight">
                 Evaluasi Sistem Sekolah Belum Diisi
               </h4>
-              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9.5px] font-black bg-amber-400 text-slate-950 uppercase tracking-wider shadow-2xs shrink-0">
-                <Sparkles className="w-2.5 h-2.5 text-amber-950" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-300 text-slate-950 uppercase tracking-wide shrink-0">
+                <SagaSparkAiIcon className="w-3 h-3" />
                 +10 Poin
               </span>
             </div>
 
-            <p className="text-[11.5px] sm:text-xs text-slate-700 leading-snug font-medium">
+            <p className="text-xs text-slate-700 leading-snug font-normal">
               Suara Anda sangat berharga untuk peningkatan mutu aplikasi. Pengisian 100% anonim (hanya 1 menit).
             </p>
           </div>
@@ -110,7 +111,7 @@ export const DailySurveyReminderBanner: React.FC<DailySurveyReminderBannerProps>
             type="button"
             id="btn-survey-reminder-fill-now"
             onClick={handleOpen}
-            className="flex-1 sm:flex-initial min-h-11 px-3.5 py-2 bg-[#023246] hover:bg-[#18536B] text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-2xs active:scale-98 cursor-pointer"
+            className="flex-1 sm:flex-initial min-h-11 px-4 py-2 bg-[#0D5C46] hover:bg-[#094736] text-white text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
           >
             <span>Isi Sekarang</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -121,10 +122,10 @@ export const DailySurveyReminderBanner: React.FC<DailySurveyReminderBannerProps>
             id="btn-survey-reminder-dismiss"
             onClick={handleDismiss}
             aria-label="Tutup pengingat sementara"
-            className="min-h-11 min-w-11 px-2.5 py-2 text-slate-600 hover:text-slate-900 hover:bg-amber-200/50 text-xs font-bold rounded-xl transition-all flex items-center justify-center cursor-pointer"
+            className="min-h-11 min-w-11 px-2.5 py-2 text-slate-600 hover:text-slate-900 hover:bg-amber-200/60 text-xs font-bold rounded-xl transition-colors flex items-center justify-center cursor-pointer"
             title="Nanti Saja"
           >
-            <span className="hidden sm:inline mr-1 text-[11px]">Nanti</span>
+            <span className="hidden sm:inline mr-1 text-xs">Nanti</span>
             <X className="w-4 h-4" />
           </button>
         </div>

@@ -48,14 +48,31 @@
 
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
-    background-color: #F6F6F6;
-    color: #023246;
+    background-color: #F8FAFC;
+    color: #0F172A;
     font-weight: 400;
     line-height: 1.5; /* Strict 150% Line Height */
     letter-spacing: normal;
     overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  a[href],
+  button:not(:disabled),
+  summary,
+  select:not(:disabled),
+  label[for],
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
   }
 
   /* Typography Hierarchy (Exact System Specs) */
@@ -174,7 +191,7 @@
   color: #64748b;
 }
 
-/* 🔔 Bell Ringing & Shaking Animation for Real-time Notifications */
+/* Bell Ringing Animation for Legacy Dropdown Notification Icon */
 @keyframes bell-ring {
   0% { transform: rotate(0); }
   15% { transform: rotate(18deg); }
@@ -192,16 +209,7 @@
   transform-origin: top center;
 }
 
-/* 📐 Guru View Background Grid Pattern */
-.guru-pattern-bg {
-  --color: #E1E1E1;
-  background-color: #F3F3F3;
-  background-image: linear-gradient(0deg, transparent 24%, var(--color) 25%, var(--color) 26%, transparent 27%, transparent 74%, var(--color) 75%, var(--color) 76%, transparent 77%, transparent),
-      linear-gradient(90deg, transparent 24%, var(--color) 25%, var(--color) 26%, transparent 27%, transparent 74%, var(--color) 75%, var(--color) 76%, transparent 77%, transparent);
-  background-size: 55px 55px;
-}
-
-/* 🌟 Floating Celebration & Reward Award Animations (Cardless Popup) */
+/* Celebration & Reward Award Animations (Cardless Popup) */
 @keyframes float-gentle {
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-10px) scale(1.02); }
@@ -229,7 +237,7 @@
   animation: pulse-glow 2.8s ease-in-out infinite;
 }
 
-/* 📡 Radar Geofence Scanning Animation */
+/* Radar Geofence Scanning Animation */
 @keyframes radar-sweep {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
@@ -249,7 +257,21 @@
   animation: radar-ping-expand 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
-/* 🖨️ Clean A4 Printing Styles (Prevents Web UI Screenshots) */
+/* Reduced Motion Accessibility Standard */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Clean A4 Printing Styles (Prevents Web UI Screenshots) */
 @media print {
   body {
     background: #ffffff !important;
@@ -269,7 +291,7 @@
   }
 }
 
-/* 📝 Official Exam Paper Typography (Times New Roman Strict Scoping) */
+/* Official Exam Paper Typography (Times New Roman Strict Scoping) */
 .exam-paper-times-new-roman,
 .exam-paper-times-new-roman * {
   font-family: 'Times New Roman', Times, serif !important;

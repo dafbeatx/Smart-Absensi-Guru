@@ -110,7 +110,7 @@ import type {
 import type { OralExamAssignment, OralExamSession } from '../types/oral-exam.types';
 import type { MeetingMinute } from '../types/meeting-minutes.types';
 import { CONSTANTS } from '../config/constants';
-import { calculateDistanceMeters, getEffectiveAllowedRadius, sanitizeCoordinate, sanitizeSchoolCoordinates } from '../utils/geofence.utils';
+import { calculateDistanceMeters, evaluateServerGeofenceGate, getEffectiveAllowedRadius, sanitizeCoordinate, sanitizeSchoolCoordinates } from '../utils/geofence.utils';
 import { logger } from '../utils/logger.utils';
 import { detectNativeContainer } from '../utils/device.utils';
 import { convertToWebP } from '../utils/image.utils';
@@ -890,17 +890,38 @@ export class SupabaseProvider implements IDataProvider {
       )
     );
     const effectiveAllowedRadius = Math.max(allowedRadius, 500);
+    const isBiometricAttempt =
+      dto.verification_method === 'BIOMETRIC_GPS' ||
+      dto.attendance_source === 'BIOMETRIC' ||
+      Boolean(dto.qr_seed?.startsWith('BIOMETRIC_'));
+
+    const serverGate = evaluateServerGeofenceGate({
+      rawDistanceMeters: distanceMeters,
+      gpsAccuracy: dto.gps_accuracy,
+      allowedRadiusMeters: effectiveAllowedRadius,
+      isBiometric: isBiometricAttempt,
+      isOfflineSync,
+      maxAllowedAccuracyMeters: isBiometricAttempt
+        ? CONSTANTS.DEFAULTS.GPS_BIOMETRIC_MAX_ALLOWED_ACCURACY_METERS
+        : CONSTANTS.DEFAULTS.GPS_QR_MAX_ALLOWED_ACCURACY_METERS,
+      maxCompensationMeters: isBiometricAttempt
+        ? CONSTANTS.DEFAULTS.GPS_BIOMETRIC_MAX_COMPENSATION_METERS
+        : CONSTANTS.DEFAULTS.GPS_QR_MAX_COMPENSATION_METERS,
+    });
 
     logger.info('SupabaseProvider', 'scanAttendance geofence check', {
       distanceMeters,
+      effectiveDistanceForGate: serverGate.effectiveDistanceMeters,
+      compensationMeters: serverGate.compensationMeters,
       allowedRadius,
       effectiveAllowedRadius,
       isOfflineSync,
       isDoorPosterQR,
+      isBiometricAttempt,
       gps_accuracy: dto.gps_accuracy,
     });
 
-    if (distanceMeters > effectiveAllowedRadius && !isOfflineSync) {
+    if (!serverGate.isAllowed) {
       throw new Error(
         `Absensi Ditolak! Anda terdeteksi berada ${distanceMeters} meter dari gerbang sekolah. Radius maksimal: ${effectiveAllowedRadius}m.`
       );

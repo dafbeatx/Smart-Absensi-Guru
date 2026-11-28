@@ -1,7 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Html5Qrcode } from 'html5-qrcode';
+import { X } from 'lucide-react';
 import { Modal } from '../../../components/ui/Modal';
 import { Badge } from '../../../components/ui/Badge';
+import {
+  SagaAspirationIcon,
+  SagaCheckBadgeIcon,
+  SagaClockStatusIcon,
+  SagaDeviceShieldIcon,
+  SagaEditPencilIcon,
+  SagaEmergencySosIcon,
+  SagaInfoCircleIcon,
+  SagaKeyboardIcon,
+  SagaMapPinIcon,
+  SagaMoodFaceIcon,
+  SagaOfflineBoltIcon,
+  SagaRefreshSyncIcon,
+  SagaSparkAiIcon,
+} from '../../../components/ui/SagaServiceIcons';
 import { SoundService } from '../../../services/audio.service';
 import { SpeechService } from '../../../services/speech.service';
 import { NotificationService } from '../../../services/notification-permission.service';
@@ -16,7 +32,7 @@ import { ManualQRCodeModal } from './ManualQRCodeModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
 import { AnonymousComplaintModal } from '../../guru/components/AnonymousComplaintModal';
-import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
+import { getEffectiveAllowedRadius, shouldReplaceWithBetterFix } from '../../../utils/geofence.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
@@ -41,8 +57,11 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   const [gpsCoords, setGpsCoords] = useState<GPSCoordinates | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [isCheckingGPS, setIsCheckingGPS] = useState(false);
+  const [isRefiningGPS, setIsRefiningGPS] = useState(false);
+  const [gpsSignalNotice, setGpsSignalNotice] = useState<'COARSE_APPROXIMATE' | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [showLiveMap, setShowLiveMap] = useState(false);
+  const gpsCoordsRef = useRef<GPSCoordinates | null>(null);
 
   const { address: physicalAddress, shortAddress: shortPhysicalAddress } = useReverseGeocode(
     gpsCoords?.latitude,
@@ -91,26 +110,55 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isProcessingRef = useRef(false);
 
+  const applyBestGPSFix = (candidate: GPSCoordinates) => {
+    if (candidate.isApproximateLocation || candidate.accuracy > (CONSTANTS.DEFAULTS.GPS_APPROXIMATE_ACCURACY_THRESHOLD_METERS || 150)) {
+      setGpsSignalNotice('COARSE_APPROXIMATE');
+    } else {
+      setGpsSignalNotice(null);
+    }
+
+    if (candidate.isMock) {
+      gpsCoordsRef.current = candidate;
+      setGpsCoords(candidate);
+      return candidate;
+    }
+
+    const current = gpsCoordsRef.current;
+    if (
+      !current ||
+      current.isMock ||
+      shouldReplaceWithBetterFix(current, candidate, CONSTANTS.DEFAULTS.GPS_SAMPLE_MAX_AGE_MS || 10000)
+    ) {
+      gpsCoordsRef.current = candidate;
+      setGpsCoords(candidate);
+      return candidate;
+    }
+
+    return current;
+  };
+
   const fetchGPSLocation = async () => {
     setIsCheckingGPS(true);
     setGpsError(null);
     logger.info('QRScannerOverlay', 'Fetching GPS location...');
     try {
       await GPSService.syncGeofenceSettings();
-      const coords = await GPSService.getCurrentPosition();
-      setGpsCoords(coords);
+      const coords = await GPSService.getCurrentPosition(undefined, undefined, { mode: 'QR_SCAN' });
+      const best = applyBestGPSFix(coords);
       setIsCheckingGPS(false);
-      logger.info('QRScannerOverlay', 'GPS location obtained:', coords);
-      return coords;
+      logger.info('QRScannerOverlay', 'GPS location obtained:', best);
+      return best;
     } catch (err: unknown) {
       setIsCheckingGPS(false);
-      setGpsCoords(null);
+      if (!gpsCoordsRef.current) {
+        setGpsCoords(null);
+      }
       const msg = err && typeof err === 'object' && 'message' in err
         ? String((err as { message: string }).message)
         : 'Perizinan lokasi GPS belum diberikan. Harap aktifkan izin lokasi di browser HP Anda.';
       logger.error('QRScannerOverlay', 'GPS location error:', msg);
       setGpsError(msg);
-      return null;
+      return gpsCoordsRef.current;
     }
   };
 
@@ -120,7 +168,34 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     if (isOpen) {
       logger.info('QRScannerOverlay', 'QR Scanner Overlay opened');
       isProcessingRef.current = false;
+      gpsCoordsRef.current = null;
+      setGpsCoords(null);
+      setGpsSignalNotice(null);
+      setIsRefiningGPS(false);
       setCameraError(null);
+
+      // Pre-warming GPS watcher sejak modal QR dibuka + pembersihan otomatis saat ditutup
+      const stopLiveWatch = GPSService.subscribeLivePosition({
+        mode: 'QR_SCAN',
+        maxCompensationMeters: CONSTANTS.DEFAULTS.GPS_QR_MAX_COMPENSATION_METERS,
+        onUpdate: (coords, meta) => {
+          if (!isMounted) return;
+          applyBestGPSFix(coords);
+          if (meta.isApproximateLocation || coords.accuracy > (CONSTANTS.DEFAULTS.GPS_APPROXIMATE_ACCURACY_THRESHOLD_METERS || 150)) {
+            setGpsSignalNotice('COARSE_APPROXIMATE');
+          } else {
+            setGpsSignalNotice(null);
+          }
+          setIsCheckingGPS(false);
+        },
+        onSignalAlert: (alert) => {
+          if (!isMounted) return;
+          if (alert.type === 'COARSE_APPROXIMATE') {
+            setGpsSignalNotice('COARSE_APPROXIMATE');
+          }
+        },
+      });
+
       fetchGPSLocation();
 
       // Dynamic import of html5-qrcode engine on demand
@@ -151,6 +226,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
       return () => {
         isMounted = false;
+        stopLiveWatch();
         if (scannerRef.current && scannerRef.current.isScanning) {
           scannerRef.current.stop().catch((err) => logger.warn('QRScannerOverlay', 'Scanner stop error:', err));
         }
@@ -230,29 +306,50 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       ? Math.max(rawAllowed, 500)
       : allowedRadius;
 
-    // 2. Fetch & Validate Geofence Radius GPS Location with Auto-Retry Pipeline (up to 3x)
-    let currentCoords = gpsCoords;
+    // 2. Fetch & Validate Geofence Radius GPS Location with Signal Quality Auto-Retry
+    const qrValidateOptions = {
+      mode: 'QR_SCAN' as const,
+      maxAllowedAccuracy: CONSTANTS.DEFAULTS.GPS_QR_MAX_ALLOWED_ACCURACY_METERS || 90,
+      maxCompensationMeters: CONSTANTS.DEFAULTS.GPS_QR_MAX_COMPENSATION_METERS || 35,
+    };
+    let currentCoords = gpsCoordsRef.current || gpsCoords;
     if (!currentCoords) {
       currentCoords = await fetchGPSLocation();
     }
 
-    let validation = currentCoords ? GPSService.validateGeofenceRadius(currentCoords, effectiveAllowedRadius) : { isValid: false };
+    let validation = currentCoords
+      ? GPSService.validateGeofenceRadius(currentCoords, effectiveAllowedRadius, qrValidateOptions)
+      : { isValid: false };
 
-    // Auto-retry up to 3 times if initial coords are missing, inaccurate (>40m), or out-of-bounds
-    if (!currentCoords || !validation.isValid || currentCoords.accuracy > CONSTANTS.DEFAULTS.GPS_CACHE_MIN_ACCURACY_METERS) {
-      logger.info('QRScannerOverlay', 'GPS fix requires refinement, starting Auto-Retry pipeline (up to 3x)...');
-      for (let retry = 0; retry < CONSTANTS.DEFAULTS.GPS_AUTO_RETRY_COUNT; retry++) {
-        const freshCoords = await fetchGPSLocation();
-        if (freshCoords) {
-          currentCoords = freshCoords;
-          validation = GPSService.validateGeofenceRadius(currentCoords, effectiveAllowedRadius);
-          if (validation.isValid && currentCoords.accuracy <= CONSTANTS.DEFAULTS.GPS_CACHE_MIN_ACCURACY_METERS) {
-            logger.info('QRScannerOverlay', `High accuracy GPS fix achieved on retry ${retry + 1}:`, currentCoords);
+    const retryAccuracyLimit = CONSTANTS.DEFAULTS.GPS_SIGNAL_RETRY_THRESHOLD_METERS || 80;
+    const needsRefinement =
+      !currentCoords ||
+      (!validation.isValid && validation.error?.code !== 'GPS_003') ||
+      currentCoords.accuracy > retryAccuracyLimit;
+
+    if (needsRefinement) {
+      logger.info('QRScannerOverlay', 'GPS fix requires refinement, starting calm auto-retry pipeline...');
+      setIsRefiningGPS(true);
+      for (let retry = 0; retry < 2; retry++) {
+        try {
+          const freshCoords = await GPSService.getCurrentPosition(undefined, undefined, {
+            mode: 'QR_SCAN',
+            minSamples: 2,
+            maxSamples: 3,
+            sampleWindowMs: 2500,
+          });
+          currentCoords = applyBestGPSFix(freshCoords);
+          validation = GPSService.validateGeofenceRadius(currentCoords, effectiveAllowedRadius, qrValidateOptions);
+          if (validation.isValid && currentCoords.accuracy <= retryAccuracyLimit) {
+            logger.info('QRScannerOverlay', `Refined GPS fix achieved on retry ${retry + 1}:`, currentCoords);
             break;
           }
+        } catch {
+          // retain previous valid fix if available
         }
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 400));
       }
+      setIsRefiningGPS(false);
     }
 
     if (!currentCoords) {
@@ -271,26 +368,46 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     }
 
     if (!validation.isValid) {
-      logger.warn('QRScannerOverlay', 'Attendance rejected: Out of allowed radius', {
+      const errorCode = validation.error?.code;
+      logger.warn('QRScannerOverlay', 'Attendance rejected on GPS gate', {
+        errorCode,
         distance: currentCoords.distanceMeters,
+        rawDistance: currentCoords.rawDistanceMeters,
+        accuracy: currentCoords.accuracy,
         allowedRadius: effectiveAllowedRadius,
       });
       SoundService.playError();
-      const userRole = useAuthStore.getState().user?.role || 'GURU';
-      GroqAIService.diagnoseScanRejection({
-        rawQrData: _qrData,
-        distanceMeters: currentCoords.distanceMeters,
-        allowedRadius: effectiveAllowedRadius,
-        gpsAccuracy: currentCoords.accuracy,
-        userRole,
-        errorType: 'OUT_OF_GEOFENCE',
-      }).then(setAiDiagnosis).catch(console.warn);
 
-      let hint = '';
-      if (currentCoords.distanceMeters > 1000) {
-        hint = '\n\n💡 Catatan: Jarak terdeteksi di atas 1 KM dari sekolah. Pastikan koordinat lokasi sekolah di Pengaturan sudah benar.';
+      if (errorCode === 'GPS_003') {
+        setRejectionReason(
+          'Absensi Ditolak! Terdeteksi penggunaan lokasi tiruan (Fake GPS). Harap matikan aplikasi pengubah lokasi terlebih dahulu lalu pindai ulang.'
+        );
+      } else if (errorCode === 'GPS_005' || currentCoords.isApproximateLocation || currentCoords.accuracy > 150) {
+        setRejectionReason(
+          `Sinyal GPS HP Anda masih memakai Lokasi Perkiraan (akurasi sekitar ${Math.round(currentCoords.accuracy)} meter).\n\nSilakan aktifkan opsi Lokasi Akurat (Precise) pada izin lokasi HP, matikan mode Hemat Daya, dan bergeser sebentar ke dekat jendela atau teras sekolah.`
+        );
+      } else if (errorCode === 'GPS_004') {
+        setRejectionReason(
+          `Sinyal GPS belum cukup akurat (sekitar ${Math.round(currentCoords.accuracy)} meter). Aktifkan Wi-Fi serta Lokasi Akurat di HP Anda, atau bergeser sebentar ke area yang lebih terbuka lalu pindai ulang.`
+        );
+      } else {
+        const userRole = useAuthStore.getState().user?.role || 'GURU';
+        GroqAIService.diagnoseScanRejection({
+          rawQrData: _qrData,
+          distanceMeters: currentCoords.distanceMeters,
+          allowedRadius: effectiveAllowedRadius,
+          gpsAccuracy: currentCoords.accuracy,
+          userRole,
+          errorType: 'OUT_OF_GEOFENCE',
+        }).then(setAiDiagnosis).catch(console.warn);
+
+        let hint = '';
+        if (currentCoords.distanceMeters > 1000) {
+          hint = '\n\nCatatan: Jarak terdeteksi di atas 1 KM dari sekolah. Pastikan koordinat lokasi sekolah di Pengaturan sudah benar.';
+        }
+        setRejectionReason(`Absensi Ditolak! Anda terdeteksi berada ${currentCoords.distanceMeters} meter dari lokasi sekolah. Batas maksimum radius yang diizinkan adalah ${effectiveAllowedRadius} meter.${hint}`);
       }
-      setRejectionReason(`Absensi Ditolak! Anda terdeteksi berada ${currentCoords.distanceMeters} meter dari lokasi sekolah. Batas maksimum radius yang diizinkan adalah ${effectiveAllowedRadius} meter.${hint}`);
+
       setIsRejectionModalOpen(true);
       isProcessingRef.current = false;
       return;
@@ -339,7 +456,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         user_lng: currentCoords.longitude,
         device_uuid: deviceUUID,
         user_id: scanUser?.id || undefined,
-        distance_meters: currentCoords.distanceMeters,
+        distance_meters: currentCoords.rawDistanceMeters ?? currentCoords.distanceMeters,
         gps_accuracy: currentCoords.accuracy,
         attempt_action: isAlreadyCheckedIn ? 'CHECK_OUT' : 'CHECK_IN',
       });
@@ -504,69 +621,83 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-slate-950 z-50 flex flex-col justify-between p-6 animate-fade-in" role="dialog" aria-modal="true" aria-label="QR Code Scanner Overlay">
-        
+      <div
+        className="fixed inset-0 bg-slate-950 z-50 flex flex-col justify-between px-4 sm:px-6 pt-[max(16px,env(safe-area-inset-top))] pb-[max(16px,env(safe-area-inset-bottom))]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="QR Code Scanner Overlay"
+      >
         {/* Scanner Top Controls Bar */}
-        <div className="flex justify-between items-center text-white pt-2 z-10">
+        <div className="flex justify-between items-center text-white pt-1 z-10">
           <button
+            type="button"
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-lg hover:bg-white/20 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
+            className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center hover:bg-white/25 active:scale-95 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer shrink-0"
             aria-label="Tutup Pemindai"
           >
-            ✕
+            <X className="w-5 h-5" />
           </button>
-          <div className="text-center">
-            <h3 className="font-extrabold text-base tracking-tight">Pindai QR Code Absensi</h3>
-            <p className="text-[11px] font-medium text-emerald-400">Pintu Kantor Utama Sekolah</p>
+          <div className="text-center px-2">
+            <h3 className="font-bold text-base tracking-tight">Pindai QR Code Absensi</h3>
+            <p className="text-xs font-medium text-emerald-300">Pintu Kantor Utama Sekolah</p>
           </div>
           <button
+            type="button"
             onClick={() => setIsManualModalOpen(true)}
-            className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+            className="min-h-11 px-3 py-2 bg-white/15 hover:bg-white/25 text-white border border-white/25 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
             title="Input Kode Barcode Manual"
           >
-            <span>⌨️</span>
+            <SagaKeyboardIcon tone="dark" className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline">Manual</span>
           </button>
         </div>
 
         {/* Camera Scanner Viewfinder Box */}
-        <div className="relative w-72 h-72 mx-auto rounded-3xl border-2 border-emerald-500/40 overflow-hidden shadow-2xl bg-black">
+        <div className="relative w-72 h-72 mx-auto rounded-3xl border-2 border-emerald-400/50 overflow-hidden shadow-2xl bg-black">
           <div id="reader" className="w-full h-full object-cover"></div>
 
-          {/* Animated Laser Beam Scanner Line */}
-          <div className="absolute left-0 right-0 h-1 bg-linear-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_15px_#10B981] animate-pulse top-1/2 -translate-y-1/2 pointer-events-none" />
+          {/* Static Scanner Guide Line */}
+          <div className="absolute left-4 right-4 h-0.5 bg-emerald-400/80 top-1/2 -translate-y-1/2 pointer-events-none" />
 
           {/* Camera Frame Corners Overlay */}
-          <div className="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-xl pointer-events-none" />
-          <div className="absolute top-4 right-4 w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-xl pointer-events-none" />
-          <div className="absolute bottom-4 left-4 w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-xl pointer-events-none" />
-          <div className="absolute bottom-4 right-4 w-8 h-8 border-b-4 border-r-4 border-emerald-500 rounded-br-xl pointer-events-none" />
+          <div className="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-emerald-400 rounded-tl-xl pointer-events-none" />
+          <div className="absolute top-4 right-4 w-8 h-8 border-t-4 border-r-4 border-emerald-400 rounded-tr-xl pointer-events-none" />
+          <div className="absolute bottom-4 left-4 w-8 h-8 border-b-4 border-l-4 border-emerald-400 rounded-bl-xl pointer-events-none" />
+          <div className="absolute bottom-4 right-4 w-8 h-8 border-b-4 border-r-4 border-emerald-400 rounded-br-xl pointer-events-none" />
         </div>
 
         {/* Error handling for GPS permissions */}
         {gpsError && (
-          <div className="bg-red-500/20 border border-red-500/40 text-red-200 text-xs p-4 rounded-2xl text-center space-y-2 z-10 max-w-xs mx-auto">
-            <p className="font-bold text-red-300">📍 Perizinan Lokasi Diperlukan</p>
+          <div className="bg-rose-950/80 border border-rose-400/40 text-rose-100 text-xs p-4 rounded-2xl text-center space-y-2 z-10 max-w-xs mx-auto">
+            <p className="font-bold text-rose-200 inline-flex items-center justify-center gap-1.5">
+              <SagaMapPinIcon tone="dark" className="w-4 h-4 shrink-0" />
+              <span>Perizinan Lokasi Diperlukan</span>
+            </p>
             <p>{gpsError}</p>
             <button
               type="button"
               onClick={fetchGPSLocation}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-xl text-xs mt-1 transition-all cursor-pointer"
+              className="w-full min-h-11 px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-xl text-xs mt-1 transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
             >
-              📍 Aktifkan & Izinkan Lokasi GPS
+              <SagaMapPinIcon className="w-4 h-4 shrink-0" />
+              <span>Aktifkan &amp; Izinkan Lokasi GPS</span>
             </button>
           </div>
         )}
 
         {/* Error handling for camera permissions */}
         {cameraError && (
-          <div className="bg-red-500/20 border border-red-500/40 text-red-200 text-xs p-4 rounded-2xl text-center space-y-2">
-            <p className="font-bold">⚠️ Kendala Akses Kamera</p>
+          <div className="bg-rose-950/80 border border-rose-400/40 text-rose-100 text-xs p-4 rounded-2xl text-center space-y-2 max-w-xs mx-auto">
+            <p className="font-bold inline-flex items-center justify-center gap-1.5">
+              <SagaEmergencySosIcon tone="dark" className="w-4 h-4 shrink-0" />
+              <span>Kendala Akses Kamera</span>
+            </p>
             <p>{cameraError}</p>
             {import.meta.env.DEV && (
               <button
+                type="button"
                 onClick={() => handleScanSuccess('MOCK_QR')}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold mt-2"
+                className="min-h-11 px-4 py-2 bg-[#0D5C46] text-white rounded-xl text-xs font-bold mt-2 cursor-pointer"
               >
                 Simulasi Absen (Dev Mode)
               </button>
@@ -575,85 +706,124 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         )}
 
         {/* Status Geofence Indicators Badges & Fallback Buttons */}
-        <div className="space-y-3 max-w-xs mx-auto text-center pb-6 z-10">
-          {isCheckingGPS ? (
-            <div className="bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs px-4 py-2 rounded-full inline-flex items-center gap-2 backdrop-blur-md font-bold">
-              <span className="w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping" />
-              <span>📍 Memastikan Anda berada di area sekolah...</span>
+        <div className="space-y-2.5 max-w-xs mx-auto text-center pb-2 z-10">
+          {(gpsSignalNotice === 'COARSE_APPROXIMATE' || (gpsCoords && gpsCoords.accuracy > 150)) && (
+            <div className="bg-amber-950/90 border border-amber-400/50 text-amber-100 text-xs p-3 rounded-2xl text-left flex items-start gap-2">
+              <SagaDeviceShieldIcon tone="dark" className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-bold text-amber-200">Lokasi Perkiraan Terdeteksi</p>
+                <p className="text-[11px] leading-snug text-amber-100">
+                  Aktifkan <strong>Lokasi Akurat (Precise)</strong> di HP, matikan Hemat Daya, dan bergeser sebentar ke dekat jendela atau teras.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {isRefiningGPS || isCheckingGPS ? (
+            <div className="bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs px-4 py-2 rounded-full inline-flex items-center gap-2 font-bold">
+              <SagaMapPinIcon tone="dark" className="w-4 h-4 shrink-0" />
+              <span>
+                {isRefiningGPS
+                  ? 'Sinyal GPS belum akurat (sedang mencari ulang...)'
+                  : 'Memastikan Anda berada di area sekolah...'}
+              </span>
             </div>
           ) : gpsCoords ? (
-            <div className="space-y-2">
-              <div className={`border text-xs px-3.5 py-1.5 rounded-full inline-flex items-center gap-2 backdrop-blur-md font-extrabold ${
-                isWithinRadius
-                  ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
-                  : 'bg-red-500/20 border-red-400/40 text-red-300 animate-pulse'
-              }`}>
-                <span className={`w-2 h-2 rounded-full ${
-                  isWithinRadius ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'
-                }`} />
-                <span>
-                  {isWithinRadius
-                    ? `GPS Safe: ${gpsCoords.distanceMeters}m dari Sekolah`
-                    : `Di Luar Radius: ${gpsCoords.distanceMeters}m (maks. ${allowedRadius}m)`}
-                </span>
-              </div>
+            <div className="space-y-2.5">
+              {(() => {
+                const liveAccuracyLow = gpsCoords.accuracy > (CONSTANTS.DEFAULTS.GPS_QR_MAX_ALLOWED_ACCURACY_METERS || 90);
+                const badgeStyle = gpsCoords.isMock
+                  ? 'bg-rose-500/20 border-rose-400/40 text-rose-200'
+                  : liveAccuracyLow
+                  ? 'bg-amber-500/20 border-amber-400/40 text-amber-200'
+                  : isWithinRadius
+                  ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-200'
+                  : 'bg-rose-500/20 border-rose-400/40 text-rose-200';
+                const dotStyle = gpsCoords.isMock
+                  ? 'bg-rose-400'
+                  : liveAccuracyLow
+                  ? 'bg-amber-400'
+                  : isWithinRadius
+                  ? 'bg-emerald-400'
+                  : 'bg-rose-400';
+
+                return (
+                  <div className={`border text-xs px-3.5 py-1.5 rounded-full inline-flex items-center gap-2 font-bold ${badgeStyle}`}>
+                    <span className={`w-2 h-2 rounded-full ${dotStyle}`} />
+                    <span>
+                      {gpsCoords.isMock
+                        ? 'Lokasi Tiruan Terdeteksi'
+                        : liveAccuracyLow
+                        ? `Sinyal GPS belum akurat (±${Math.round(gpsCoords.accuracy)}m)`
+                        : isWithinRadius
+                        ? `GPS Aman: ${gpsCoords.distanceMeters}m dari Sekolah`
+                        : `Di Luar Radius: ${gpsCoords.distanceMeters}m (maks. ${allowedRadius}m)`}
+                    </span>
+                  </div>
+                );
+              })()}
               
               <div className="flex justify-center gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setShowLiveMap(true)}
-                  className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 text-xs font-bold rounded-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  className="min-h-11 px-3 py-2 bg-[#0D5C46] hover:bg-[#094736] text-white border border-white/20 text-xs font-bold rounded-xl transition-colors active:scale-95 cursor-pointer flex items-center gap-1.5"
                 >
-                  <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                  </svg>
+                  <SagaMapPinIcon tone="dark" className="w-4 h-4 shrink-0" />
                   <span>Peta Live</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsManualModalOpen(true)}
-                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  className="min-h-11 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 text-xs font-bold rounded-xl transition-colors active:scale-95 cursor-pointer flex items-center gap-1.5"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
+                  <SagaKeyboardIcon tone="dark" className="w-4 h-4 shrink-0" />
                   <span>Manual</span>
                 </button>
                 <button
                   type="button"
                   onClick={fetchGPSLocation}
-                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-xs font-bold rounded-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  className="min-h-11 px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40 text-xs font-bold rounded-xl transition-colors active:scale-95 cursor-pointer flex items-center gap-1.5"
                 >
-                  <svg className="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
+                  <SagaRefreshSyncIcon tone="dark" className="w-4 h-4 shrink-0" />
                   <span>Ukur GPS</span>
                 </button>
               </div>
             </div>
           ) : null}
-          <p className="text-[11px] text-slate-400 font-medium">Arahkan kamera HP Anda ke QR Code resmi di pintu sekolah</p>
+          <p className="text-xs text-slate-300 font-medium">Arahkan kamera HP Anda ke QR Code resmi di pintu sekolah</p>
         </div>
 
       </div>
 
       {/* Live Location OpenStreetMap Modal */}
-      <Modal isOpen={showLiveMap} onClose={() => setShowLiveMap(false)} title="📍 Peta Geofence Presensi Real-Time">
+      <Modal
+        isOpen={showLiveMap}
+        onClose={() => setShowLiveMap(false)}
+        title="Peta Geofence Presensi Real-Time"
+        mobileFullscreen
+      >
         <div className="space-y-3">
           {isOfflineMode && (
-            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold text-center">
-              ⚡ Mode Offline: Radius toleransi sementara {allowedRadius}m
+            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center justify-center gap-1.5">
+              <SagaOfflineBoltIcon className="w-4 h-4 shrink-0" />
+              <span>Mode Offline: Radius toleransi sementara {allowedRadius}m</span>
             </div>
           )}
 
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-[#DDD9D0]">
-            <div>
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div className="flex items-center gap-1.5">
               <span>Status: </span>
-              <strong className={isWithinRadius ? 'text-emerald-700' : 'text-red-700'}>
-                {isWithinRadius ? '🟢 Dalam Radius Safe-Zone' : '🔴 Di Luar Radius Sekolah'}
+              <span
+                className={`w-2 h-2 rounded-full inline-block ${
+                  isWithinRadius ? 'bg-[#0D5C46]' : 'bg-rose-600'
+                }`}
+              />
+              <strong className={isWithinRadius ? 'text-[#0D5C46]' : 'text-rose-700'}>
+                {isWithinRadius ? 'Dalam Radius Safe-Zone' : 'Di Luar Radius Sekolah'}
               </strong>
             </div>
-            <span className="font-mono text-[11px] text-slate-500">
+            <span className="font-mono text-xs text-slate-500">
               Akurasi: ±{gpsCoords?.accuracy ? Math.round(gpsCoords.accuracy) : 0}m
             </span>
           </div>
@@ -668,34 +838,42 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             height="320px"
           />
 
-          <p className="text-[11px] text-slate-500 text-center font-medium">
+          <p className="text-xs text-slate-500 text-center font-medium">
             Peta presensi berbasis OpenStreetMap &amp; Leaflet (Bebas kuota API). Pin hijau menandakan posisi fisik HP Anda.
           </p>
         </div>
       </Modal>
 
       {/* Auto-Submit Success Modal Overlay */}
-      <Modal isOpen={isSuccessModalOpen} onClose={() => {}}>
-        <div className="text-center space-y-3.5 py-1">
+      <Modal isOpen={isSuccessModalOpen} onClose={() => {}} mobileFullscreen>
+        <div className="text-center space-y-3.5 py-2">
           
-          {/* Animated Hero Icon */}
+          {/* Hero Icon */}
           <div className="relative inline-flex items-center justify-center">
-            <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-3xl mx-auto shadow-md transition-transform duration-300 ring-4 ${
+            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto shadow-sm ${
               scanResult?.action === 'CHECK_OUT'
-                ? 'bg-blue-600 text-white ring-blue-100 shadow-blue-600/20'
+                ? 'bg-[#0D5C46] text-white'
                 : scanResult?.rawStatus === 'TERLAMBAT'
-                ? 'bg-amber-500 text-white ring-amber-100 shadow-amber-500/20'
+                ? 'bg-amber-600 text-white'
                 : scanResult?.action === 'ALREADY_COMPLETED'
-                ? 'bg-amber-500 text-white ring-amber-100 shadow-amber-500/20'
-                : 'bg-emerald-600 text-white ring-emerald-100 shadow-emerald-600/20'
+                ? 'bg-amber-600 text-white'
+                : 'bg-[#0D5C46] text-white'
             }`}>
-              {scanResult?.action === 'CHECK_OUT' ? '🌇' : scanResult?.rawStatus === 'TERLAMBAT' ? '⚠️' : scanResult?.action === 'ALREADY_COMPLETED' ? 'ℹ️' : '✓'}
+              {scanResult?.action === 'CHECK_OUT' ? (
+                <SagaClockStatusIcon tone="dark" className="w-9 h-9" />
+              ) : scanResult?.rawStatus === 'TERLAMBAT' ? (
+                <SagaEmergencySosIcon tone="dark" className="w-9 h-9" />
+              ) : scanResult?.action === 'ALREADY_COMPLETED' ? (
+                <SagaInfoCircleIcon tone="dark" className="w-9 h-9" />
+              ) : (
+                <SagaCheckBadgeIcon tone="dark" className="w-9 h-9" />
+              )}
             </div>
           </div>
 
           {/* Title & Subtitle */}
           <div className="space-y-1">
-            <h3 className="font-black text-slate-900 text-lg sm:text-xl tracking-tight">
+            <h3 className="font-bold text-slate-900 text-lg sm:text-xl tracking-tight">
               {scanResult?.action === 'CHECK_OUT'
                 ? 'Absen Pulang Berhasil!'
                 : scanResult?.rawStatus === 'TERLAMBAT'
@@ -704,7 +882,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                 ? 'Presensi Hari Ini Lengkap!'
                 : 'Absen Masuk Berhasil!'}
             </h3>
-            <p className="text-xs text-slate-500 font-medium max-w-xs mx-auto">
+            <p className="text-xs sm:text-sm text-slate-600 font-medium max-w-xs mx-auto">
               {scanResult?.action === 'CHECK_OUT'
                 ? 'Terima kasih atas pengabdian Anda hari ini.'
                 : scanResult?.rawStatus === 'TERLAMBAT'
@@ -715,78 +893,93 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             </p>
           </div>
 
-          {/* Compact Guru Piket Badge (If Applicable) */}
+          {/* Compact Guru Piket Badge */}
           {scanResult?.isPiketGuru && (
-            <div className="bg-linear-to-r from-amber-500 to-orange-600 text-white p-2.5 rounded-2xl text-left shadow-sm border border-amber-300 flex items-center gap-2.5">
-              <span className="text-xl shrink-0">🛡️</span>
+            <div className="bg-amber-50 text-amber-950 p-3 rounded-2xl text-left border border-amber-300 flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-600 flex items-center justify-center shrink-0">
+                <SagaDeviceShieldIcon tone="dark" className="w-5 h-5" />
+              </div>
               <div className="min-w-0">
-                <span className="font-extrabold text-white text-xs block truncate">Guru Piket Hari Ini 🌟</span>
-                <p className="text-[10px] text-amber-50 font-medium truncate">Selamat bertugas &amp; jaga ketertiban sekolah!</p>
+                <span className="font-bold text-amber-950 text-xs block truncate">Guru Piket Hari Ini</span>
+                <p className="text-xs text-amber-800 font-medium truncate">Selamat bertugas menjaga ketertiban sekolah.</p>
               </div>
             </div>
           )}
 
           {/* Unified Compact Info Card */}
-          <div className="bg-slate-50/90 border border-slate-200/80 rounded-2xl p-3.5 space-y-2 text-xs text-slate-700 text-left">
-            <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-200/60">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Status Presensi</span>
+          <div className="bg-[#F8FAFC] border border-slate-200 rounded-2xl p-3.5 space-y-2.5 text-xs text-slate-700 text-left">
+            <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-200">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status Presensi</span>
               <Badge status={scanResult?.rawStatus === 'TERLAMBAT' ? 'TERLAMBAT' : 'HADIR'}>
                 {scanResult?.status || (scanResult?.rawStatus === 'TERLAMBAT' ? 'Terlambat' : 'Hadir Tepat Waktu')}
               </Badge>
             </div>
 
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">Waktu Presensi:</span>
-              <span className="font-bold text-slate-900 bg-white px-2.5 py-0.5 rounded-lg border border-slate-200 font-mono text-[11px]">
+              <span className="text-slate-600 font-medium">Waktu Presensi:</span>
+              <span className="font-bold text-slate-900 bg-white px-2.5 py-0.5 rounded-lg border border-slate-200 font-mono text-xs">
                 {scanResult?.timestamp}
               </span>
             </div>
 
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">Verifikasi GPS:</span>
-              <span className="font-semibold text-emerald-700 flex items-center gap-1 text-[11px]">
-                <span>🟢 Safe-Zone</span>
-                <span className="text-slate-400">({scanResult?.distance}m)</span>
+              <span className="text-slate-600 font-medium">Verifikasi GPS:</span>
+              <span className="font-semibold text-[#0D5C46] inline-flex items-center gap-1.5 text-xs">
+                <span className="w-2 h-2 rounded-full bg-[#0D5C46]" />
+                <span>Safe-Zone</span>
+                <span className="text-slate-500">({scanResult?.distance}m)</span>
               </span>
             </div>
 
             {physicalAddress && (
-              <div className="flex items-start justify-between text-xs pt-0.5">
-                <span className="text-slate-500 font-medium shrink-0">Alamat GPS:</span>
-                <span className="font-semibold text-slate-800 text-[11px] text-right truncate max-w-50" title={physicalAddress}>
-                  📍 {shortPhysicalAddress || physicalAddress}
+              <div className="flex items-start justify-between gap-2 text-xs pt-0.5">
+                <span className="text-slate-600 font-medium shrink-0">Alamat GPS:</span>
+                <span className="font-semibold text-slate-800 text-xs text-right truncate max-w-52 inline-flex items-center gap-1" title={physicalAddress}>
+                  <SagaMapPinIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{shortPhysicalAddress || physicalAddress}</span>
                 </span>
               </div>
             )}
 
             <div className="flex items-center justify-between text-xs pt-0.5">
-              <span className="text-slate-500 font-medium">Status Koneksi:</span>
-              <span className={`font-semibold text-[11px] flex items-center gap-1 ${
-                scanResult?.isOffline ? 'text-amber-700' : 'text-emerald-700'
+              <span className="text-slate-600 font-medium">Status Koneksi:</span>
+              <span className={`font-semibold text-xs inline-flex items-center gap-1 ${
+                scanResult?.isOffline ? 'text-amber-700' : 'text-[#0D5C46]'
               }`}>
-                <span>{scanResult?.isOffline ? '⚡ Sync Offline (Tersimpan di HP)' : '🌐 Realtime Server'}</span>
+                {scanResult?.isOffline ? (
+                  <>
+                    <SagaOfflineBoltIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>Sync Offline (Tersimpan di HP)</span>
+                  </>
+                ) : (
+                  <>
+                    <SagaDeviceShieldIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>Realtime Server</span>
+                  </>
+                )}
               </span>
             </div>
           </div>
 
           {/* Lateness Note Input (Only if TERLAMBAT) */}
           {scanResult?.rawStatus === 'TERLAMBAT' && (
-            <div className="space-y-1 text-left bg-amber-50/80 p-3 rounded-2xl border border-amber-200">
-              <label className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
-                <span>📝 Catatan Alasan Terlambat:</span>
+            <div className="space-y-1.5 text-left bg-amber-50 p-3.5 rounded-2xl border border-amber-200">
+              <label className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                <SagaEditPencilIcon className="w-4 h-4 shrink-0" />
+                <span>Catatan Alasan Terlambat:</span>
               </label>
               <input
                 type="text"
                 value={latenessReason}
                 onChange={(e) => setLatenessReason(e.target.value)}
                 placeholder="Contoh: Hujan deras / Macet di jalan utama"
-                className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full px-3 py-2.5 bg-white border border-amber-300 rounded-xl text-base sm:text-xs text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0D5C46] min-h-11"
               />
             </div>
           )}
 
           {/* Action Buttons */}
-          <div className="pt-1 space-y-2">
+          <div className="pt-1 space-y-2.5">
             {/* Tombol Utama: Kirim Laporan ke WhatsApp Grup */}
             <button
               type="button"
@@ -809,11 +1002,11 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                   isOffline: scanResult?.isOffline,
                 });
               }}
-              className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-black text-xs sm:text-sm tracking-wide rounded-2xl transition-all cursor-pointer shadow-lg hover:shadow-xl active:scale-98 flex items-center justify-center gap-2 border border-emerald-400"
+              className="w-full min-h-12 py-3 bg-[#15803D] hover:bg-[#166534] text-white font-bold text-sm tracking-wide rounded-2xl transition-colors cursor-pointer active:scale-[0.99] flex items-center justify-center gap-2"
             >
-              <span className="text-base">💬</span>
+              <SagaAspirationIcon tone="dark" className="w-5 h-5 shrink-0" />
               <span>Kirim Laporan ke WhatsApp Grup</span>
-              <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-extrabold uppercase">
+              <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase">
                 1-Klik
               </span>
             </button>
@@ -821,29 +1014,29 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             <button
               type="button"
               onClick={() => handleSaveReasonAndClose('MOOD')}
-              className="w-full py-2.5 bg-[#0D7A5F] hover:bg-[#095744] text-white font-extrabold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-98 flex items-center justify-center gap-1.5 border border-[#0D7A5F]"
+              className="w-full min-h-12 py-3 bg-[#0D5C46] hover:bg-[#094736] text-white font-bold text-xs tracking-wide rounded-xl transition-colors cursor-pointer active:scale-[0.99] flex items-center justify-center gap-2"
             >
-              <span>💚</span>
+              <SagaMoodFaceIcon mood="VERY_HAPPY" tone="dark" className="w-5 h-5 shrink-0" />
               <span>
                 {scanResult?.rawStatus === 'TERLAMBAT'
-                  ? 'Simpan Alasan & Isi Mood Harian ✨'
-                  : 'Isi Mood Harian (Check-in) ✨'}
+                  ? 'Simpan Alasan & Isi Mood Harian'
+                  : 'Isi Mood Harian (Check-in)'}
               </span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSaveReasonAndClose('COMPLAINT')}
-              className="w-full py-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-900 border border-amber-300 font-extrabold text-xs rounded-xl transition-all cursor-pointer active:scale-98 flex items-center justify-center gap-1.5 shadow-2xs"
+              className="w-full min-h-11 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 font-bold text-xs rounded-xl transition-colors cursor-pointer active:scale-[0.99] flex items-center justify-center gap-1.5"
             >
-              <span>💬</span>
-              <span>Tulis Catatan / Keluhan Anonim 🔒</span>
+              <SagaDeviceShieldIcon className="w-4 h-4 shrink-0" />
+              <span>Tulis Catatan / Keluhan Anonim</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSaveReasonAndClose('NONE')}
-              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer border border-slate-200 active:scale-98"
+              className="w-full min-h-11 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-colors cursor-pointer border border-slate-200 active:scale-[0.99]"
             >
               {scanResult?.rawStatus === 'TERLAMBAT'
                 ? 'Simpan Alasan & Masuk Dashboard'
@@ -852,16 +1045,20 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
           </div>
 
           {scanResult?.rawStatus !== 'TERLAMBAT' && (
-            <p className="text-[10px] text-slate-400 font-medium">
+            <p className="text-xs text-slate-500 font-medium">
               Mengalihkan ke Dashboard secara otomatis...
             </p>
           )}
         </div>
       </Modal>
 
-      {/* Rejection Modal Overlay with AI Diagnostic Engine & 4 Recovery Actions */}
       {/* Rejection Modal Overlay with AI Diagnostic Engine & Timing Policy Guidance */}
-      <Modal isOpen={isRejectionModalOpen} onClose={() => setIsRejectionModalOpen(false)} maxWidth="lg">
+      <Modal
+        isOpen={isRejectionModalOpen}
+        onClose={() => setIsRejectionModalOpen(false)}
+        maxWidth="lg"
+        mobileFullscreen
+      >
         {(() => {
           const reasonText = rejectionReason || '';
           const isTimingRejection = reasonText.includes('absensi pulang') ||
@@ -871,22 +1068,26 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             reasonText.includes('belum dibuka');
 
           return (
-            <div className="space-y-3.5 py-1">
-              {/* Sleek Horizontal Header */}
-              <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
-                <div className={`w-10 h-10 ${isTimingRejection ? 'bg-amber-100 text-amber-700 ring-amber-50' : 'bg-red-100 text-red-600 ring-red-50'} rounded-2xl flex shrink-0 items-center justify-center text-xl font-black ring-4`}>
-                  {isTimingRejection ? '⏰' : '✕'}
+            <div className="space-y-4 py-1">
+              {/* Header */}
+              <div className="flex items-center gap-3 pb-2.5 border-b border-slate-100">
+                <div className={`w-11 h-11 ${isTimingRejection ? 'bg-amber-100' : 'bg-rose-100'} rounded-2xl flex shrink-0 items-center justify-center`}>
+                  {isTimingRejection ? (
+                    <SagaClockStatusIcon className="w-6 h-6" />
+                  ) : (
+                    <SagaEmergencySosIcon className="w-6 h-6" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className={`font-black ${isTimingRejection ? 'text-amber-800' : 'text-red-600'} text-base tracking-tight`}>
-                      {isTimingRejection ? 'JADWAL PRESENSI BELUM SESUAI' : 'ABSENSI DITOLAK!'}
+                    <h3 className={`font-bold ${isTimingRejection ? 'text-amber-900' : 'text-rose-700'} text-base tracking-tight`}>
+                      {isTimingRejection ? 'Jadwal Presensi Belum Sesuai' : 'Absensi Ditolak'}
                     </h3>
-                    <span className={`px-2.5 py-0.5 ${isTimingRejection ? 'bg-amber-600' : 'bg-red-600'} text-white font-extrabold text-[10px] rounded-full shrink-0`}>
-                      {isTimingRejection ? 'WAKTU BELUM TIBA' : 'REJECTED'}
+                    <span className={`px-2.5 py-0.5 ${isTimingRejection ? 'bg-amber-600' : 'bg-rose-600'} text-white font-bold text-[10px] rounded-full shrink-0`}>
+                      {isTimingRejection ? 'WAKTU BELUM TIBA' : 'DITOLAK'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 font-medium truncate">
+                  <p className="text-xs text-slate-500 font-medium truncate">
                     {isTimingRejection
                       ? 'Ketentuan waktu presensi masuk & pulang resmi (GMT+7 Jakarta / WIB)'
                       : 'Kendala verifikasi lokasi GPS atau pembacaan barcode fisik'}
@@ -895,31 +1096,30 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
               </div>
 
               {/* Unified AI & System Diagnostic Card */}
-              <div className="bg-slate-50 rounded-2xl border border-slate-200/80 p-3.5 space-y-2 text-xs">
-                {/* System Error Message */}
+              <div className="bg-[#F8FAFC] rounded-2xl border border-slate-200 p-3.5 space-y-2.5 text-xs">
                 <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Keterangan Sistem:</span>
-                  <p className="font-semibold text-slate-800 bg-white p-2.5 rounded-xl border border-slate-200/80 text-[11px] leading-relaxed whitespace-pre-line">
+                  <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">Keterangan Sistem:</span>
+                  <p className="font-medium text-slate-800 bg-white p-3 rounded-xl border border-slate-200 text-xs leading-relaxed whitespace-pre-line">
                     {rejectionReason}
                   </p>
                 </div>
 
                 {/* Info Card Waktu Resmi Presensi Sekolah */}
                 {isTimingRejection && (
-                  <div className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5 space-y-1 text-slate-700">
-                    <span className="text-[10px] font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1">
-                      <span>⏰</span>
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1.5 text-slate-700">
+                    <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <SagaClockStatusIcon className="w-4 h-4 shrink-0" />
                       <span>Ketentuan Jam Presensi Sekolah (GMT+7 Jakarta)</span>
                     </span>
-                    <div className="grid grid-cols-2 gap-1.5 pt-0.5 text-[10.5px]">
-                      <div className="bg-white/80 p-1.5 rounded-lg border border-amber-200/50">
+                    <div className="grid grid-cols-2 gap-2 pt-0.5 text-xs">
+                      <div className="bg-white p-2 rounded-lg border border-amber-200">
                         <span className="text-slate-500 block font-medium">Presensi Masuk:</span>
-                        <strong className="text-emerald-800 font-bold">Mulai 06.00 WIB</strong>
+                        <strong className="text-[#0D5C46] font-bold">Mulai 06.00 WIB</strong>
                       </div>
-                      <div className="bg-white/80 p-1.5 rounded-lg border border-amber-200/50">
+                      <div className="bg-white p-2 rounded-lg border border-amber-200">
                         <span className="text-slate-500 block font-medium">Presensi Pulang:</span>
-                        <strong className="text-indigo-900 font-bold">Mulai 12.00 WIB</strong>
-                        <span className="text-[9.5px] text-amber-800 block">(Jum'at: 10.00 WIB)</span>
+                        <strong className="text-slate-900 font-bold">Mulai 12.00 WIB</strong>
+                        <span className="text-[11px] text-amber-800 block">(Jum'at: 10.00 WIB)</span>
                       </div>
                     </div>
                   </div>
@@ -927,18 +1127,18 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
                 {/* Groq AI Smart Diagnosis & Action Suggestion */}
                 {!isTimingRejection && aiDiagnosis && (
-                  <div className="bg-linear-to-r from-emerald-50/90 to-teal-50/90 p-3 rounded-xl border border-emerald-200 space-y-1.5 mt-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-emerald-950 text-[11px] flex items-center gap-1.5">
-                        <span>🤖</span>
+                  <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 space-y-2 mt-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-[#0D5C46] text-xs flex items-center gap-1.5">
+                        <SagaSparkAiIcon className="w-4 h-4 shrink-0" />
                         <span>{aiDiagnosis.diagnosisTitle}</span>
                       </span>
-                      <span className="px-2 py-0.5 bg-emerald-600 text-white text-[9px] font-black rounded-full">
+                      <span className="px-2 py-0.5 bg-[#0D5C46] text-white text-[10px] font-bold rounded-full shrink-0">
                         Groq AI
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-700 font-medium bg-white/90 p-2 rounded-lg border border-emerald-200/60 leading-relaxed">
-                      💡 <strong>Saran AI:</strong> {aiDiagnosis.actionSuggestion}
+                    <p className="text-xs text-slate-700 font-medium bg-white p-2.5 rounded-lg border border-emerald-200 leading-relaxed">
+                      <strong>Saran AI:</strong> {aiDiagnosis.actionSuggestion}
                     </p>
                   </div>
                 )}
@@ -953,15 +1153,15 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                       setIsRejectionModalOpen(false);
                       onClose();
                     }}
-                    className="w-full py-3 bg-[#023246] hover:bg-[#0D7A5F] active:scale-[0.98] text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full min-h-12 py-3 bg-[#0D5C46] hover:bg-[#094736] active:scale-[0.98] text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2"
                   >
-                    <span>✓</span>
+                    <SagaCheckBadgeIcon tone="dark" className="w-4 h-4 shrink-0" />
                     <span>Mengerti, Saya Akan Absen Pulang Nanti</span>
                   </button>
                 </div>
               ) : (
                 <div className="pt-1">
-                  <span className="text-[11px] font-bold text-slate-500 block mb-1.5 text-left">Pilihan Pemulihan Instan:</span>
+                  <span className="text-xs font-bold text-slate-600 block mb-2 text-left">Pilihan Pemulihan Instan:</span>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <button
                       type="button"
@@ -969,9 +1169,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                         setIsRejectionModalOpen(false);
                         fetchGPSLocation();
                       }}
-                      className="py-2.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95"
+                      className="min-h-11 py-2.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-xs rounded-xl border border-slate-300 transition-colors cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                     >
-                      <span>🔄</span>
+                      <SagaRefreshSyncIcon className="w-4 h-4 shrink-0" />
                       <span>Pindai Ulang</span>
                     </button>
                     <button
@@ -980,9 +1180,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                         setIsRejectionModalOpen(false);
                         setIsManualModalOpen(true);
                       }}
-                      className="py-2.5 px-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 shadow-xs"
+                      className="min-h-11 py-2.5 px-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                     >
-                      <span>⌨️</span>
+                      <SagaKeyboardIcon className="w-4 h-4 shrink-0" />
                       <span>Kode Manual</span>
                     </button>
                     <button
@@ -991,9 +1191,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                         setIsRejectionModalOpen(false);
                         fetchGPSLocation();
                       }}
-                      className="py-2.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 shadow-xs"
+                      className="min-h-11 py-2.5 px-2 bg-[#0D5C46] hover:bg-[#094736] text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                     >
-                      <span>📍</span>
+                      <SagaMapPinIcon tone="dark" className="w-4 h-4 shrink-0" />
                       <span>Ukur Ulang GPS</span>
                     </button>
                     <button
@@ -1002,9 +1202,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                         setIsRejectionModalOpen(false);
                         setIsCorrectionModalOpen(true);
                       }}
-                      className="py-2.5 px-2 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 shadow-xs"
+                      className="min-h-11 py-2.5 px-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                     >
-                      <span>⚡</span>
+                      <SagaSparkAiIcon tone="dark" className="w-4 h-4 shrink-0" />
                       <span>Koreksi AI</span>
                     </button>
                   </div>

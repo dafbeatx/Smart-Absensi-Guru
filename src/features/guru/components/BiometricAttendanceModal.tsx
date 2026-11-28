@@ -1,13 +1,26 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
+import {
+  SagaAspirationIcon,
+  SagaCheckBadgeIcon,
+  SagaClassroomIcon,
+  SagaClockStatusIcon,
+  SagaDeviceShieldIcon,
+  SagaEmergencySosIcon,
+  SagaFingerprintIcon,
+  SagaMapPinIcon,
+  SagaRefreshSyncIcon,
+  SagaScanQrIcon,
+} from '../../../components/ui/SagaServiceIcons';
 import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { BiometricService } from '../../../services/biometric.service';
 import { AttendanceRepository } from '../../../repositories/AttendanceRepository';
 import { SoundService } from '../../../services/audio.service';
 import { SpeechService } from '../../../services/speech.service';
-import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
+import { CONSTANTS } from '../../../config/constants';
+import { getEffectiveAllowedRadius, shouldReplaceWithBetterFix } from '../../../utils/geofence.utils';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { logger } from '../../../utils/logger.utils';
 import { NotificationService } from '../../../services/notification-permission.service';
@@ -25,17 +38,6 @@ export interface BiometricAttendanceModalProps {
   onSwitchToQR?: () => void;
 }
 
-const FingerprintIcon: React.FC<{ className?: string }> = ({ className = 'w-8 h-8' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1.75}
-      d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
-    />
-  </svg>
-);
-
 export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> = ({
   isOpen,
   onClose,
@@ -49,7 +51,9 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
   const [isLoadingGPS, setIsLoadingGPS] = useState(false);
   const [gpsCoords, setGpsCoords] = useState<GPSCoordinates | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
+  const [gpsSignalState, setGpsSignalState] = useState<'IDLE' | 'REFINING' | 'APPROXIMATE' | 'WEAK' | 'MOCK' | 'OUT_OF_RANGE' | 'READY' | 'ERROR'>('IDLE');
   const [isInsideGeofence, setIsInsideGeofence] = useState<boolean | null>(null);
+  const gpsCoordsRef = useRef<GPSCoordinates | null>(null);
 
   const [isBiometricSupported, setIsBiometricSupported] = useState<boolean>(true);
   const [isWebView, setIsWebView] = useState<boolean>(false);
@@ -76,31 +80,97 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
 
   const effectiveAllowedRadius = Math.max(getEffectiveAllowedRadius(settings.geofence_radius, 500), 500);
 
-  // Ambil lokasi GPS fisik guru dan cocokkan dengan geofence sekolah (Toleransi indoor hingga 100m)
+  const evaluateAndApplyBiometricGPS = useCallback(
+    (candidate: GPSCoordinates) => {
+      const current = gpsCoordsRef.current;
+      let activeCoords = candidate;
+      if (
+        !candidate.isMock &&
+        current &&
+        !current.isMock &&
+        !shouldReplaceWithBetterFix(current, candidate, CONSTANTS.DEFAULTS.GPS_SAMPLE_MAX_AGE_MS || 10000)
+      ) {
+        activeCoords = current;
+      } else {
+        gpsCoordsRef.current = candidate;
+        setGpsCoords(candidate);
+      }
+
+      const validation = GPSService.validateGeofenceRadius(activeCoords, effectiveAllowedRadius, {
+        mode: 'BIOMETRIC',
+        maxAllowedAccuracy: CONSTANTS.DEFAULTS.GPS_BIOMETRIC_MAX_ALLOWED_ACCURACY_METERS || 100,
+        maxCompensationMeters: CONSTANTS.DEFAULTS.GPS_BIOMETRIC_MAX_COMPENSATION_METERS || 25,
+      });
+
+      setIsInsideGeofence(validation.isValid);
+      if (validation.isValid) {
+        setGpsError(null);
+        setGpsSignalState('READY');
+        return true;
+      }
+
+      const errCode = validation.error?.code;
+      if (errCode === 'GPS_003') {
+        setGpsSignalState('MOCK');
+        setGpsError('Terdeteksi indikasi Fake GPS / lokasi tiruan. Matikan aplikasi pengubah lokasi terlebih dahulu.');
+      } else if (errCode === 'GPS_005' || activeCoords.isApproximateLocation || activeCoords.accuracy > 150) {
+        setGpsSignalState('APPROXIMATE');
+        setGpsError('HP Anda sedang memakai Lokasi Perkiraan. Aktifkan Lokasi Akurat (Precise), matikan Hemat Daya, dan bergeser sebentar ke dekat jendela atau teras.');
+      } else if (errCode === 'GPS_004') {
+        setGpsSignalState('WEAK');
+        setGpsError(`Sinyal GPS belum akurat (${Math.round(activeCoords.accuracy)}m). Aktifkan Wi-Fi atau bergeser ke dekat jendela.`);
+      } else {
+        setGpsSignalState('OUT_OF_RANGE');
+        setGpsError(`Posisi Anda ${activeCoords.distanceMeters}m dari sekolah (Maksimal ${effectiveAllowedRadius}m).`);
+      }
+      return false;
+    },
+    [effectiveAllowedRadius]
+  );
+
+  // Ambil lokasi GPS fisik guru dan cocokkan dengan geofence sekolah (Biometrik ketat B_max <= 25m)
   const checkGPSLocation = useCallback(async () => {
     setIsLoadingGPS(true);
     setGpsError(null);
+    setGpsSignalState('REFINING');
     try {
       await GPSService.syncGeofenceSettings();
-      const coords = await GPSService.getCurrentPosition(settings.geofence_lat, settings.geofence_lng);
-      setGpsCoords(coords);
+      let coords = await GPSService.getCurrentPosition(settings.geofence_lat, settings.geofence_lng, {
+        mode: 'BIOMETRIC',
+      });
 
-      // Berikan toleransi akurasi 100m untuk satelit di dalam ruangan / ruang guru
-      const validation = GPSService.validateGeofenceRadius(coords, effectiveAllowedRadius, { maxAllowedAccuracy: 100 });
-      setIsInsideGeofence(validation.isValid);
-      if (!validation.isValid) {
-        setGpsError(validation.error?.message || `Posisi Anda ${coords.distanceMeters}m dari sekolah (Maksimal ${effectiveAllowedRadius}m).`);
+      const isInitialStrong = evaluateAndApplyBiometricGPS(coords);
+      // Auto-retry singkat bila sinyal masih lemah (> 80m) sebelum menyerah
+      if (
+        !isInitialStrong &&
+        !coords.isMock &&
+        coords.accuracy > (CONSTANTS.DEFAULTS.GPS_SIGNAL_RETRY_THRESHOLD_METERS || 80)
+      ) {
+        setGpsSignalState('REFINING');
+        try {
+          const retryCoords = await GPSService.getCurrentPosition(settings.geofence_lat, settings.geofence_lng, {
+            mode: 'BIOMETRIC',
+            minSamples: 2,
+            maxSamples: 3,
+            sampleWindowMs: 2500,
+          });
+          coords = retryCoords;
+          evaluateAndApplyBiometricGPS(retryCoords);
+        } catch {
+          // Pertahankan hasil terbaik yang sudah diperoleh
+        }
       }
     } catch (err: unknown) {
       const msg = err && typeof err === 'object' && 'message' in err
         ? String((err as { message: string }).message)
         : 'Tidak dapat membaca lokasi GPS HP. Pastikan izin lokasi (GPS) sudah aktif di browser HP.';
       setGpsError(msg);
+      setGpsSignalState('ERROR');
       setIsInsideGeofence(false);
     } finally {
       setIsLoadingGPS(false);
     }
-  }, [settings.geofence_lat, settings.geofence_lng, effectiveAllowedRadius]);
+  }, [settings.geofence_lat, settings.geofence_lng, evaluateAndApplyBiometricGPS]);
 
   // Cek kapabilitas sensor biometrik WebAuthn & deteksi WebView di HP
   const checkBiometrics = useCallback(async () => {
@@ -114,13 +184,38 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
   }, [user?.id]);
 
   useEffect(() => {
+    let isMounted = true;
     if (isOpen) {
+      gpsCoordsRef.current = null;
+      setGpsCoords(null);
       setAttendanceSuccess(null);
       setBioError(null);
       checkBiometrics();
       checkGPSLocation();
+
+      // Pre-warming watcher hidup selama modal Biometrik terbuka + cleanup otomatis saat ditutup
+      const stopWatch = GPSService.subscribeLivePosition({
+        mode: 'BIOMETRIC',
+        maxCompensationMeters: CONSTANTS.DEFAULTS.GPS_BIOMETRIC_MAX_COMPENSATION_METERS || 25,
+        onUpdate: (coords) => {
+          if (!isMounted) return;
+          evaluateAndApplyBiometricGPS(coords);
+          setIsLoadingGPS(false);
+        },
+        onSignalAlert: (alert) => {
+          if (!isMounted) return;
+          if (alert.type === 'COARSE_APPROXIMATE' && (!gpsCoordsRef.current || gpsCoordsRef.current.accuracy > 150)) {
+            setGpsSignalState('APPROXIMATE');
+          }
+        },
+      });
+
+      return () => {
+        isMounted = false;
+        stopWatch();
+      };
     }
-  }, [isOpen, checkBiometrics, checkGPSLocation]);
+  }, [isOpen, checkBiometrics, checkGPSLocation, evaluateAndApplyBiometricGPS]);
 
   /**
    * Helper inti untuk menyimpan transaksi absensi ke repository backend
@@ -165,7 +260,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         user_lng: gpsCoords.longitude,
         device_uuid: activeDeviceUUID,
         user_id: user.id,
-        distance_meters: gpsCoords.distanceMeters,
+        distance_meters: gpsCoords.rawDistanceMeters ?? gpsCoords.distanceMeters,
         gps_accuracy: gpsCoords.accuracy,
         verification_method: 'BIOMETRIC_GPS',
         attendance_source: 'BIOMETRIC',
@@ -336,39 +431,43 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         onClose={handleModalClose}
         title="Presensi Sidik Jari HP"
         maxWidth="md"
+        mobileFullscreen
       >
       <div className="space-y-4 text-slate-800">
         {/* State 1: Presensi Sukses */}
         {attendanceSuccess ? (
           <div className="text-center py-5 space-y-4">
-            <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto text-3xl shadow-sm ring-8 ring-emerald-50">
-              ✨
+            <div className="w-16 h-16 rounded-3xl bg-[#0D5C46] text-white flex items-center justify-center mx-auto shadow-sm">
+              <SagaCheckBadgeIcon tone="dark" className="w-9 h-9" />
             </div>
 
             <div className="space-y-1">
-              <span className="px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-black rounded-full border border-emerald-300 inline-block">
+              <span className="px-3 py-1 bg-emerald-50 text-[#0D5C46] text-xs font-bold rounded-full border border-emerald-200 inline-block">
                 {attendanceSuccess.action}
               </span>
-              <h3 className="text-lg font-black text-[#023246]">
+              <h3 className="text-lg font-bold text-slate-900">
                 Presensi Sidik Jari Berhasil!
               </h3>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-xs text-slate-600 font-medium">
                 {user.full_name} • {attendanceSuccess.timestamp}
               </p>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left space-y-1.5 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-bold">Metode Verifikasi:</span>
-                <span className="font-extrabold text-emerald-800">👆 Sidik Jari + GPS</span>
+            <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-slate-200 text-left space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600 font-semibold">Metode Verifikasi:</span>
+                <span className="font-bold text-[#0D5C46] inline-flex items-center gap-1">
+                  <SagaFingerprintIcon className="w-4 h-4 shrink-0" />
+                  <span>Sidik Jari + GPS</span>
+                </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-bold">Jarak ke Sekolah:</span>
-                <span className="font-extrabold text-slate-800">{attendanceSuccess.distance} meter</span>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600 font-semibold">Jarak ke Sekolah:</span>
+                <span className="font-bold text-slate-900">{attendanceSuccess.distance} meter</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-bold">Status Kehadiran:</span>
-                <span className="font-extrabold text-slate-900">{attendanceSuccess.status}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600 font-semibold">Status Kehadiran:</span>
+                <span className="font-bold text-slate-900">{attendanceSuccess.status}</span>
               </div>
             </div>
 
@@ -388,11 +487,11 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
                   status: attendanceSuccess.status,
                 });
               }}
-              className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-black text-xs sm:text-sm rounded-2xl transition-all cursor-pointer shadow-lg hover:shadow-xl active:scale-98 flex items-center justify-center gap-2 border border-emerald-400"
+              className="w-full min-h-12 py-3 bg-[#15803D] hover:bg-[#166534] text-white font-bold text-sm rounded-2xl transition-colors cursor-pointer active:scale-[0.99] flex items-center justify-center gap-2"
             >
-              <span className="text-base">💬</span>
+              <SagaAspirationIcon tone="dark" className="w-5 h-5 shrink-0" />
               <span>Kirim Laporan ke WhatsApp Grup</span>
-              <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-extrabold uppercase">
+              <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase">
                 1-Klik
               </span>
             </button>
@@ -400,7 +499,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
             <Button
               variant="primary"
               onClick={handleModalClose}
-              className="w-full py-3 text-xs font-black min-h-11 bg-[#023246] hover:bg-[#0D7A5F]"
+              className="w-full py-3 text-xs font-bold min-h-12 bg-[#0D5C46] hover:bg-[#094736]"
             >
               Selesai &amp; Kembali ke Beranda
             </Button>
@@ -409,11 +508,11 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
           <>
             {/* Banner WhatsApp / WebView In-App Browser Warning */}
             {isWebView && (
-              <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 text-xs flex items-start gap-2.5">
-                <span className="text-base shrink-0 mt-0.5">⚠️</span>
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs flex items-start gap-2.5">
+                <SagaEmergencySosIcon className="w-5 h-5 shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <p className="font-bold text-amber-900">Perhatian: Browser Internal WhatsApp</p>
-                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                  <p className="font-bold text-amber-950">Perhatian: Browser Internal WhatsApp</p>
+                  <p className="text-xs text-amber-900 leading-relaxed">
                     Anda sedang membuka aplikasi di browser internal WhatsApp. Sensor sidik jari (WebAuthn) mungkin dibatasi oleh aplikasi.
                     Jika gagal, silakan <strong>salin tautan dan buka di aplikasi Google Chrome</strong>.
                   </p>
@@ -422,47 +521,72 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
             )}
 
             {/* 1. KOTAK INFORMASI LOKASI GPS & RADIUS SEKOLAH */}
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+            <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-slate-200 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-[#023246] flex items-center gap-1.5">
-                  <span>📍</span> Lokasi GPS Sekolah
+                <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                  <SagaMapPinIcon className="w-4 h-4 shrink-0" />
+                  <span>Lokasi GPS Sekolah</span>
                 </span>
                 <button
                   type="button"
                   onClick={checkGPSLocation}
                   disabled={isLoadingGPS}
-                  className="text-[10px] font-extrabold text-[#0D7A5F] hover:underline cursor-pointer flex items-center gap-1"
+                  className="text-xs font-bold text-[#0D5C46] hover:underline cursor-pointer flex items-center gap-1 min-h-8 px-1"
                 >
-                  {isLoadingGPS ? 'Memperbarui...' : '🔄 Cek Ulang GPS'}
+                  {isLoadingGPS ? (
+                    <span>Memperbarui...</span>
+                  ) : (
+                    <>
+                      <SagaRefreshSyncIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>Cek Ulang GPS</span>
+                    </>
+                  )}
                 </button>
               </div>
 
-              {isLoadingGPS ? (
-                <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold py-1">
-                  <div className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-                  <span>Membaca sinyal satelit GPS HP Anda...</span>
+              {isLoadingGPS || gpsSignalState === 'REFINING' ? (
+                <div className="flex items-center gap-2 text-xs text-slate-700 font-semibold py-1">
+                  <div className="w-3.5 h-3.5 border-2 border-[#0D5C46] border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span>Sinyal GPS belum akurat (sedang mencari ulang...)</span>
                 </div>
               ) : isInsideGeofence ? (
-                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs flex items-center gap-2">
-                  <span className="text-base shrink-0">✅</span>
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs flex items-start gap-2.5">
+                  <SagaCheckBadgeIcon className="w-5 h-5 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-extrabold text-emerald-900">Lokasi Valid di Area Sekolah</p>
-                    <p className="text-[11px] text-emerald-800">
+                    <p className="font-bold text-[#0D5C46]">Lokasi Valid di Area Sekolah</p>
+                    <p className="text-xs text-slate-700 mt-0.5">
                       Jarak: <strong>{gpsCoords?.distanceMeters}m</strong> (Batas Maksimal: {effectiveAllowedRadius}m)
                       {gpsCoords && gpsCoords.accuracy > 50 && (
-                        <span className="block text-[10px] text-emerald-700 font-semibold mt-0.5">
-                          🏢 Sinyal GPS Dalam Gedung (Akurasi {gpsCoords.accuracy}m diterima)
+                        <span className="flex items-center gap-1 text-[11px] text-[#0D5C46] font-semibold mt-1">
+                          <SagaClassroomIcon className="w-3.5 h-3.5 shrink-0" />
+                          <span>Sinyal GPS Dalam Gedung (Akurasi {Math.round(gpsCoords.accuracy)}m diterima)</span>
                         </span>
                       )}
                     </p>
                   </div>
                 </div>
+              ) : gpsSignalState === 'APPROXIMATE' || gpsSignalState === 'WEAK' ? (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 text-xs flex items-start gap-2.5">
+                  <SagaDeviceShieldIcon className="w-5 h-5 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-bold text-amber-950">
+                      {gpsSignalState === 'APPROXIMATE'
+                        ? `Lokasi Perkiraan Terdeteksi (±${Math.round(gpsCoords?.accuracy || 0)}m)`
+                        : `Sinyal GPS Belum Cukup Akurat (±${Math.round(gpsCoords?.accuracy || 0)}m)`}
+                    </p>
+                    <p className="text-xs text-amber-900 leading-relaxed">
+                      Aktifkan <strong>Lokasi Akurat (Precise)</strong> di pengaturan HP, matikan mode Hemat Daya, dan bergeser sebentar ke dekat jendela atau teras sekolah lalu tekan Cek Ulang GPS.
+                    </p>
+                  </div>
+                </div>
               ) : (
-                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-950 text-xs flex items-center gap-2">
-                  <span className="text-base shrink-0">⚠️</span>
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-950 text-xs flex items-start gap-2.5">
+                  <SagaEmergencySosIcon className="w-5 h-5 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-extrabold text-rose-900">Di Luar Area Sekolah</p>
-                    <p className="text-[11px] text-rose-800">
+                    <p className="font-bold text-rose-900">
+                      {gpsSignalState === 'MOCK' ? 'Indikasi Lokasi Tiruan Terdeteksi' : 'Di Luar Area Sekolah'}
+                    </p>
+                    <p className="text-xs text-rose-800 mt-0.5">
                       {gpsError || `Jarak Anda ${gpsCoords?.distanceMeters || 0}m dari titik sekolah (Maksimal ${effectiveAllowedRadius}m).`}
                     </p>
                   </div>
@@ -473,30 +597,28 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
             {/* 2. AREA SENSOR SIDIK JARI INTERAKTIF */}
             <div className="py-4 text-center space-y-3">
               <div className="relative inline-block">
-                {/* Visual pulsating aura saat di dalam radius */}
-                {isInsideGeofence && !isVerifyingBio && (
-                  <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
-                )}
-
                 <button
                   type="button"
                   disabled={!isInsideGeofence || isVerifyingBio}
                   onClick={isEnrolled ? handleTriggerBiometricAttendance : handleEnrollBiometric}
-                  className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md active:scale-95 min-h-24 min-w-24 mx-auto ${
+                  className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-colors cursor-pointer shadow-sm active:scale-95 min-h-24 min-w-24 mx-auto ${
                     !isInsideGeofence
-                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-2 border-slate-300'
+                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-2 border-slate-300'
                       : isVerifyingBio
-                      ? 'bg-amber-100 text-amber-700 border-2 border-amber-300 animate-pulse'
-                      : 'bg-linear-to-b from-[#023246] to-[#0D7A5F] text-white hover:shadow-lg ring-4 ring-emerald-500/20'
+                      ? 'bg-amber-100 text-amber-800 border-2 border-amber-300'
+                      : 'bg-[#0D5C46] hover:bg-[#094736] text-white border-2 border-[#094736]'
                   }`}
                   title="Sentuh untuk verifikasi sidik jari"
                 >
-                  <FingerprintIcon className="w-12 h-12" />
+                  <SagaFingerprintIcon
+                    tone={isInsideGeofence && !isVerifyingBio ? 'dark' : 'light'}
+                    className="w-12 h-12"
+                  />
                 </button>
               </div>
 
               <div className="space-y-1 px-4">
-                <h4 className="text-sm font-black text-[#023246]">
+                <h4 className="text-sm font-bold text-slate-900">
                   {isVerifyingBio
                     ? 'Menunggu Sensor Sidik Jari...'
                     : !isInsideGeofence
@@ -505,7 +627,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
                     ? 'Tekan Tombol & Tempelkan Sidik Jari'
                     : 'Daftarkan Sidik Jari HP Ini'}
                 </h4>
-                <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                <p className="text-xs text-slate-600 font-normal leading-relaxed">
                   {!isInsideGeofence
                     ? 'Anda harus berada di dalam radius sekolah yang telah ditentukan untuk dapat melakukan absensi.'
                     : isEnrolled
@@ -524,23 +646,27 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
                 bioError.includes('belum dibuka');
 
               return (
-                <div className={`p-3.5 rounded-2xl border ${isTiming ? 'bg-amber-50/90 border-amber-300 text-amber-950 shadow-2xs' : 'bg-rose-50 border-rose-300 text-rose-950'} text-xs space-y-2 text-left`}>
+                <div className={`p-3.5 rounded-2xl border ${isTiming ? 'bg-amber-50 border-amber-200 text-amber-950' : 'bg-rose-50 border-rose-200 text-rose-950'} text-xs space-y-2 text-left`}>
                   <div className="flex items-start gap-2.5">
-                    <span className="text-xl shrink-0">{isTiming ? '⏰' : '⚠️'}</span>
+                    {isTiming ? (
+                      <SagaClockStatusIcon className="w-5 h-5 shrink-0 mt-0.5" />
+                    ) : (
+                      <SagaEmergencySosIcon className="w-5 h-5 shrink-0 mt-0.5" />
+                    )}
                     <div className="space-y-1 flex-1">
-                      <p className={`font-black ${isTiming ? 'text-amber-900' : 'text-rose-900'}`}>
+                      <p className={`font-bold ${isTiming ? 'text-amber-950' : 'text-rose-900'}`}>
                         {isTiming ? 'Jadwal Presensi Belum Sesuai' : 'Kendala Verifikasi:'}
                       </p>
-                      <p className={`text-[11px] ${isTiming ? 'text-amber-900' : 'text-rose-800'} leading-relaxed whitespace-pre-line font-medium`}>
+                      <p className={`text-xs ${isTiming ? 'text-amber-900' : 'text-rose-800'} leading-relaxed whitespace-pre-line font-normal`}>
                         {bioError}
                       </p>
                     </div>
                   </div>
 
                   {isTiming && (
-                    <div className="bg-white/80 border border-amber-200 rounded-xl p-2 text-[10.5px] text-slate-700 space-y-1">
+                    <div className="bg-white border border-amber-200 rounded-xl p-2.5 text-xs text-slate-700 space-y-1">
                       <span className="font-bold text-amber-900 block">Jadwal Presensi Sekolah (GMT+7 Jakarta):</span>
-                      <div className="grid grid-cols-2 gap-1 text-[10px]">
+                      <div className="grid grid-cols-2 gap-1 text-[11px]">
                         <div>• Masuk: <strong>Mulai 06.00 WIB</strong></div>
                         <div>• Pulang: <strong>Mulai 12.00 WIB</strong> <span className="text-amber-800 font-semibold">(Jum'at 10.00)</span></div>
                       </div>
@@ -554,20 +680,20 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
             {!isBiometricSupported && (
               <div className="p-3 rounded-2xl bg-slate-100 border border-slate-200 text-slate-700 text-xs text-center space-y-1">
                 <p className="font-bold">Browser Tidak Mendukung Biometrik</p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-xs text-slate-500">
                   Gunakan Google Chrome Android versi terbaru atau gunakan metode Pindai QR Code di bawah.
                 </p>
               </div>
             )}
 
-            {/* Action Buttons (Touch standard min 44-48px) */}
+            {/* Action Buttons */}
             <div className="pt-2 border-t border-slate-100 space-y-2">
               <Button
                 variant="primary"
                 disabled={!isInsideGeofence || isVerifyingBio}
                 onClick={isEnrolled ? handleTriggerBiometricAttendance : handleEnrollBiometric}
-                leftIcon={<FingerprintIcon className="w-5 h-5 text-white shrink-0" />}
-                className="w-full py-3.5 text-xs font-black min-h-12 bg-[#0D7A5F] hover:bg-[#095744] shadow-md shadow-emerald-700/20 cursor-pointer"
+                leftIcon={<SagaFingerprintIcon tone="dark" className="w-5 h-5 shrink-0" />}
+                className="w-full py-3.5 text-xs font-bold min-h-12 bg-[#0D5C46] hover:bg-[#094736] cursor-pointer"
               >
                 {isVerifyingBio
                   ? 'MEMPROSES SENSOR...'
@@ -576,16 +702,16 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
                   : 'DAFTARKAN & ABSEN SEKARANG'}
               </Button>
 
-              {/* Tombol Recovery: Daftar Ulang Sidik Jari jika sebelumnya gagal atau ganti PIN/perangkat */}
+              {/* Tombol Recovery */}
               {(isEnrolled || bioError) && (
                 <button
                   type="button"
                   disabled={isVerifyingBio}
                   onClick={handleResetAndReEnroll}
-                  className="w-full py-2.5 px-3 rounded-xl border border-amber-300 bg-amber-50/70 hover:bg-amber-100 active:scale-98 text-amber-900 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-11"
+                  className="w-full py-2.5 px-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 active:scale-[0.99] text-amber-950 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer min-h-11"
                   title="Gunakan ini jika sidik jari tidak merespons atau Anda baru mengubah kunci layar HP"
                 >
-                  <span>🔄</span>
+                  <SagaRefreshSyncIcon className="w-4 h-4 shrink-0" />
                   <span>Daftar Ulang Sidik Jari di HP Ini</span>
                 </button>
               )}
@@ -597,16 +723,16 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
                   onClose();
                   onSwitchToQR?.();
                 }}
-                className="w-full py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-98 text-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer min-h-11 shadow-2xs"
+                className="w-full py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.99] text-slate-800 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer min-h-11"
               >
-                <span>📷</span>
+                <SagaScanQrIcon className="w-4 h-4 shrink-0" />
                 <span>Beralih ke Scan QR Code</span>
               </button>
 
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer min-h-10"
+                className="w-full py-2 text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer min-h-11"
               >
                 Batal
               </button>

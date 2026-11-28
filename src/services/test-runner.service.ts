@@ -57,6 +57,7 @@ import { runUniversalExcelGradingTestSuite } from './__tests__/universal-excel-g
 import { runOralExamAssessmentTestSuite } from './__tests__/oral-exam-assessment.test';
 import { runComplaintRepositorySyncTestSuite } from './__tests__/complaint-repository-sync.test';
 import { runOnlineAttendanceGeofenceFixTestSuite } from './__tests__/online-attendance-geofence-fix.test';
+import { runGpsStabilityAntiJumpTestSuite } from './__tests__/gps-stability-antijump.test';
 import { runAnnouncementBroadcastTestSuite } from './__tests__/announcement-broadcast.test';
 import { runAttendanceReminderSettingsTestSuite } from './__tests__/attendance-reminder-settings.test';
 import { runAttendanceCorrectionNotificationExclusionTestSuite } from './__tests__/attendance-correction-notification-exclusion.test';
@@ -168,6 +169,7 @@ export class MasterTestRunner {
       { name: 'Oral Exam Assessment Engine (3 Kriteria: Bahasa & BTQ/Hafalan)', fn: runOralExamAssessmentTestSuite },
       { name: 'Kotak Aspirasi & Keluhan Guru Cross-Device Sync Suite (Phase 5.3)', fn: runComplaintRepositorySyncTestSuite },
       { name: 'Online Attendance Geofence Sanitization & 500m Safety Buffer Suite (Fix Penolakan Data)', fn: runOnlineAttendanceGeofenceFixTestSuite },
+      { name: 'GPS Anti-Jump, Clock Skew, & Bounded B_max Stability Suite', fn: runGpsStabilityAntiJumpTestSuite },
       { name: 'Pengumuman Notifikasi Push Guru & Anti-Spam Safeguards Suite (Phase 5.4)', fn: runAnnouncementBroadcastTestSuite },
       { name: 'Attendance Reminder Settings & 13:00 Accuracy Engine', fn: runAttendanceReminderSettingsTestSuite },
       { name: 'Bimtek & Diklat Guru Recording Engine (Phase 5.5)', fn: runBimtekTestSuite },

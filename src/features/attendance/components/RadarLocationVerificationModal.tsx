@@ -22,10 +22,10 @@ export const RadarLocationVerificationModal: React.FC<RadarLocationVerificationM
   onComplete,
   onLockGreen,
   latitude = -6.613144,
-  longitude = 106.812345,
+  longitude = 106.684975,
   accuracy = 12,
   distanceMeters = 18,
-  allowedRadiusMeters = 150,
+  allowedRadiusMeters = 500,
   teacherName = 'Guru',
   action = 'CHECK_IN',
 }) => {
@@ -74,7 +74,7 @@ export const RadarLocationVerificationModal: React.FC<RadarLocationVerificationM
 
   // Format koordinat GPS rapi untuk telemetry HUD
   const formattedLat = typeof latitude === 'number' ? latitude.toFixed(6) : '-6.613144';
-  const formattedLng = typeof longitude === 'number' ? longitude.toFixed(6) : '106.812345';
+  const formattedLng = typeof longitude === 'number' ? longitude.toFixed(6) : '106.684975';
   const effectiveDist = Math.round(distanceMeters || 15);
   const effectiveRadius = Math.round(allowedRadiusMeters || 150);
 

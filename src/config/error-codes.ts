@@ -49,8 +49,13 @@ export const ERROR_CODES: Record<string, ErrorDefinition> = {
   },
   GPS_004: {
     code: 'GPS_004',
-    message: 'Akurasi sinyal GPS HP Anda terlalu rendah (> 50 meter).',
-    solution: 'Pastikan berada di area terbuka dan nyalakan Wi-Fi. Untuk pengguna iPhone: pastikan opsi "Lokasi Tepat" aktif di Pengaturan > Privasi > Layanan Lokasi > Safari.',
+    message: 'Sinyal GPS HP Anda belum cukup akurat (> 50 meter).',
+    solution: 'Pastikan Wi-Fi aktif, matikan mode Hemat Daya, dan bergeser sebentar ke dekat jendela atau area terbuka.',
+  },
+  GPS_005: {
+    code: 'GPS_005',
+    message: 'HP Anda sedang memakai Lokasi Perkiraan (akurasi > 150 meter).',
+    solution: 'Aktifkan opsi Lokasi Akurat (Precise) di pengaturan izin lokasi HP, matikan Hemat Daya, lalu pindah sebentar ke dekat jendela atau teras.',
   },
 
   // Attendance & QR Errors (ATT_xxx / QR_xxx)
@@ -111,7 +116,7 @@ export const ERROR_CODES: Record<string, ErrorDefinition> = {
   SYS_002: {
     code: 'SYS_002',
     message: 'Server Google Apps Script sedang tidak merespons (Timeout).',
-    solution: 'Klik tombol [ 🔄 Coba Lagi ] untuk mengulang transaksi.',
+    solution: 'Klik tombol [ Coba Lagi ] untuk mengulang transaksi.',
   },
 } as const;
 

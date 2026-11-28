@@ -1,7 +1,36 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { ChevronRight, X } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
 import { WebTrafficService } from '../../../services/web-traffic.service';
+import {
+  SagaAdminHubIcon,
+  SagaAspirationIcon,
+  SagaBookMaterialIcon,
+  SagaCalendarAgendaIcon,
+  SagaClassroomIcon,
+  SagaClockStatusIcon,
+  SagaCreateExamIcon,
+  SagaEditPencilIcon,
+  SagaEmergencySosIcon,
+  SagaExamCardIcon,
+  SagaGamePidIcon,
+  SagaGradingIcon,
+  SagaHistoryIcon,
+  SagaHomeroomIcon,
+  SagaInfoCircleIcon,
+  SagaKeyPinIcon,
+  SagaLogoutDoorIcon,
+  SagaMapPinIcon,
+  SagaMoodFaceIcon,
+  SagaMoreAppsIcon,
+  SagaNotulenIcon,
+  SagaRfidKioskIcon,
+  SagaSarprasIcon,
+  SagaSparkAiIcon,
+  SagaStudentsIcon,
+  SagaVoiceAudioIcon,
+} from '../../../components/ui/SagaServiceIcons';
 
 interface MoreFeaturesModalProps {
   isOpen: boolean;
@@ -70,13 +99,22 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenTeacherBoard,
   onOpenGamePidModal,
 }) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   interface MenuItem {
     id: string;
     title: string;
     subtitle: string;
-    icon: string;
+    icon: React.ReactNode;
     badge?: string;
     badgeDone?: boolean;
     action: () => void;
@@ -97,7 +135,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'administrasi',
                 title: 'Administrasi Sekolah & KBM',
                 subtitle: 'Pusat berkas ujian, bahan ajar, jadwal, dan perangkat berbasis tahun ajaran',
-                icon: '📁',
+                icon: <SagaAdminHubIcon className="w-6 h-6" />,
                 badge: 'Pusat Berkas',
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
@@ -119,7 +157,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'game_pid',
                 title: 'Game PID (Pekan Inovasi Digital)',
                 subtitle: 'Arena edukasi School Slice 3D & kuis interaktif sekolah berbasis karakter',
-                icon: '🎮',
+                icon: <SagaGamePidIcon className="w-6 h-6" />,
                 badge: '3D Ready',
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
@@ -141,7 +179,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'homeroom_plan',
                 title: 'Ruang Wali Kelas: Rencana Studi Siswa',
                 subtitle: 'Pendataan & verifikasi rencana pendidikan lanjutan siswa kelas 9',
-                icon: '🎓',
+                icon: <SagaHomeroomIcon className="w-6 h-6" />,
                 badge: 'Wali Kelas 9',
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
@@ -163,7 +201,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'exam_card',
                 title: 'Cetak Kartu Ujian & Barcode Siswa',
                 subtitle: 'Generator kartu peserta ujian & barcode NISN siswa (Format A4)',
-                icon: '🏷️',
+                icon: <SagaExamCardIcon className="w-6 h-6" />,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,
@@ -184,7 +222,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'buat_soal_ai',
                 title: 'Pembuat Soal & Kisi-Kisi AI',
                 subtitle: 'Generator naskah soal KOP SMPT Al-Ittihadiyah, kunci & kisi-kisi',
-                icon: '✨',
+                icon: <SagaCreateExamIcon className="w-6 h-6" />,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,
@@ -203,7 +241,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           id: 'koreksi_soal',
           title: 'Koreksi Soal & Input Nilai',
           subtitle: 'Aplikasi koreksi lembar ujian & rekap nilai siswa (In-App)',
-          icon: '📝',
+          icon: <SagaGradingIcon className="w-6 h-6" />,
           action: () => {
             WebTrafficService.recordFeatureVisit({
               user_id: user.id,
@@ -224,8 +262,8 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'student_good_points',
                 title: 'Poin Kebaikan Siswa',
                 subtitle: 'Apresiasi sikap, kebersihan, dan keaktifan siswa (Sinkron)',
-                icon: '🌟',
-                badge: hasAwardedMeritToday ? '✓ +5 Pts' : '+5 Poin',
+                icon: <SagaSparkAiIcon className="w-6 h-6" />,
+                badge: hasAwardedMeritToday ? 'Selesai (+5 Poin)' : '+5 Poin',
                 badgeDone: hasAwardedMeritToday,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
@@ -243,8 +281,8 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'student_discipline_points',
                 title: 'Poin Kedisiplinan Siswa',
                 subtitle: 'Catatan pelanggaran tata tertib & pengurangan poin',
-                icon: '⚠️',
-                badge: hasRecordedDemeritToday ? '✓ +5 Pts' : '+5 Poin',
+                icon: <SagaClockStatusIcon className="w-6 h-6" />,
+                badge: hasRecordedDemeritToday ? 'Selesai (+5 Poin)' : '+5 Poin',
                 badgeDone: hasRecordedDemeritToday,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
@@ -266,7 +304,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'student_directory',
                 title: 'Direktori Siswa & RFID',
                 subtitle: 'Database siswa, kelas, kontak wali, dan kartu RFID',
-                icon: '🎓',
+                icon: <SagaStudentsIcon className="w-6 h-6" />,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,
@@ -287,7 +325,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'classroom',
                 title: 'Ruang Kelas & Rombel',
                 subtitle: 'Daftar rombongan belajar dan jadwal kelas',
-                icon: '🏫',
+                icon: <SagaClassroomIcon className="w-6 h-6" />,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,
@@ -308,7 +346,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'materials',
                 title: 'Modul & Bahan Ajar KBM',
                 subtitle: 'Bank materi pembelajaran dan referensi ajar',
-                icon: '📚',
+                icon: <SagaBookMaterialIcon className="w-6 h-6" />,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,
@@ -329,7 +367,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'events',
                 title: 'Kalender Acara & Agenda',
                 subtitle: 'Jadwal kegiatan akademik, ujian, dan hari libur',
-                icon: '📅',
+                icon: <SagaCalendarAgendaIcon className="w-6 h-6" />,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,
@@ -355,7 +393,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'teacher_daily_board',
                 title: 'Papan Presensi Harian',
                 subtitle: 'Lihat kehadiran seluruh rekan guru hari ini secara real-time',
-                icon: '👥',
+                icon: <SagaHistoryIcon className="w-6 h-6" />,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,
@@ -376,7 +414,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'correction',
                 title: 'Koreksi Presensi Guru',
                 subtitle: 'Pengajuan koreksi kehadiran jika lupa atau terkendala GPS',
-                icon: '📝',
+                icon: <SagaEditPencilIcon className="w-6 h-6" />,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,
@@ -397,7 +435,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'location',
                 title: 'Peta Lokasi & Geofence GPS',
                 subtitle: 'Pantau koordinat GPS sekolah dan radius presensi',
-                icon: '📍',
+                icon: <SagaMapPinIcon className="w-6 h-6" />,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,
@@ -418,7 +456,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'rfid_kiosk',
                 title: 'Terminal Presensi RFID Siswa 2',
                 subtitle: 'Kiosk tap kartu RFID siswa untuk guru piket',
-                icon: '📡',
+                icon: <SagaRfidKioskIcon className="w-6 h-6" />,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,
@@ -444,7 +482,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'sarpras_inventory',
                 title: 'Inventaris Sarana & Prasarana',
                 subtitle: 'Pencatatan aset barang, kondisi, dan kebutuhan pengadaan sekolah',
-                icon: '📦',
+                icon: <SagaSarprasIcon className="w-6 h-6" />,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,
@@ -470,7 +508,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'classroom_emergency',
                 title: 'Panggilan Bantuan Darurat Kelas (SOS)',
                 subtitle: 'Panggil Guru Piket & Tim UKS instan dengan deteksi ruang kelas otomatis',
-                icon: '🚨',
+                icon: <SagaEmergencySosIcon className="w-6 h-6" />,
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,
@@ -494,8 +532,8 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           id: 'complaint',
           title: 'Kotak Aspirasi Guru',
           subtitle: 'Sampaikan aspirasi & masukan secara anonim ke Kepala Sekolah',
-          icon: '💬',
-          badge: hasSubmittedComplaintToday ? '✓ +5 Pts' : '+5 Poin',
+          icon: <SagaAspirationIcon className="w-6 h-6" />,
+          badge: hasSubmittedComplaintToday ? 'Selesai (+5 Poin)' : '+5 Poin',
           badgeDone: hasSubmittedComplaintToday,
           action: () => {
             WebTrafficService.recordFeatureVisit({
@@ -513,8 +551,8 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           id: 'mood',
           title: 'Mood & Kesiapan Harian',
           subtitle: 'Catat kesiapan mental dan suasana hati harian guru',
-          icon: '😊',
-          badge: hasFilledMoodToday ? '✓ +5 Pts' : '+5 Poin',
+          icon: <SagaMoodFaceIcon mood="VERY_HAPPY" className="w-6 h-6" />,
+          badge: hasFilledMoodToday ? 'Selesai (+5 Poin)' : '+5 Poin',
           badgeDone: hasFilledMoodToday,
           action: () => {
             WebTrafficService.recordFeatureVisit({
@@ -532,7 +570,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           id: 'voice',
           title: 'Panduan Suara & Audio KBM',
           subtitle: 'Pengaturan alarm bel kelas dan pembacaan teks otomatis',
-          icon: '🔊',
+          icon: <SagaVoiceAudioIcon className="w-6 h-6" />,
           action: () => {
             onClose();
             onOpenVoiceSettings();
@@ -542,7 +580,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           id: 'terms',
           title: 'Syarat & Ketentuan',
           subtitle: 'Aturan absensi GPS, geofence, dan binding perangkat HP',
-          icon: '📋',
+          icon: <SagaNotulenIcon className="w-6 h-6" />,
           action: () => {
             onClose();
             onOpenTermsModal();
@@ -552,7 +590,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           id: 'pin',
           title: 'Ubah PIN Keamanan',
           subtitle: 'Perbarui 6-digit PIN login akun pengajar Anda',
-          icon: '🔐',
+          icon: <SagaKeyPinIcon className="w-6 h-6" />,
           action: () => {
             onClose();
             onOpenChangePin();
@@ -564,7 +602,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 id: 'about_app',
                 title: 'Tentang Aplikasi & Pengembang',
                 subtitle: 'Kisah Dafa Maulana, S.Pd & kolaborasi AI Agent Gemini',
-                icon: 'ℹ️',
+                icon: <SagaInfoCircleIcon className="w-6 h-6" />,
                 action: () => {
                   onClose();
                   onOpenAboutModal();
@@ -577,62 +615,67 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-      <div className="bg-white w-full max-w-120 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
+    <div
+      className="fixed inset-0 z-50 bg-slate-950/70 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Semua Fitur dan Pengaturan"
+    >
+      <div className="bg-white w-full sm:max-w-120 h-dvh sm:h-auto sm:max-h-[92dvh] rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-slate-200 overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-[#023246] text-white p-4 px-5 flex items-center justify-between shrink-0">
+        <div className="bg-[#0D5C46] text-white pt-[max(14px,env(safe-area-inset-top))] pb-3.5 px-4 sm:px-5 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center text-white text-xl shadow-xs shrink-0 border border-white/10">
-              ⚙️
+            <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center shrink-0 border border-white/15">
+              <SagaMoreAppsIcon tone="dark" className="w-6 h-6" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-bold leading-tight truncate">Semua Fitur & Pengaturan</h3>
-              <p className="text-[11px] text-slate-300 font-medium truncate">{user.full_name}</p>
+              <h3 className="text-base font-bold leading-tight truncate">Semua Fitur &amp; Pengaturan</h3>
+              <p className="text-xs text-emerald-100 font-medium truncate">{user.full_name}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 rounded-full text-slate-200 transition-colors cursor-pointer text-sm font-bold shrink-0"
+            className="w-11 h-11 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 rounded-full text-white transition-colors cursor-pointer shrink-0"
             aria-label="Tutup"
           >
-            ✕
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-4 overflow-y-auto flex-1">
+        <div className="p-4 space-y-4 overflow-y-auto flex-1 bg-[#F8FAFC]">
           {menuGroups.map((group) => {
             if (group.items.length === 0) return null;
             return (
               <div key={group.category} className="space-y-2">
-                <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-1">
+                <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider px-1">
                   {group.category}
                 </h4>
-                <div className="bg-slate-50/70 rounded-2xl border border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                   {group.items.map((item, idx) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={item.action}
-                      className={`w-full p-3.5 flex items-center justify-between gap-3 text-left hover:bg-white active:bg-slate-100 transition-colors cursor-pointer ${
+                      className={`w-full p-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer min-h-16 ${
                         idx > 0 ? 'border-t border-slate-100' : ''
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-base shrink-0 shadow-2xs">
+                        <div className="w-11 h-11 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-2xs">
                           {item.icon}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <h5 className="font-bold text-xs text-[#023246] leading-tight truncate">
+                            <h5 className="font-bold text-sm text-slate-900 leading-tight truncate">
                               {item.title}
                             </h5>
                             {item.badge && (
                               <span
-                                className={`px-1.5 py-0.2 text-[8.5px] font-black rounded-md border shrink-0 ${
+                                className={`px-2 py-0.5 text-[10px] font-bold rounded-md border shrink-0 ${
                                   item.badgeDone
-                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
                                     : 'bg-amber-100 text-amber-900 border-amber-300'
                                 }`}
                               >
@@ -640,12 +683,12 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                          <p className="text-xs text-slate-500 font-normal truncate mt-0.5">
                             {item.subtitle}
                           </p>
                         </div>
                       </div>
-                      <span className="text-slate-400 font-bold text-sm shrink-0">›</span>
+                      <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                     </button>
                   ))}
                 </div>
@@ -654,27 +697,27 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           })}
 
           {/* Logout Button */}
-          <div className="pt-2">
+          <div className="pt-1 pb-2">
             <button
               type="button"
               onClick={() => {
                 onClose();
                 onLogout();
               }}
-              className="w-full h-11 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98 shadow-2xs"
+              className="w-full min-h-12 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-sm font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]"
             >
-              <span>🚪</span>
+              <SagaLogoutDoorIcon className="w-5 h-5 shrink-0" />
               <span>Keluar dari Akun</span>
             </button>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-3 px-4 bg-slate-50 border-t border-slate-200 flex justify-end shrink-0">
+        {/* Sticky Footer */}
+        <div className="p-3.5 px-4 pb-[max(14px,env(safe-area-inset-bottom))] bg-white border-t border-slate-200 flex justify-end shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="w-full h-10 bg-[#023246] hover:bg-[#034560] active:scale-98 text-white text-xs font-bold rounded-xl transition-all cursor-pointer text-center"
+            className="w-full min-h-12 bg-[#0D5C46] hover:bg-[#094736] active:scale-[0.99] text-white text-sm font-bold rounded-xl transition-colors cursor-pointer text-center"
           >
             Tutup
           </button>

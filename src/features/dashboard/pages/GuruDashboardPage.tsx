@@ -51,63 +51,72 @@ const OralExamAssessmentModal = React.lazy(() =>
     default: m.OralExamAssessmentModal,
   }))
 );
-import {
-  CustomizeQuickIconsModal,
-  ALL_QUICK_ICONS,
-  DEFAULT_8_QUICK_ICONS,
-} from '../../guru/components/CustomizeQuickIconsModal';
+import { CustomizeQuickIconsModal, sanitizeQuickIconIds } from '../../guru/components/CustomizeQuickIconsModal';
 import { SarprasInventoryModal } from '../../sarpras/components/SarprasInventoryModal';
-import { GuruSurveyVoiceCard } from '../../guru/components/GuruSurveyVoiceCard';
 import { SurveyAnalyticsView } from '../../survey/components/SurveyAnalyticsView';
 import { DailySurveyReminderBanner } from '../../../components/survey/DailySurveyReminderBanner';
-import { syncSurveyCompletionFromPointLogs } from '../../../services/research-survey.service';
+import {
+  syncSurveyCompletionFromPointLogs,
+  shouldShowDailySurveyBanner,
+} from '../../../services/research-survey.service';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
 import { PermissionGuardService } from '../../../services/permission-guard.service';
+import { ArrowLeft, ArrowRight, ChevronRight } from 'lucide-react';
 import {
-  Radio,
-  Fingerprint,
-  QrCode,
-  Clock,
-  Calendar,
-  BarChart3,
-  FileEdit,
-  Megaphone,
-  GraduationCap,
-  School,
-  BookOpen,
-  CalendarRange,
-  MapPin,
-  MessageSquare,
-  Smile,
-  Lock,
-  FileText,
-  Info,
-  ArrowLeft,
-  ArrowRight,
-  ChevronRight,
-  LayoutGrid,
-  FileSpreadsheet,
-  ClipboardCheck,
-  Sparkles,
-  AlertTriangle,
-  ShieldAlert,
-  Settings2,
-  CheckCircle2,
-  CalendarDays,
-  CalendarCheck,
-  Printer,
-  Award,
-  Coffee,
-  NotebookPen,
-  SlidersHorizontal,
-  Users,
-  ChevronDown,
-  X,
-  Gamepad2,
-  ExternalLink,
-  HeartHandshake,
-  Languages,
-} from 'lucide-react';
+  SagaAdminHubIcon,
+  SagaAppDownloadIcon,
+  SagaAspirationIcon,
+  SagaAttachmentClipIcon,
+  SagaBellIcon,
+  SagaBimtekIcon,
+  SagaBookMaterialIcon,
+  SagaCalendarAgendaIcon,
+  SagaChallengeTrophyIcon,
+  SagaCheckBadgeIcon,
+  SagaClassroomIcon,
+  SagaClockStatusIcon,
+  SagaCounselingIcon,
+  SagaCreateExamIcon,
+  SagaDeviceShieldIcon,
+  SagaEditPencilIcon,
+  SagaEmergencySosIcon,
+  SagaEmptyListIllustration,
+  SagaExamCardIcon,
+  SagaFingerprintIcon,
+  SagaGamePidIcon,
+  SagaGradingIcon,
+  SagaHistoryIcon,
+  SagaHolidayIcon,
+  SagaHomeroomIcon,
+  SagaInfoCircleIcon,
+  SagaKeyPinIcon,
+  SagaLeavePermitIcon,
+  SagaLogoutDoorIcon,
+  SagaMapPinIcon,
+  SagaMedalRankIcon,
+  SagaMoodFaceIcon,
+  SagaMoreAppsIcon,
+  SagaNotulenIcon,
+  SagaOralExamIcon,
+  SagaPrinterIcon,
+  SagaRfidKioskIcon,
+  SagaRoleSwitchIcon,
+  SagaScanQrIcon,
+  SagaScheduleIcon,
+  SagaStudentsIcon,
+  type SagaAttendanceStatusVariant,
+} from '../../../components/ui/SagaServiceIcons';
+import { GuruDashboardHeader } from '../components/GuruDashboardHeader';
+import { GuruAttendanceHeroCard } from '../components/GuruAttendanceHeroCard';
+import { GuruQuickMenuGrid } from '../components/GuruQuickMenuGrid';
+import { GuruTodayScheduleCard } from '../components/GuruTodayScheduleCard';
+import { GuruAdminHubTabView } from '../components/GuruAdminHubTabView';
+import {
+  GuruBottomNavBar,
+  GuruDesktopNavBar,
+  type GuruMainTab,
+} from '../components/GuruBottomNavBar';
+import { pwaService } from '../../../services/pwa.service';
 import {
   OralExamAssignmentRepository,
   ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT,
@@ -123,7 +132,6 @@ import { ProviderFactory } from '../../../providers/provider-factory';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { ComplaintRepository } from '../../../repositories/ComplaintRepository';
 import { GPSService } from '../../../services/gps.service';
-import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
 import {
@@ -139,8 +147,6 @@ import {
   isAutoCheckInRecord,
   isAutoCheckOutRecord,
 } from '../../../utils/time.utils';
-import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
-import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { SoundService } from '../../../services/audio.service';
 import { SpeechService } from '../../../services/speech.service';
 import { VoiceSettingsCard } from '../../../components/dashboard/VoiceSettingsCard';
@@ -162,7 +168,6 @@ import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 import {
   calculateTeacherAppreciationScore,
   getTeacherDisciplineLeaderboard,
-  formatShortTeacherName,
   type DisciplinePeriodType,
 } from '../../../utils/teacher-appreciation.utils';
 import { getSafeInitialTeacherPointLogs } from '../../../utils/teacher-point-seed.utils';
@@ -173,7 +178,7 @@ import { TeacherDailyChallengeWidget } from '../../guru/components/TeacherDailyC
 import { TeacherChallengeModal } from '../../guru/components/TeacherChallengeModal';
 import { GamePidView } from '../../guru/components/GamePidView';
 import { GamePidPromoModal } from '../../guru/components/GamePidPromoModal';
-import { getGamePidPlatformUrl, shouldShowPidPromoToday } from '../../../config/game-pid.config';
+import { shouldShowPidPromoToday } from '../../../config/game-pid.config';
 import { TeacherChallengeService } from '../../../services/teacher-challenge.service';
 import { CheckoutReminderBanner } from '../components/CheckoutReminderBanner';
 import { AttendancePolicyAgreementModal } from '../../guru/components/AttendancePolicyAgreementModal';
@@ -301,43 +306,6 @@ const getSlotLiveStatus = (
   }
 };
 
-// Clean UI Icons (Anti AI-Slop standard)
-const HomeIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 00-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-  </svg>
-);
-
-const ChartIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-  </svg>
-);
-
-const BellIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-  </svg>
-);
-
-const UserIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-  </svg>
-);
-
-const KeyIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-  </svg>
-);
-
-const LogOutIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-  </svg>
-);
-
 const FALLBACK_GURU_USER: UserProfile = {
   id: 'usr_guru_sample',
   nip: null,
@@ -374,7 +342,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     return authUser || FALLBACK_GURU_USER;
   }, [previewUser, authUser]);
 
-  const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
+  const [activeTab, setActiveTab] = useState<GuruMainTab>('BERANDA');
+  const [notifReturnTab, setNotifReturnTab] = useState<Exclude<GuruMainTab, 'NOTIFIKASI'>>('BERANDA');
   const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN' | 'SURVEY_ANALYTICS' | 'GAME_PID' | 'BIMTEK' | 'COUNSELING_BK' | 'ORAL_EXAM'>('HOME');
   const [bimtekReturnTarget, setBimtekReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const [counselingReturnTarget, setCounselingReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
@@ -382,11 +351,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const berandaLayerRef = React.useRef(berandaLayer);
   berandaLayerRef.current = berandaLayer;
   const [gamePidReturnTarget, setGamePidReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
-  const [surveyAnalyticsReturnTarget, setSurveyAnalyticsReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('HOME');
+  const [surveyAnalyticsReturnTarget, setSurveyAnalyticsReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'ADMIN' | 'AKUN'>('HOME');
   const [notulenReturnTarget, setNotulenReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const [studentBehaviorReturnTarget, setStudentBehaviorReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
-  const [aboutReturnTarget, setAboutReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('HOME');
-  const [educationReturnTarget, setEducationReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('PROFIL');
+  const [aboutReturnTarget, setAboutReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'AKUN'>('HOME');
+  const [educationReturnTarget, setEducationReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'AKUN'>('AKUN');
   const [profilSubView, setProfilSubView] = useState<'MAIN' | 'EDUCATION'>('MAIN');
   const [educationViewTab, setEducationViewTab] = useState<'QR' | 'BIOMETRIC' | 'POINTS' | 'SECURITY'>('QR');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
@@ -399,7 +368,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isAttendanceChoiceModalOpen, setIsAttendanceChoiceModalOpen] = useState(false);
   const [isQuestionCorrectionModalOpen, setIsQuestionCorrectionModalOpen] = useState(false);
 
-  const handleOpenAboutLayer = useCallback((returnTo: 'HOME' | 'ALL_FEATURES' | 'PROFIL' = 'HOME') => {
+  const handleOpenAboutLayer = useCallback((returnTo: 'HOME' | 'ALL_FEATURES' | 'AKUN' = 'HOME') => {
     setAboutReturnTarget(returnTo);
     setActiveTab('BERANDA');
     setBerandaLayer('ABOUT');
@@ -407,8 +376,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, []);
 
   const handleBackFromAboutLayer = useCallback(() => {
-    if (aboutReturnTarget === 'PROFIL') {
-      setActiveTab('PROFIL');
+    if (aboutReturnTarget === 'AKUN') {
+      setActiveTab('AKUN');
     } else if (aboutReturnTarget === 'ALL_FEATURES') {
       setActiveTab('BERANDA');
       setBerandaLayer('ALL_FEATURES');
@@ -422,12 +391,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const handleOpenEducationLayer = useCallback(
     (
       tab: 'QR' | 'BIOMETRIC' | 'POINTS' | 'SECURITY' = 'QR',
-      returnTo: 'HOME' | 'ALL_FEATURES' | 'PROFIL' = 'PROFIL'
+      returnTo: 'HOME' | 'ALL_FEATURES' | 'AKUN' = 'AKUN'
     ) => {
       setEducationViewTab(tab);
       setEducationReturnTarget(returnTo);
-      if (returnTo === 'PROFIL') {
-        setActiveTab('PROFIL');
+      if (returnTo === 'AKUN') {
+        setActiveTab('AKUN');
         setProfilSubView('EDUCATION');
       } else {
         setActiveTab('BERANDA');
@@ -439,8 +408,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   );
 
   const handleBackFromEducation = useCallback(() => {
-    if (educationReturnTarget === 'PROFIL') {
-      setActiveTab('PROFIL');
+    if (educationReturnTarget === 'AKUN') {
+      setActiveTab('AKUN');
       setProfilSubView('MAIN');
     } else if (educationReturnTarget === 'ALL_FEATURES') {
       setActiveTab('BERANDA');
@@ -511,45 +480,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isMoreFeaturesModalOpen, setIsMoreFeaturesModalOpen] = useState(false);
   const [isTeacherBoardOpen, setIsTeacherBoardOpen] = useState(false);
   const [isExamCreatorModalOpen, setIsExamCreatorModalOpen] = useState(false);
-  const [isTeacherBoardTourActive, setIsTeacherBoardTourActive] = useState<boolean>(() => {
-    try {
-      if (typeof window === 'undefined') return false;
-      return localStorage.getItem('smart_absensi_tour_teacher_board_seen') !== 'true';
-    } catch {
-      return false;
-    }
-  });
-
-  const handleDismissTeacherBoardTour = useCallback(() => {
-    setIsTeacherBoardTourActive(false);
-    try {
-      localStorage.setItem('smart_absensi_tour_teacher_board_seen', 'true');
-    } catch {}
-  }, []);
-
-  const handleOpenTeacherBoardFromTour = useCallback(() => {
-    handleDismissTeacherBoardTour();
-    setIsTeacherBoardOpen(true);
-  }, [handleDismissTeacherBoardTour]);
-
-  // Auto-scroll / langsung mengarahkan pandangan guru ke tombol Papan Presensi di card Log Presensi Hari Ini
-  useEffect(() => {
-    if (!isTeacherBoardTourActive) return;
-    const timer = setTimeout(() => {
-      const el = document.getElementById('tour-teacher-daily-board-entry');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 700);
-    return () => clearTimeout(timer);
-  }, [isTeacherBoardTourActive]);
   const [isHomeroomModalOpen, setIsHomeroomModalOpen] = useState(false);
   const [isExamCardModalOpen, setIsExamCardModalOpen] = useState(false);
   const [isStudentKioskOpen, setIsStudentKioskOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [isBioEnrolled, setIsBioEnrolled] = useState(false);
   const [isBiometricPromptOpen, setIsBiometricPromptOpen] = useState(false);
-  const [isInfoExpanded, setIsInfoExpanded] = useState(false);
   const [isPermissionBlockedModalOpen, setIsPermissionBlockedModalOpen] = useState(false);
   const [permissionBlockedRequiresCamera, setPermissionBlockedRequiresCamera] = useState(false);
   const [isDisciplineBadgeModalOpen, setIsDisciplineBadgeModalOpen] = useState(false);
@@ -799,44 +735,66 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     };
   }, [effectiveUser?.id, effectiveUser?.full_name, effectiveUser?.nip]);
 
-  // 8 Quick Icons Customization State & Hak Akses Wakasek Sarpras (M. Iqbal Gustiawan)
+  // 8 Quick Icons Customization State & Hak Akses Wakasek Sarpras
   const isSarprasOfficer = isUserSarprasOfficer(effectiveUser);
+  const isHomeroomTeacher =
+    effectiveUser?.role !== 'GURU' ||
+    /wali\s*kelas|walas|homeroom/i.test(effectiveUser?.position || '');
+  const defaultHomeQuickIcons = useMemo(
+    () => [
+      'jadwal',
+      'riwayat',
+      'administrasi',
+      isHomeroomTeacher ? 'homeroom_plan' : 'oral_exam',
+      'buat_soal_ai',
+      'koreksi_soal',
+      'direktori_siswa',
+      'lainnya',
+    ],
+    [isHomeroomTeacher]
+  );
+
   const [isSarprasModalOpen, setIsSarprasModalOpen] = useState(false);
   const [isCustomizeIconsModalOpen, setIsCustomizeIconsModalOpen] = useState(false);
   const [quickIconIds, setQuickIconIds] = useState<string[]>(() => {
+    const allowSarpras = isUserSarprasOfficer(effectiveUser);
     try {
-      const stored = localStorage.getItem(`smart_absensi_quick_icons_${effectiveUser?.id || 'default'}`);
+      const stored = localStorage.getItem(`smart_absensi_quick_icons_v2_${effectiveUser?.id || 'default'}`);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length === 8) {
-          let updated = parsed;
-          if (!updated.includes('exam_card') && updated.includes('koreksi')) {
-            updated = updated.map((id) => (id === 'koreksi' ? 'exam_card' : id));
-          }
-          if (!isUserSarprasOfficer(effectiveUser)) {
-            // Guru lain tidak boleh memiliki icon sarpras_inventory
-            return updated.map((id) => (id === 'sarpras_inventory' ? 'kalender' : id));
-          }
-          return updated;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return sanitizeQuickIconIds(parsed, allowSarpras, defaultHomeQuickIcons);
         }
       }
     } catch {
       // ignore
     }
-    if (isUserSarprasOfficer(effectiveUser)) {
-      return ['presensi', 'izin_cuti', 'jadwal', 'rekap', 'koreksi', 'sarpras_inventory', 'direktori_siswa', 'kalender'];
-    }
-    return DEFAULT_8_QUICK_ICONS;
+    return defaultHomeQuickIcons;
   });
 
+  useEffect(() => {
+    if (!effectiveUser?.id) return;
+    const allowSarpras = isUserSarprasOfficer(effectiveUser);
+    try {
+      const stored = localStorage.getItem(`smart_absensi_quick_icons_v2_${effectiveUser.id}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setQuickIconIds(sanitizeQuickIconIds(parsed, allowSarpras, defaultHomeQuickIcons));
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    setQuickIconIds(sanitizeQuickIconIds(defaultHomeQuickIcons, allowSarpras, defaultHomeQuickIcons));
+  }, [effectiveUser?.id, isSarprasOfficer, defaultHomeQuickIcons]);
+
   const handleSaveQuickIcons = (newIds: string[]) => {
-    // Sanitasi untuk non-officer
-    const sanitized = isSarprasOfficer
-      ? newIds
-      : newIds.map((id) => (id === 'sarpras_inventory' ? 'kalender' : id));
+    const sanitized = sanitizeQuickIconIds(newIds, isSarprasOfficer, defaultHomeQuickIcons);
     setQuickIconIds(sanitized);
     try {
-      localStorage.setItem(`smart_absensi_quick_icons_${effectiveUser?.id || 'default'}`, JSON.stringify(sanitized));
+      localStorage.setItem(`smart_absensi_quick_icons_v2_${effectiveUser?.id || 'default'}`, JSON.stringify(sanitized));
     } catch {
       // ignore
     }
@@ -902,8 +860,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       } else if (berandaLayer === 'STUDENT_BEHAVIOR') {
         setBerandaLayer(studentBehaviorReturnTarget || 'HOME');
       } else if (berandaLayer === 'SURVEY_ANALYTICS') {
-        if (surveyAnalyticsReturnTarget === 'PROFIL') {
-          setActiveTab('PROFIL');
+        if (surveyAnalyticsReturnTarget === 'AKUN') {
+          setActiveTab('AKUN');
+          setBerandaLayer('HOME');
+        } else if (surveyAnalyticsReturnTarget === 'ADMIN') {
+          setActiveTab('ADMIN');
+          setBerandaLayer('HOME');
         } else {
           setBerandaLayer(surveyAnalyticsReturnTarget || 'HOME');
         }
@@ -922,13 +884,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     },
   });
 
-  // 🛡️ Tab Navigation Back Handler (RIWAYAT / NOTIFIKASI / PROFIL -> BERANDA)
+  // Tab Navigation Back Handler (RIWAYAT / ADMIN / NOTIFIKASI / AKUN -> BERANDA)
   useTabBackNavigation({
     id: 'guru_active_tab',
     activeTab,
     defaultTab: 'BERANDA',
     onBackToDefault: () => {
-      setActiveTab('BERANDA');
+      if (activeTab === 'NOTIFIKASI') {
+        setActiveTab(notifReturnTab);
+      } else {
+        setActiveTab('BERANDA');
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
   });
@@ -963,6 +929,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         break;
       case 'rekap':
         setIsRecapModalOpen(true);
+        break;
+      case 'riwayat':
+        setActiveTab('RIWAYAT');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
       case 'administrasi':
         setIsAdministrationModalOpen(true);
@@ -1069,8 +1039,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         setBerandaLayer('GAME_PID');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
+      case 'lainnya':
       default:
-        setIsMoreFeaturesModalOpen(true);
+        setActiveTab('BERANDA');
+        setBerandaLayer('ALL_FEATURES');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -1104,21 +1077,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [activeDutyLeavesToday, setActiveDutyLeavesToday] = useState<LeaveRequest[]>([]);
   const [isCopiedDutyTaskId, setIsCopiedDutyTaskId] = useState<string | null>(null);
 
-  // Pre-scan GPS Health Status & Realtime Coordinates State
+  // Pre-scan GPS Health Status State
   const [gpsHealth, setGpsHealth] = useState<{ status: 'READY' | 'REFINING' | 'OFF' | 'INVALID'; text: string; accuracy?: number }>({
     status: 'REFINING',
-    text: '📍 Mengukur lokasi GPS...',
+    text: 'Mengukur lokasi GPS...',
   });
-  const [userCoords, setUserCoords] = useState<GPSCoordinates | null>(() => GPSService.getLatestCoords());
 
   useEffect(() => {
     GPSService.startBackgroundWarmUp();
     setGpsHealth(GPSService.getGPSHealthStatus());
-    setUserCoords(GPSService.getLatestCoords());
 
     const interval = setInterval(() => {
       setGpsHealth(GPSService.getGPSHealthStatus());
-      setUserCoords(GPSService.getLatestCoords());
     }, 2000);
 
     return () => clearInterval(interval);
@@ -1159,6 +1129,24 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   // Check if today is a non-working day (Weekend or Holiday)
   const isTodayOff = isDateOffDay(new Date(), settings, todayHoliday ? [todayHoliday] : allHolidays);
+
+  const allowOverrideScanForHome = settings.auto_attendance_allow_override_scan !== false;
+  const hasCheckedInToday = Boolean(
+    todayAttendance?.check_in_time &&
+      (!(allowOverrideScanForHome && isAutoCheckInRecord(todayAttendance)) || Boolean(todayAttendance?.check_out_time))
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !effectiveUser?.id) return;
+    window.dispatchEvent(
+      new CustomEvent('smart_absensi_teacher_checkin_state', {
+        detail: {
+          userId: effectiveUser.id,
+          checkedIn: hasCheckedInToday && !isTodayOff.isOff,
+        },
+      })
+    );
+  }, [effectiveUser?.id, hasCheckedInToday, isTodayOff.isOff]);
 
   // Check if tomorrow is a non-working day (Weekend or Holiday)
   const isTomorrowOff = useMemo(() => {
@@ -1226,26 +1214,38 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         token || ''
       );
       setDeviceBindingStatus(bindingRes);
-
-      // 🌟 Jika HP mendukung sensor fisik dan guru belum mendaftar sidik jari:
-      if (!isEnrolled && !isPreviewMode) {
-        const todayStr = getTodayDateInJakarta();
-        const dismissKey = `smart_absensi_bio_prompt_dismissed_${effectiveUser.id}_${todayStr}`;
-        const isDismissed = sessionStorage.getItem(dismissKey) === 'true';
-
-        if (!isDismissed) {
-          const availability = await BiometricService.checkAvailability(effectiveUser.id);
-          if (availability.isSupported && availability.hasPlatformSensor && !availability.isEnrolled) {
-            setTimeout(() => {
-              setIsBiometricPromptOpen(true);
-            }, 600);
-          }
-        }
-      }
     } catch (err) {
       console.warn('Failed to check device binding or biometric status:', err);
     }
   };
+
+  // Tawarkan aktivasi biometrik HP hanya SETELAH guru absen hari ini (zero interruption pre-check-in)
+  useEffect(() => {
+    if (!effectiveUser?.id || isPreviewMode || isBioEnrolled || isTodayOff.isOff || !hasCheckedInToday) {
+      return;
+    }
+    const todayStr = getTodayDateInJakarta();
+    const dismissKey = `smart_absensi_bio_prompt_dismissed_${effectiveUser.id}_${todayStr}`;
+    if (sessionStorage.getItem(dismissKey) === 'true') {
+      return;
+    }
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    BiometricService.checkAvailability(effectiveUser.id)
+      .then((availability) => {
+        if (!cancelled && availability.isSupported && availability.hasPlatformSensor && !availability.isEnrolled) {
+          timer = setTimeout(() => {
+            setIsBiometricPromptOpen(true);
+          }, 600);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [effectiveUser?.id, isPreviewMode, isBioEnrolled, isTodayOff.isOff, hasCheckedInToday]);
 
   const handleCloseBiometricPrompt = () => {
     if (effectiveUser?.id) {
@@ -1488,7 +1488,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             {
               id: `ann_checkin_guide_${effectiveUser.id}`,
               user_id: effectiveUser.id,
-              title: '☀️ Ketertiban & Batas Waktu Absensi Masuk',
+              title: 'Ketertiban & Batas Waktu Absensi Masuk',
               message: 'Batas toleransi absensi masuk adalah sesuai jadwal kerja sekolah (pukul 07:30 WIB). Pastikan melakukan scan QR Code saat tiba di lingkungan sekolah.',
               type: 'INFO',
               is_read: readIds.has(`ann_checkin_guide_${effectiveUser.id}`),
@@ -1497,7 +1497,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             {
               id: `ann_device_guide_${effectiveUser.id}`,
               user_id: effectiveUser.id,
-              title: '📱 Keamanan Perangkat (1 Akun = 1 HP)',
+              title: 'Keamanan Perangkat (1 Akun = 1 HP)',
               message: 'Akun presensi Anda terikat secara aman dengan HP aktif Anda untuk menjamin keabsahan data kehadiran.',
               type: 'SUCCESS',
               is_read: readIds.has(`ann_device_guide_${effectiveUser.id}`),
@@ -1506,7 +1506,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             {
               id: `ann_leave_guide_${effectiveUser.id}`,
               user_id: effectiveUser.id,
-              title: '📋 Pengajuan Izin & Koreksi Presensi',
+              title: 'Pengajuan Izin & Koreksi Presensi',
               message: 'Bapak/Ibu Guru dapat mengajukan permohonan Cuti, Izin, Sakit, atau Koreksi Presensi langsung dari tombol layanan di menu Beranda.',
               type: 'INFO',
               is_read: readIds.has(`ann_leave_guide_${effectiveUser.id}`),
@@ -1515,8 +1515,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             {
               id: `ann_security_pin_${effectiveUser.id}`,
               user_id: effectiveUser.id,
-              title: '🔒 Keamanan Akun & PIN Presensi',
-              message: 'Jaga kerahasiaan PIN 6-digit Anda. Anda dapat memperbarui PIN secara berkala melalui tab Profil.',
+              title: 'Keamanan Akun & PIN Presensi',
+              message: 'Jaga kerahasiaan PIN 6-digit Anda. Anda dapat memperbarui PIN secara berkala melalui tab Akun.',
               type: 'WARNING',
               is_read: readIds.has(`ann_security_pin_${effectiveUser.id}`),
               created_at: new Date().toISOString(),
@@ -1605,7 +1605,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             const newNotif: AppNotification = {
               id: schedNotifId,
               user_id: effectiveUser.id,
-              title: `📅 Jadwal Mengajar Hari Ini (${todayDayName})`,
+              title: `Jadwal Mengajar Hari Ini (${todayDayName})`,
               message: `Anda memiliki ${todaySlots.length} jadwal KBM hari ini: ${slotSummary}. Silakan bersiap-siap tepat waktu.`,
               type: 'INFO',
               is_read: isSchedRead,
@@ -1683,7 +1683,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               const newNotif: AppNotification = {
                 id: piketNotifId,
                 user_id: effectiveUser.id,
-                title: '🛡️ Pengingat Jadwal Piket Guru Hari Ini',
+                title: 'Pengingat Jadwal Piket Guru Hari Ini',
                 message: `Hari ini (${dayName}) Anda bertugas sebagai Guru Piket. ${
                   myPiket.notes ? `Tugas: ${myPiket.notes}` : 'Selamat bertugas dan jaga ketertiban sekolah!'
                 }`,
@@ -1823,7 +1823,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           const missingItem: AppNotification = {
             id: notifId,
             user_id: effectiveUser.id,
-            title: `⚠️ Presensi Belum Tercatat: ${dateStr}`,
+            title: `Presensi Belum Tercatat: ${dateStr}`,
             message: `Anda belum tercatat presensi pada ${dateStr}. Ketuk di sini untuk langsung mengajukan Koreksi Absen.`,
             type: 'WARNING',
             is_read: isRead,
@@ -2159,9 +2159,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const effectiveTotalPoints = currentUserLeaderboardItem?.totalPoints ?? 0;
 
   // Automated Pop-up Apresiasi Kehormatan untuk Juara 1, 2, dan 3 Disiplin Sekolah
-  // Piagam resmi dan selebrasi penghargaan hanya aktif jika telah memasuki akhir bulan dan status data SYNCED
+  // Hanya tampil SETELAH guru menyelesaikan absen masuk hari ini dan akhir bulan SYNCED
   useEffect(() => {
-    if (!effectiveUser?.id) return;
+    if (!effectiveUser?.id || !hasCheckedInToday || isTodayOff.isOff) {
+      setIsCelebrationModalOpen(false);
+      return;
+    }
     const rank = disciplineLeaderboard.currentUserRank;
     if (!rank || rank < 1 || rank > 3) {
       setIsCelebrationModalOpen(false);
@@ -2182,7 +2185,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     const alreadyCelebrated = sessionStorage.getItem(storageKey);
     if (!alreadyCelebrated) {
       const timer = setTimeout(() => {
-        // Re-verifikasi rank mutakhir sesaat sebelum membuka modal
         const currentFreshRank = disciplineLeaderboard.currentUserRank;
         if (currentFreshRank && currentFreshRank >= 1 && currentFreshRank <= 3 && disciplineLeaderboard.dataStatus === 'SYNCED') {
           setIsCelebrationModalOpen(true);
@@ -2192,16 +2194,25 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [effectiveUser?.id, disciplineLeaderboard.currentUserRank, disciplineLeaderboard.dataStatus, selectedYear, selectedMonth, allTeacherPointLogs]);
+  }, [
+    effectiveUser?.id,
+    hasCheckedInToday,
+    isTodayOff.isOff,
+    disciplineLeaderboard.currentUserRank,
+    disciplineLeaderboard.dataStatus,
+    selectedYear,
+    selectedMonth,
+    allTeacherPointLogs,
+  ]);
 
-  // ── Teacher Challenge & Streak Engine (Duolingo Style) ─────────────────
+  // ── Teacher Challenge & Streak Engine ─────────────────
   const streakInfo = useMemo(() => {
     return TeacherChallengeService.calculateStreak(attendanceHistory, pointHistory);
   }, [attendanceHistory, pointHistory]);
 
   const todayDateStr = useMemo(() => getTodayDateInJakarta(), []);
 
-  // 🎮 Promosi Pop-up Game PID & Deep Link Handler saat Guru Masuk ke Web
+  // Promosi Pop-up Game PID & Deep Link Handler (Pop-up hanya SETELAH absen masuk)
   useEffect(() => {
     if (!effectiveUser?.id) return;
 
@@ -2217,15 +2228,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       }
     }
 
-    // 2. Automated Pop-up Promosi Game PID saat Guru Masuk ke Web
-    if (shouldShowPidPromoToday(todayDateStr)) {
+    // 2. Automated Pop-up Promosi Game PID hanya setelah guru selesai absen masuk (zero interruption)
+    if (hasCheckedInToday && !isTodayOff.isOff && !isCelebrationModalOpen && shouldShowPidPromoToday(todayDateStr)) {
       const promoTimer = setTimeout(() => {
         setIsGamePidPromoOpen(true);
         SoundService.play('SUCCESS');
       }, 1200);
       return () => clearTimeout(promoTimer);
     }
-  }, [effectiveUser?.id, todayDateStr]);
+  }, [effectiveUser?.id, todayDateStr, hasCheckedInToday, isTodayOff.isOff, isCelebrationModalOpen]);
 
   const hasFilledMoodToday = useMemo(() => {
     if (todayMood) return true;
@@ -2689,9 +2700,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     {cell.dayNumber}
                   </span>
                   {cell.isToday ? (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#0D5C46] shrink-0" />
                   ) : cell.isSchedule ? (
-                    <span className="text-[8px] leading-none" title="Ada Agenda Sekolah">📢</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" title="Ada Agenda Sekolah" />
                   ) : null}
                 </div>
 
@@ -2740,748 +2751,811 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     );
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50 pb-28 text-[#023246]">
-      {/* ── PREVIEW MODE WARNING BANNER ───────────────────────────────────── */}
-      {isPreviewMode && !isDualRoleUser && (
-        <div className="bg-purple-900 text-purple-100 px-4 py-2 text-xs font-bold text-center border-b border-purple-700 flex items-center justify-center gap-2">
-          <span>⚠️</span> MODE PREVIEW GURU (ADMIN/KEPSEK ACCESS) — Menggunakan data simulasi guru.
+  const hasActiveAssignmentCards = Boolean(
+    (committeeInfo?.isCommittee && isExamPeriodActive) ||
+      shouldShowDutyCard ||
+      (isDutyTeacherToday && activeDutyLeavesToday.length > 0) ||
+      todaySchedule
+  );
+
+  const activeAssignmentCardsNode = hasActiveAssignmentCards ? (
+    <div className="space-y-3.5">
+      {/* Kartu Tugas Kepanitiaan Ujian (SK Kepala Sekolah) */}
+      {committeeInfo?.isCommittee && isExamPeriodActive && (
+        <div
+          id="committee-assignment-banner"
+          className="bg-white rounded-2xl p-4 border border-slate-200 space-y-3"
+        >
+          <div className="flex items-start justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                <SagaMedalRankIcon className="w-6 h-6" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[#0F172A] text-[10px] font-bold tracking-wider uppercase border border-slate-200">
+                    SK Kepanitiaan Ujian
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-mono font-semibold">
+                    T.A. {committeeInfo.academicYear}
+                  </span>
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-[#0F172A] leading-tight mt-0.5 truncate">
+                  {committeeInfo.roleLabel}
+                </h3>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsExamPeriodModalOpen(true)}
+              className="min-h-10 px-3 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-[#0D5C46] text-xs font-bold shrink-0 flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Atur status aktif atau batas waktu otomatis masa ujian"
+            >
+              <span className="w-2 h-2 rounded-full bg-[#0D5C46]" />
+              <span>Aktif</span>
+            </button>
+          </div>
+
+          <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-1">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+              <SagaAdminHubIcon className="w-4 h-4 shrink-0" />
+              <span>Surat Keputusan (SK) Kepala Sekolah</span>
+            </div>
+            <p className="text-xs text-slate-700 leading-relaxed font-medium">
+              {committeeInfo.role === 'PENANGGUNG_JAWAB' ? (
+                <>
+                  Ditetapkan sebagai <strong className="text-[#0F172A]">Penanggung Jawab</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Bertanggung jawab penuh atas keseluruhan kebijakan, legalitas, kelancaran, dan penjaminan mutu asesmen di satuan pendidikan.
+                </>
+              ) : committeeInfo.role === 'KETUA' ? (
+                <>
+                  Ditetapkan oleh <strong className="text-[#0F172A]">Kepala Sekolah</strong> sebagai <strong className="text-[#0F172A]">Ketua Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Berwenang memimpin kepanitiaan, perencanaan jadwal, koordinasi ruang rombel, dan pengesahan pengawas ujian.
+                </>
+              ) : committeeInfo.role === 'SEKRETARIS' ? (
+                <>
+                  Ditetapkan oleh <strong className="text-[#0F172A]">Kepala Sekolah</strong> sebagai <strong className="text-[#0F172A]">Sekretaris Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Bertanggung jawab menyusun jadwal sesi ujian, administrasi pengawas, cetak kartu peserta, dan berita acara.
+                </>
+              ) : committeeInfo.role === 'BENDAHARA' ? (
+                <>
+                  Ditetapkan oleh <strong className="text-[#0F172A]">Kepala Sekolah</strong> sebagai <strong className="text-[#0F172A]">Bendahara Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Bertanggung jawab atas pengelolaan administrasi logistik, perlengkapan ujian, dan operasional kepanitiaan.
+                </>
+              ) : (
+                <>
+                  Ditetapkan oleh <strong className="text-[#0F172A]">Kepala Sekolah</strong> sebagai <strong className="text-[#0F172A]">Anggota Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Bertugas mendukung kelancaran teknis, distribusi ruangan, dan ketertiban ruang ujian.
+                </>
+              )}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsExamScheduleReadOnly(false);
+                setExamScheduleInitialTab('ai_prompt');
+                setIsExamScheduleModalOpen(true);
+              }}
+              className="min-h-11 px-3.5 bg-[#0D5C46] hover:bg-[#094736] text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-between gap-2 cursor-pointer"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <SagaScheduleIcon className="w-4 h-4 shrink-0" />
+                <span className="truncate">Jadwal &amp; Pengawas AI</span>
+              </div>
+              <ChevronRight className="w-4 h-4 shrink-0" />
+            </button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsExamCardModalOpen(true)}
+                className="min-h-11 px-2.5 bg-white hover:bg-slate-50 text-[#0F172A] font-bold text-xs rounded-xl border border-slate-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <SagaExamCardIcon className="w-4 h-4 shrink-0" />
+                <span className="truncate">Kartu Ujian</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsQuestionCorrectionModalOpen(true)}
+                className="min-h-11 px-2.5 bg-white hover:bg-slate-50 text-[#0F172A] font-bold text-xs rounded-xl border border-slate-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <SagaGradingIcon className="w-4 h-4 shrink-0" />
+                <span className="truncate">Koreksi Soal</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
+            <div className="flex items-center gap-1.5 truncate">
+              <SagaClockStatusIcon className="w-4 h-4 shrink-0" />
+              <span className="truncate">{examPeriodStatus?.remainingText || 'Masa Ujian Sedang Berlangsung'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsExamPeriodModalOpen(true)}
+              className="min-h-10 px-2 text-xs font-bold text-[#0D5C46] hover:underline shrink-0 cursor-pointer"
+            >
+              Atur Batas Waktu
+            </button>
+          </div>
         </div>
       )}
 
-      {/* ── TOP NAV BAR (HEADER) ────────────────────────────────────────── */}
-      <header className="bg-[#023246] text-white pt-4 pb-7 px-4 shadow-sm w-full max-w-120 mx-auto rounded-b-3xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border-2 border-white/30 shadow-xs">
-              <UserAvatar
-                avatarUrl={effectiveUser.avatar_url}
-                name={effectiveUser.full_name}
-                className="w-full h-full object-cover"
-                textClassName="text-sm font-bold text-white"
-              />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-cyan-200 uppercase tracking-wider truncate">
-                {settings.institution_name || 'Portal Smart Absensi Guru'}
-              </p>
-              <h1 className="font-black text-white text-sm sm:text-base leading-tight truncate">
-                {getTimeBasedGreeting()}, {effectiveUser.full_name}
-              </h1>
-              {committeeInfo?.isCommittee && isExamPeriodActive && (
-                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-950/60 text-cyan-200 border border-cyan-400/40 text-[9.5px] sm:text-[10px] font-extrabold tracking-wide leading-tight">
-                    <Award className="w-3 h-3 text-amber-300 shrink-0" />
-                    <span>{committeeInfo.roleLabel}</span>
-                  </span>
-                  <span className="text-[9.5px] text-cyan-200/80 font-mono">
-                    • SK Kepala Sekolah
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Dual-Role Switcher Pill for Admin/Operator working in Guru Mode */}
-            {isDualRoleUser && onSwitchRoleMode && (
+      {/* Kartu Tugas Mengawas Asesmen Sekolah */}
+      {shouldShowDutyCard && (
+        <div
+          id="teacher-exam-duty-card"
+          className="bg-white rounded-2xl p-4 border border-slate-200 space-y-3"
+        >
+          {hasMultipleLevels && (
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
               <button
                 type="button"
-                onClick={onSwitchRoleMode}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-400/40 rounded-2xl transition-all cursor-pointer text-xs font-bold shrink-0 min-h-11 active:scale-95"
-                title="Beralih Peran (Mode Guru / Admin)"
-                aria-label="Beralih Mode Tampilan"
+                onClick={() => setSelectedExamDutyLevel('ALL')}
+                className={`min-h-10 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer truncate ${
+                  selectedExamDutyLevel === 'ALL'
+                    ? 'bg-[#0D5C46] text-white'
+                    : 'text-slate-600 hover:text-[#0F172A] hover:bg-white'
+                }`}
               >
-                <span className="text-sm">🔄</span>
-                <span className="text-[11px] font-extrabold hidden min-[360px]:inline">Mode Guru</span>
-                <span className="text-[9px] opacity-75">▾</span>
+                Semua ({(smpExamDuty?.duties.length || 0) + (smaExamDuty?.duties.length || 0)})
               </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('smart_absensi_open_app_install'))}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 rounded-2xl transition-all cursor-pointer shrink-0 min-h-11 active:scale-95"
-              title="Unduh Aplikasi (Android APK & Windows EXE)"
-              aria-label="Unduh Aplikasi"
-            >
-              <span className="text-sm">📥</span>
-              <span className="text-[11px] font-extrabold hidden min-[360px]:inline">Aplikasi</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('NOTIFIKASI')}
-              className="relative p-2.5 text-white/90 hover:text-white hover:bg-white/10 rounded-2xl transition-colors cursor-pointer shrink-0 min-h-11 min-w-11 flex items-center justify-center active:scale-95"
-              aria-label="Notifikasi"
-            >
-              <Megaphone className="w-5 h-5 text-cyan-200" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 px-1.5 py-0.2 text-[9px] font-black bg-red-500 text-white rounded-full min-w-4 text-center ring-2 ring-[#023246] shadow-2xs animate-pulse">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-xs text-slate-200">
-          <span className="font-medium">
-            {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-          </span>
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-cyan-200 border border-white/15">
-            {isOnline ? '● Online' : '○ Offline'}
-          </span>
-        </div>
-      </header>
-
-      <main className="px-4 -mt-3.5 pb-24 space-y-3.5 w-full max-w-120 mx-auto">
-        <NotificationPermissionBanner
-          user={effectiveUser}
-          onOpenPreferences={() => setIsPreferencesModalOpen(true)}
-        />
-        <PWAInstallPrompt />
-
-        {/* 🚨 CLASSROOM EMERGENCY ALERT BANNER (High-Priority Realtime Alert for Piket & Teachers) */}
-        {activeEmergencies.length > 0 && (
-          <div className="bg-linear-to-r from-rose-600 to-red-700 text-white rounded-2xl p-3.5 shadow-lg border-2 border-amber-300 animate-pulse space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="p-2 bg-white text-rose-600 rounded-xl shadow-xs shrink-0 animate-bounce">
-                  <ShieldAlert className="w-5 h-5" />
-                </span>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-1.5 py-0.2 bg-amber-400 text-slate-950 text-[9px] font-black rounded-md tracking-wider uppercase">
-                      SOS KELAS AKTIF
-                    </span>
-                    <span className="text-[10px] text-rose-100 font-bold">
-                      {activeEmergencies.length} Panggilan Membutuhkan Bantuan
-                    </span>
-                  </div>
-                  <p className="text-xs font-black truncate leading-tight mt-0.5">
-                    📍 {activeEmergencies[0].room_name}
-                    {activeEmergencies[0].class_name ? ` (${activeEmergencies[0].class_name})` : ''} • {activeEmergencies[0].teacher_name}
-                  </p>
-                </div>
-              </div>
               <button
                 type="button"
-                onClick={() => setIsEmergencyModalOpen(true)}
-                className="px-3 py-2 bg-white hover:bg-rose-50 active:scale-95 text-rose-700 font-black text-xs rounded-xl shadow-xs shrink-0 cursor-pointer transition-all"
+                onClick={() => setSelectedExamDutyLevel('SMP')}
+                className={`min-h-10 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer truncate ${
+                  selectedExamDutyLevel === 'SMP'
+                    ? 'bg-[#0D5C46] text-white'
+                    : 'text-slate-600 hover:text-[#0F172A] hover:bg-white'
+                }`}
               >
-                Lihat &amp; Tangani
+                SMP ({smpExamDuty?.duties.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedExamDutyLevel('SMA')}
+                className={`min-h-10 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer truncate ${
+                  selectedExamDutyLevel === 'SMA'
+                    ? 'bg-[#0D5C46] text-white'
+                    : 'text-slate-600 hover:text-[#0F172A] hover:bg-white'
+                }`}
+              >
+                SMA ({smaExamDuty?.duties.length || 0})
               </button>
             </div>
+          )}
 
-            {isDutyTeacherToday && (
-              <div className="bg-black/25 rounded-xl px-2.5 py-1.5 text-[10px] font-bold text-amber-200 flex items-center gap-1.5 border border-amber-400/30">
-                <span>⚠️</span>
-                <span>Anda bertugas sebagai Guru Piket hari ini. Segera menuju lokasi bantuan!</span>
-              </div>
-            )}
-          </div>
-        )}
-        {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
-        {activeTab === 'BERANDA' && berandaLayer === 'HOME' && (
-          <>
-            {/* 📋 PENGINGAT HARIAN SURVEY EVALUASI SISTEM (+10 POIN) */}
-            <DailySurveyReminderBanner />
-
-            {/* 🏛️ KARTU TUGAS KEPANITIAAN UJIAN (SK KEPALA SEKOLAH) */}
-            {committeeInfo?.isCommittee && isExamPeriodActive && (
+          {activeExamDuty && activeExamDuty.duties.length > 0 ? (
+            <>
               <div
-                id="committee-assignment-banner"
-                className="bg-white rounded-3xl p-4 sm:p-4.5 border border-indigo-200/90 shadow-xs space-y-3 animate-fadeIn"
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setIsExamScheduleReadOnly(true);
+                  setExamScheduleInitialTab('my_schedule');
+                  setIsExamScheduleModalOpen(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setIsExamScheduleReadOnly(true);
+                    setExamScheduleInitialTab('my_schedule');
+                    setIsExamScheduleModalOpen(true);
+                  }
+                }}
+                className="rounded-xl p-3.5 border border-slate-200 bg-slate-50 hover:border-[#0D5C46] transition-colors cursor-pointer"
+                title="Klik untuk membuka jadwal mengawas dan rincian lengkap"
               >
-                {/* Header: Icon, Badge, Position Title, and Active Status */}
                 <div className="flex items-start justify-between gap-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-200/80 text-indigo-700 flex items-center justify-center shrink-0 shadow-2xs">
-                      <Award className="w-5 h-5 text-indigo-600" />
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
+                      <SagaScheduleIcon className="w-6 h-6" />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-900 text-[9.5px] font-black tracking-wider uppercase border border-indigo-200/80">
-                          SK KEPANITIAAN UJIAN
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-[#0D5C46] border border-emerald-200 text-[10px] font-bold tracking-wider uppercase">
+                          Tugas Mengawas ({selectedExamDutyLevel === 'ALL' ? 'SMP & SMA' : selectedExamDutyLevel})
                         </span>
-                        <span className="text-[10px] text-slate-500 font-mono font-bold">
-                          T.A. {committeeInfo.academicYear}
-                        </span>
-                      </div>
-                      <h3 className="text-sm sm:text-base font-black text-slate-900 leading-tight mt-0.5 truncate">
-                        {committeeInfo.roleLabel}
-                      </h3>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsExamPeriodModalOpen(true)}
-                    className="px-2.5 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[10px] font-extrabold shrink-0 flex items-center gap-1.5 shadow-2xs cursor-pointer transition-all active:scale-95"
-                    title="Atur status aktif atau batas waktu otomatis masa ujian"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Aktif</span>
-                    <SlidersHorizontal className="w-3 h-3 text-emerald-700 ml-0.5" />
-                  </button>
-                </div>
-
-                {/* SK Kepala Sekolah Official Note */}
-                <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200/80 space-y-1">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    <FileText className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Surat Keputusan (SK) Kepala Sekolah</span>
-                  </div>
-                  <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                    {committeeInfo.role === 'PENANGGUNG_JAWAB' ? (
-                      <>
-                        Ditetapkan sebagai <strong className="text-indigo-950 font-bold">Penanggung Jawab</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Bertanggung jawab penuh atas keseluruhan kebijakan, legalitas, kelancaran, dan penjaminan mutu asesmen di satuan pendidikan.
-                      </>
-                    ) : committeeInfo.role === 'KETUA' ? (
-                      <>
-                        Ditetapkan oleh <strong className="text-slate-900 font-bold">Kepala Sekolah</strong> sebagai <strong className="text-indigo-950 font-bold">Ketua Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Berwenang memimpin kepanitiaan, perencanaan jadwal, koordinasi ruang rombel, dan pengesahan pengawas ujian.
-                      </>
-                    ) : committeeInfo.role === 'SEKRETARIS' ? (
-                      <>
-                        Ditetapkan oleh <strong className="text-slate-900 font-bold">Kepala Sekolah</strong> sebagai <strong className="text-indigo-950 font-bold">Sekretaris Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Bertanggung jawab menyusun jadwal sesi ujian, administrasi pengawas, cetak kartu peserta, dan berita acara.
-                      </>
-                    ) : committeeInfo.role === 'BENDAHARA' ? (
-                      <>
-                        Ditetapkan oleh <strong className="text-slate-900 font-bold">Kepala Sekolah</strong> sebagai <strong className="text-indigo-950 font-bold">Bendahara Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Bertanggung jawab atas pengelolaan administrasi logistik, perlengkapan ujian, dan operasional kepanitiaan.
-                      </>
-                    ) : (
-                      <>
-                        Ditetapkan oleh <strong className="text-slate-900 font-bold">Kepala Sekolah</strong> sebagai <strong className="text-indigo-950 font-bold">Anggota Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Bertugas mendukung kelancaran teknis, distribusi ruangan, dan ketertiban ruang ujian.
-                      </>
-                    )}
-                  </p>
-                </div>
-
-                {/* Touch-Friendly Action Buttons */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsExamScheduleReadOnly(false);
-                      setExamScheduleInitialTab('ai_prompt');
-                      setIsExamScheduleModalOpen(true);
-                    }}
-                    className="h-11 px-3.5 bg-[#023246] hover:bg-[#03445e] active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-between gap-2 cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Calendar className="w-4 h-4 text-cyan-300 shrink-0" />
-                      <span className="truncate">Jadwal &amp; Pengawas AI</span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-cyan-300/70 shrink-0" />
-                  </button>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsExamCardModalOpen(true)}
-                      className="h-11 px-2.5 bg-white hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                      title="Cetak Kartu Ujian & Barcode Siswa"
-                    >
-                      <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                      <span className="truncate">Kartu Ujian</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsQuestionCorrectionModalOpen(true)}
-                      className="h-11 px-2.5 bg-white hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                      title="Koreksi Lembar Jawaban Siswa"
-                    >
-                      <FileEdit className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                      <span className="truncate">Koreksi Soal</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Sub-bar: Status Waktu & Tombol Atur Selesai */}
-                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-[11px] text-slate-500">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="truncate">{examPeriodStatus?.remainingText || 'Masa Ujian Sedang Berlangsung'}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsExamPeriodModalOpen(true)}
-                    className="text-xs font-bold text-[#023246] hover:underline flex items-center gap-1 shrink-0 cursor-pointer"
-                  >
-                    <SlidersHorizontal className="w-3 h-3 text-[#18536B]" />
-                    <span>Atur Batas Waktu / Selesai</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* 📋 KARTU TUGAS MENGAWAS ASESMEN SEKOLAH (SENIOR & MOBILE FRIENDLY) */}
-            {shouldShowDutyCard && (
-              <div
-                id="teacher-exam-duty-card"
-                className="bg-white rounded-2xl p-3.5 sm:p-4 border border-teal-600/30 shadow-xs space-y-3 animate-fadeIn"
-              >
-                {/* Level Switcher (SMP vs SMA vs SEMUA) if multiple levels exist */}
-                {hasMultipleLevels && (
-                  <div className="w-full sm:w-auto grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedExamDutyLevel('ALL')}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                        selectedExamDutyLevel === 'ALL'
-                          ? 'bg-[#023246] text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                      }`}
-                    >
-                      <span className="truncate">Semua ({(smpExamDuty?.duties.length || 0) + (smaExamDuty?.duties.length || 0)})</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedExamDutyLevel('SMP')}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                        selectedExamDutyLevel === 'SMP'
-                          ? 'bg-teal-700 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                      }`}
-                    >
-                      <span>🏫</span>
-                      <span className="truncate">SMP ({smpExamDuty?.duties.length || 0})</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedExamDutyLevel('SMA')}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                        selectedExamDutyLevel === 'SMA'
-                          ? 'bg-blue-700 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                      }`}
-                    >
-                      <span>🎓</span>
-                      <span className="truncate">SMA ({smaExamDuty?.duties.length || 0})</span>
-                    </button>
-                  </div>
-                )}
-
-                {activeExamDuty && activeExamDuty.duties.length > 0 ? (
-                  <>
-                    {/* Interactive Card Summary: Click to open full official schedule */}
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        setIsExamScheduleReadOnly(true);
-                        setExamScheduleInitialTab('my_schedule');
-                        setIsExamScheduleModalOpen(true);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          setIsExamScheduleReadOnly(true);
-                          setExamScheduleInitialTab('my_schedule');
-                          setIsExamScheduleModalOpen(true);
-                        }
-                      }}
-                      className={`group relative rounded-xl p-3 sm:p-3.5 border transition-all cursor-pointer select-none ${
-                        selectedExamDutyLevel === 'SMA'
-                          ? 'bg-linear-to-br from-blue-50/70 via-slate-50 to-indigo-50/50 border-blue-200 hover:border-blue-400 hover:shadow-xs active:scale-[0.99]'
-                          : selectedExamDutyLevel === 'ALL'
-                          ? 'bg-linear-to-br from-sky-50/70 via-slate-50 to-teal-50/50 border-sky-300/80 hover:border-sky-400 hover:shadow-xs active:scale-[0.99]'
-                          : 'bg-linear-to-br from-teal-50/70 via-slate-50 to-emerald-50/50 border-teal-200 hover:border-teal-400 hover:shadow-xs active:scale-[0.99]'
-                      }`}
-                      title="Klik untuk membuka jadwal mengawas asli & rincian lengkap"
-                    >
-                      <div className="flex items-start justify-between gap-2.5">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className={`w-10 h-10 rounded-xl ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-700' : selectedExamDutyLevel === 'ALL' ? 'bg-[#023246]' : 'bg-teal-700'} text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}>
-                            <CalendarCheck className="w-5 h-5 text-white" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className={`px-2 py-0.5 rounded-md ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-100 text-blue-900 border-blue-300' : selectedExamDutyLevel === 'ALL' ? 'bg-sky-100 text-sky-900 border-sky-300' : 'bg-teal-100 text-teal-900 border-teal-300'} text-[10px] font-black tracking-wider uppercase border`}>
-                                TUGAS MENGAWAS ({selectedExamDutyLevel === 'ALL' ? 'SMP & SMA' : selectedExamDutyLevel})
-                              </span>
-                              {activeExamDuty.teacherCode && (
-                                <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-black border border-amber-300">
-                                  KODE {activeExamDuty.teacherCode}
-                                </span>
-                              )}
-                              <span className="text-[10px] text-slate-500 font-semibold">
-                                T.A. {activeExamDuty.schedule?.config?.academicYear || '2026/2027'}
-                              </span>
-                            </div>
-                            <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-snug mt-0.5 line-clamp-1">
-                              {selectedExamDutyLevel === 'ALL'
-                                ? 'Jadwal Tugas Mengawas Ujian (SMP & SMA Terpadu)'
-                                : (activeExamDuty.schedule?.config?.examTitle || `Jadwal Tugas Mengawas Ujian (${selectedExamDutyLevel})`)}
-                            </h3>
-                            <p className="text-[11px] text-slate-500 font-medium">
-                              Bapak/Ibu: <strong className="text-slate-800">{effectiveUser?.full_name}</strong>
-                              {effectiveUser?.nip ? ` (NPP: ${effectiveUser.nip})` : ''}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1 shrink-0">
-                          {activeExamDuty.duties.some((d) => d.date === getTodayDateInJakarta()) ? (
-                            <span className="px-2.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black shrink-0 flex items-center gap-1 shadow-2xs animate-pulse">
-                              <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                              HARI INI
-                            </span>
-                          ) : (
-                            <span className={`px-2.5 py-0.5 rounded-full ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-100 text-blue-900 border-blue-300' : selectedExamDutyLevel === 'ALL' ? 'bg-sky-100 text-sky-900 border-sky-300' : 'bg-teal-100 text-teal-900 border-teal-300'} border text-[10px] font-extrabold shrink-0`}>
-                              {activeExamDuty.duties.length} Sesi
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Compact Duty Badges Preview */}
-                      <div className="mt-2.5 pt-2.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[11px] text-slate-500 font-medium">Jadwal Tugas:</span>
-                          {activeExamDuty.duties.map((duty, idx) => {
-                            const isToday = duty.date === getTodayDateInJakarta();
-                            return (
-                              <div
-                                key={duty.id || idx}
-                                className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border flex items-center gap-1 ${
-                                  isToday
-                                    ? 'bg-amber-100 text-amber-950 border-amber-300 ring-2 ring-amber-300/60 font-black'
-                                    : 'bg-white text-slate-800 border-slate-300/80'
-                                }`}
-                              >
-                                <span className="text-slate-500 font-medium">{duty.dayName}:</span>
-                                <span className="text-slate-900 font-black">{duty.subject}</span>
-                                <span className={`px-1 py-0.2 rounded text-[9px] font-black ${duty.educationLevel === 'SMA' || (selectedExamDutyLevel === 'SMA') ? 'bg-blue-100 text-blue-800' : 'bg-teal-100 text-teal-800'}`}>
-                                  {duty.educationLevel ? `${duty.educationLevel} • ` : ''}{duty.roomName || `R.${duty.className}`}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        <div className="flex items-center gap-1 text-[11px] font-bold text-teal-700 group-hover:text-teal-900 transition-colors shrink-0">
-                          <span>Buka Detail</span>
-                          <ChevronRight className="w-3.5 h-3.5 text-teal-600 group-hover:translate-x-0.5 transition-transform" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Touch-Friendly Action Buttons */}
-                    <div className="grid grid-cols-2 gap-2 pt-0.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const institutionForSlip = selectedExamDutyLevel === 'SMA'
-                            ? 'SMA Terpadu As Salaam'
-                            : selectedExamDutyLevel === 'ALL'
-                            ? 'SMP & SMA Terpadu As Salaam'
-                            : 'SMP Terpadu Al-Ittihadiyah';
-                          const titleForSlip = selectedExamDutyLevel === 'ALL'
-                            ? 'Jadwal Tugas Mengawas Ujian (SMP & SMA)'
-                            : (activeExamDuty.schedule?.config?.examTitle || `Jadwal Tugas Mengawas Ujian (${selectedExamDutyLevel})`);
-                          ExamWordExporterService.printTeacherDutySlip(
-                            effectiveUser?.full_name || 'Bapak/Ibu Guru',
-                            activeExamDuty.teacherCode,
-                            activeExamDuty.duties,
-                            institutionForSlip,
-                            titleForSlip
-                          );
-                        }}
-                        className={`h-11 px-3 ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-700 hover:bg-blue-800' : selectedExamDutyLevel === 'ALL' ? 'bg-[#023246] hover:bg-[#03445e]' : 'bg-teal-700 hover:bg-teal-800'} active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer`}
-                      >
-                        <Printer className="w-3.5 h-3.5 text-teal-200" />
-                        <span>Cetak Kartu (A4)</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsExamScheduleReadOnly(true);
-                          setExamScheduleInitialTab('proctors');
-                          setIsExamScheduleModalOpen(true);
-                        }}
-                        className="h-11 px-3 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-800 font-bold text-xs rounded-xl border border-slate-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Calendar className="w-3.5 h-3.5 text-slate-600" />
-                        <span>Jadwal Sekolah</span>
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  /* Informative state when teacher has no duty in selected level */
-                  <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center space-y-2 bg-slate-50/70">
-                    <p className="text-xs font-semibold text-slate-600">
-                      Tidak ada penugasan mengawas untuk Anda di jenjang <strong className="text-slate-900">{selectedExamDutyLevel === 'ALL' ? 'SMP maupun SMA' : selectedExamDutyLevel}</strong>.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsExamScheduleReadOnly(true);
-                        setExamScheduleInitialTab('proctors');
-                        setIsExamScheduleModalOpen(true);
-                      }}
-                      className="h-9 px-3 bg-white hover:bg-slate-100 text-teal-800 border border-slate-300 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                    >
-                      <Calendar className="w-3.5 h-3.5 text-teal-700" />
-                      <span>Lihat Roster Sekolah ({selectedExamDutyLevel === 'ALL' ? 'SMP' : selectedExamDutyLevel})</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 📢 BANNER PENGINGAT JADWAL AGENDA HARI INI (RAPAT / UTS / UAS / UPACARA) */}
-            {todaySchedule && (
-              <div
-                onClick={() => setIsEventsCalendarModalOpen(true)}
-                className="bg-linear-to-r from-blue-700 via-indigo-700 to-[#18536B] rounded-3xl p-3.5 sm:p-4 text-white shadow-sm border border-blue-400/40 flex items-center justify-between gap-3 cursor-pointer hover:brightness-105 active:scale-[0.99] transition-all"
-              >
-                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <div className="w-9 h-9 rounded-2xl bg-white/20 flex items-center justify-center text-base shrink-0">
-                    📢
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="px-1.5 py-0.2 bg-amber-300 text-slate-900 text-[9px] font-black rounded-md tracking-wider uppercase">
-                        AGENDA HARI INI
-                      </span>
-                      <span className="text-[10.5px] text-blue-100 font-bold">
-                        Tetap Masuk &amp; Presensi
-                      </span>
-                    </div>
-                    <p className="text-xs font-black truncate leading-tight mt-0.5">
-                      {todaySchedule.name}
-                      {todaySchedule.description ? ` • ${todaySchedule.description}` : ''}
-                    </p>
-                  </div>
-                </div>
-                <span className="text-xs text-blue-200 hover:text-white font-bold shrink-0">
-                  Detail Agenda →
-                </span>
-              </div>
-            )}
-
-            {/* 🌟 BANNER PENGINGAT JAM PULANG OTOMATIS (H-1 JAM & OVERDUE) */}
-            <CheckoutReminderBanner
-              todayAttendance={todayAttendance}
-              settings={settings}
-              isTodayOff={Boolean(isTodayOff?.isOff)}
-              userId={effectiveUser?.id}
-              onOpenBiometric={handleOpenBiometricModal}
-              onOpenScanner={handleOpenScannerClick}
-              onOpenPolicyModal={() => setIsPolicyModalOpen(true)}
-            />
-
-            {/* 📋 KARTU TUGAS TITIPAN DARI GURU IZIN HARI INI (KHUSUS GURU PIKET) */}
-            {isDutyTeacherToday && activeDutyLeavesToday.length > 0 && (
-              <div
-                id="duty-teacher-tasks-banner"
-                className="bg-white rounded-3xl p-4 sm:p-4.5 border border-amber-200/90 shadow-sm space-y-3 animate-fadeIn"
-              >
-                {/* Header Widget */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center shadow-xs shrink-0 ring-2 ring-amber-100">
-                      <span className="text-lg">📋</span>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-900 text-[9.5px] font-black rounded-md tracking-wider uppercase border border-amber-300">
-                          TUGAS PIKET HARI INI
-                        </span>
-                        <span className="text-[10px] font-bold text-amber-700">
-                          {activeDutyLeavesToday.length} Guru Izin
-                        </span>
-                      </div>
-                      <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-snug mt-0.5">
-                        Tugas Titipan dari Guru Izin
-                      </h4>
-                    </div>
-                  </div>
-                  <span className="text-[10.5px] font-bold text-slate-400 font-mono shrink-0">
-                    {new Date().toLocaleDateString('id-ID', { weekday: 'long' })}
-                  </span>
-                </div>
-
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Berikut instruksi dan materi kelas yang dititipkan oleh rekan pendidik yang sedang izin hari ini:
-                </p>
-
-                <div className="space-y-2.5">
-                  {activeDutyLeavesToday.map((leave) => {
-                    const teacher = allRegisteredTeachers.find(
-                      (t) => t.id === leave.user_id || (Boolean(t.full_name) && Boolean(leave.teacher_name) && t.full_name.toLowerCase() === leave.teacher_name?.toLowerCase())
-                    );
-                    const tName = leave.teacher_name || teacher?.full_name || leave.user_name || 'Rekan Guru';
-                    const tNpp = teacher?.nip || '-';
-                    const tPhone = (teacher as any)?.phone || null;
-                    const hasTask = Boolean(leave.duty_teacher_notes && leave.duty_teacher_notes.trim().length > 0);
-                    const taskText = leave.duty_teacher_notes?.trim() || 'Tidak ada catatan tugas khusus yang dititipkan.';
-                    const isCopied = isCopiedDutyTaskId === leave.id;
-
-                    const handleCopyTask = () => {
-                      const copyText = `*Tugas Titipan dari ${tName} (${leave.leave_type})*\nAlasan: ${leave.reason}\nInstruksi untuk Guru Piket:\n"${taskText}"`;
-                      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                        navigator.clipboard.writeText(copyText).then(() => {
-                          setIsCopiedDutyTaskId(leave.id);
-                          showToast('success', 'Tugas Disalin!', `Instruksi kelas dari ${tName} berhasil disalin.`);
-                          setTimeout(() => setIsCopiedDutyTaskId(null), 2500);
-                        }).catch(() => {
-                          showToast('info', 'Tugas Guru Izin', taskText);
-                        });
-                      } else {
-                        showToast('info', 'Tugas Guru Izin', taskText);
-                      }
-                    };
-
-                    return (
-                      <div
-                        key={leave.id}
-                        className="p-3 sm:p-3.5 rounded-2xl bg-amber-50/40 border border-amber-200/90 shadow-2xs space-y-2"
-                      >
-                        {/* Top Row: Teacher Identity & Badge */}
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-7 h-7 rounded-xl bg-linear-to-br from-[#023246] to-[#18536B] text-white flex items-center justify-center text-[10px] font-black shrink-0">
-                              {tName.charAt(0)}
-                            </div>
-                            <div className="min-w-0">
-                              <span className="text-xs font-black text-slate-900 truncate block">
-                                {tName}
-                              </span>
-                              <span className="text-[10px] text-slate-500 font-mono block">
-                                NPP: {tNpp}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span
-                              className={`px-2 py-0.5 rounded-md text-[9.5px] font-extrabold border ${
-                                leave.leave_type === 'SAKIT'
-                                  ? 'bg-rose-50 text-rose-800 border-rose-200'
-                                  : leave.leave_type === 'DINAS_LUAR'
-                                  ? 'bg-blue-50 text-blue-800 border-blue-200'
-                                  : 'bg-amber-50 text-amber-900 border-amber-200'
-                              }`}
-                            >
-                              {leave.leave_type === 'SAKIT'
-                                ? '🤒 Sakit'
-                                : leave.leave_type === 'DINAS_LUAR'
-                                ? '💼 Dinas Luar'
-                                : '📝 Izin'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Reason Snippet */}
-                        <p className="text-[10.5px] text-slate-600 leading-tight">
-                          <span className="font-semibold text-slate-700">Keterangan:</span> {leave.reason}
-                        </p>
-
-                        {/* The Task Box */}
-                        <div className="p-2.5 rounded-xl bg-white border border-amber-200/80 shadow-3xs space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9.5px] font-black text-amber-900 uppercase tracking-wider flex items-center gap-1">
-                              <span>📌</span> Instruksi / Tugas Kelas
-                            </span>
-                            {hasTask && (
-                              <button
-                                type="button"
-                                onClick={handleCopyTask}
-                                className="text-[9.5px] font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1 cursor-pointer px-1.5 py-0.5 rounded hover:bg-amber-50 transition-colors"
-                                title="Salin instruksi tugas kelas"
-                              >
-                                {isCopied ? '✓ Tersalin' : '📋 Salin Tugas'}
-                              </button>
-                            )}
-                          </div>
-                          <p className="text-xs font-semibold text-slate-800 leading-relaxed italic">
-                            "{taskText}"
-                          </p>
-                        </div>
-
-                        {/* Action Bar (WhatsApp Link if phone available) */}
-                        {tPhone && (
-                          <div className="pt-0.5 flex justify-end">
-                            <a
-                              href={`https://wa.me/${tPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                                `Halo Bapak/Ibu ${tName}, terkait tugas kelas yang dititipkan untuk piket hari ini: "${taskText}".`
-                              )}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[10.5px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
-                            >
-                              <span>💬</span> Konfirmasi via WhatsApp →
-                            </a>
-                          </div>
+                        {activeExamDuty.teacherCode && (
+                          <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-bold border border-amber-300">
+                            Kode {activeExamDuty.teacherCode}
+                          </span>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* 🌟 BANNER TANTANGAN DISIPLIN (COMPACT - KLIK UNTUK PINDAH LAYER LENGKAP) ─── */}
-            <div
-              id="compact-challenge-banner"
-              onClick={() => {
-                setBerandaLayer('CHALLENGE');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="bg-linear-to-r from-[#023246] via-[#0A4158] to-[#18536B] rounded-2xl p-3 sm:p-3.5 text-white shadow-md border border-cyan-700/40 flex items-center justify-between gap-2.5 cursor-pointer hover:brightness-110 active:scale-[0.99] transition-all group"
-              role="button"
-              tabIndex={0}
-              title="Klik untuk membuka Layer Tantangan Disiplin & Misi Lengkap"
-            >
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-lg sm:text-xl shrink-0 shadow-inner group-hover:scale-105 transition-transform">
-                  <span className="animate-pulse">🔥</span>
-                  {(streakInfo?.currentStreak ?? 0) > 0 && (
-                    <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 font-black text-[8.5px] leading-tight shadow-xs">
-                      {streakInfo.currentStreak}d
-                    </span>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 leading-none">
-                    <span className="text-[9.5px] sm:text-[10px] font-extrabold uppercase tracking-wider text-amber-300">
-                      Tantangan Disiplin
-                    </span>
-                    <span className="text-[9px] font-mono text-cyan-200">• Bulan Berjalan</span>
+                      <h3 className="text-sm font-bold text-[#0F172A] leading-snug mt-0.5 line-clamp-1">
+                        {selectedExamDutyLevel === 'ALL'
+                          ? 'Jadwal Tugas Mengawas Ujian (SMP & SMA)'
+                          : activeExamDuty.schedule?.config?.examTitle || `Jadwal Tugas Mengawas (${selectedExamDutyLevel})`}
+                      </h3>
+                      <p className="text-xs text-slate-600 font-medium">
+                        <strong className="text-[#0F172A]">{effectiveUser?.full_name}</strong>
+                        {effectiveUser?.nip ? ` (NPP: ${effectiveUser.nip})` : ''}
+                      </p>
+                    </div>
                   </div>
-                  <h4 className="text-xs sm:text-sm font-black text-white truncate leading-tight mt-1">
-                    {(streakInfo?.currentStreak ?? 0) > 0
-                      ? `${streakInfo.currentStreak} Hari Beruntun Tepat Waktu!`
-                      : 'Mulai Nyalakan Api Rekor!'}
-                  </h4>
+
+                  <div className="shrink-0">
+                    {activeExamDuty.duties.some((d) => d.date === getTodayDateInJakarta()) ? (
+                      <span className="px-2.5 py-0.5 rounded-full bg-rose-700 text-white text-[10px] font-bold shrink-0">
+                        HARI INI
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full bg-white text-[#0D5C46] border border-emerald-200 text-[11px] font-bold shrink-0">
+                        {activeExamDuty.duties.length} Sesi
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-2.5 pt-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs text-slate-600 font-medium">Jadwal Tugas:</span>
+                    {activeExamDuty.duties.map((duty, idx) => {
+                      const isToday = duty.date === getTodayDateInJakarta();
+                      return (
+                        <div
+                          key={duty.id || idx}
+                          className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border flex items-center gap-1 ${
+                            isToday
+                              ? 'bg-amber-100 text-amber-950 border-amber-300'
+                              : 'bg-white text-[#0F172A] border-slate-200'
+                          }`}
+                        >
+                          <span className="text-slate-600 font-medium">{duty.dayName}:</span>
+                          <span className="text-[#0F172A]">{duty.subject}</span>
+                          <span className="px-1 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                            {duty.educationLevel ? `${duty.educationLevel} • ` : ''}{duty.roomName || `R.${duty.className}`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-1 text-xs font-bold text-[#0D5C46] shrink-0">
+                    <span>Buka Detail</span>
+                    <ChevronRight className="w-4 h-4 shrink-0" />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                <div className="text-right">
-                  <span className="px-2 py-0.5 rounded-lg bg-white/10 border border-white/15 text-[10px] sm:text-[10.5px] font-black text-amber-200 block">
-                    {(dailyQuests || []).filter((q) => q?.status === 'COMPLETED').length}/{(dailyQuests || []).length} Misi
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const institutionForSlip = selectedExamDutyLevel === 'SMA'
+                      ? 'SMA Terpadu As Salaam'
+                      : selectedExamDutyLevel === 'ALL'
+                      ? 'SMP & SMA Terpadu As Salaam'
+                      : 'SMP Terpadu Al-Ittihadiyah';
+                    const titleForSlip = selectedExamDutyLevel === 'ALL'
+                      ? 'Jadwal Tugas Mengawas Ujian (SMP & SMA)'
+                      : activeExamDuty.schedule?.config?.examTitle || `Jadwal Tugas Mengawas Ujian (${selectedExamDutyLevel})`;
+                    ExamWordExporterService.printTeacherDutySlip(
+                      effectiveUser?.full_name || 'Bapak/Ibu Guru',
+                      activeExamDuty.teacherCode,
+                      activeExamDuty.duties,
+                      institutionForSlip,
+                      titleForSlip
+                    );
+                  }}
+                  className="min-h-11 px-3 bg-[#0D5C46] hover:bg-[#094736] text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <SagaPrinterIcon className="w-4 h-4 shrink-0" />
+                  <span>Cetak Kartu (A4)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExamScheduleReadOnly(true);
+                    setExamScheduleInitialTab('proctors');
+                    setIsExamScheduleModalOpen(true);
+                  }}
+                  className="min-h-11 px-3 bg-slate-100 hover:bg-slate-200 text-[#0F172A] font-bold text-xs rounded-xl border border-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <SagaScheduleIcon className="w-4 h-4 shrink-0" />
+                  <span>Jadwal Sekolah</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center space-y-2.5 bg-slate-50">
+              <p className="text-xs font-semibold text-slate-600">
+                Tidak ada penugasan mengawas untuk Anda di jenjang <strong className="text-[#0F172A]">{selectedExamDutyLevel === 'ALL' ? 'SMP maupun SMA' : selectedExamDutyLevel}</strong>.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsExamScheduleReadOnly(true);
+                  setExamScheduleInitialTab('proctors');
+                  setIsExamScheduleModalOpen(true);
+                }}
+                className="min-h-11 px-3.5 bg-white hover:bg-slate-100 text-[#0D5C46] border border-slate-300 rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <SagaScheduleIcon className="w-4 h-4 shrink-0" />
+                <span>Lihat Roster Sekolah ({selectedExamDutyLevel === 'ALL' ? 'SMP' : selectedExamDutyLevel})</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Banner Pengingat Jadwal Agenda Sekolah Hari Ini */}
+      {todaySchedule && (
+        <button
+          type="button"
+          onClick={() => setIsEventsCalendarModalOpen(true)}
+          className="w-full text-left bg-blue-50 hover:bg-blue-100/70 rounded-2xl p-4 text-[#0F172A] border border-blue-200 flex items-center justify-between gap-3 cursor-pointer transition-colors"
+        >
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-xl bg-white border border-blue-200 flex items-center justify-center shrink-0">
+              <SagaCalendarAgendaIcon className="w-6 h-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="px-2 py-0.5 bg-blue-700 text-white text-[10px] font-bold rounded-md tracking-wider uppercase">
+                  Agenda Hari Ini
+                </span>
+                <span className="text-xs text-blue-900 font-semibold">
+                  Tetap Masuk &amp; Presensi
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm font-bold truncate leading-tight mt-0.5">
+                {todaySchedule.name}
+                {todaySchedule.description ? ` • ${todaySchedule.description}` : ''}
+              </p>
+            </div>
+          </div>
+          <span className="text-xs text-[#0D5C46] font-bold shrink-0">Detail Agenda</span>
+        </button>
+      )}
+
+      {/* Kartu Tugas Titipan dari Guru Izin Hari Ini (Khusus Guru Piket) */}
+      {isDutyTeacherToday && activeDutyLeavesToday.length > 0 && (
+        <div
+          id="duty-teacher-tasks-banner"
+          className="bg-white rounded-2xl p-4 border border-amber-200 space-y-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                <SagaAdminHubIcon className="w-6 h-6" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-900 text-[10px] font-bold rounded-md tracking-wider uppercase border border-amber-300">
+                    Tugas Piket Hari Ini
                   </span>
-                  <span className="text-[8.5px] text-cyan-200/80 font-mono block mt-0.5">
-                    #{(disciplineLeaderboard?.currentUserRank) ?? 1} • {effectiveTotalPoints} PTS
+                  <span className="text-xs font-bold text-amber-800">
+                    {activeDutyLeavesToday.length} Guru Izin
                   </span>
                 </div>
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/10 group-hover:bg-white/20 text-white flex items-center justify-center transition-all">
-                  <ChevronRight className="w-3.5 h-3.5 text-cyan-200 group-hover:translate-x-0.5 transition-transform" />
-                </div>
+                <h4 className="text-sm font-bold text-[#0F172A] leading-snug mt-0.5">
+                  Tugas Titipan dari Guru Izin
+                </h4>
               </div>
             </div>
+            <span className="text-xs font-semibold text-slate-500 shrink-0">
+              {new Date().toLocaleDateString('id-ID', { weekday: 'long' })}
+            </span>
+          </div>
 
-            {/* 🌟 1. CARD LOG PRESENSI HARI INI (DEVICE LOG TODAY MODEL) ─────────── */}
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Berikut instruksi dan materi kelas yang dititipkan oleh rekan pendidik yang sedang izin hari ini:
+          </p>
+
+          <div className="space-y-2.5">
+            {activeDutyLeavesToday.map((leave) => {
+              const teacher = allRegisteredTeachers.find(
+                (t) =>
+                  t.id === leave.user_id ||
+                  (Boolean(t.full_name) &&
+                    Boolean(leave.teacher_name) &&
+                    t.full_name.toLowerCase() === leave.teacher_name?.toLowerCase())
+              );
+              const tName = leave.teacher_name || teacher?.full_name || leave.user_name || 'Rekan Guru';
+              const tNpp = teacher?.nip || '-';
+              const tPhone = (teacher as any)?.phone || null;
+              const hasTask = Boolean(leave.duty_teacher_notes && leave.duty_teacher_notes.trim().length > 0);
+              const taskText = leave.duty_teacher_notes?.trim() || 'Tidak ada catatan tugas khusus yang dititipkan.';
+              const isCopied = isCopiedDutyTaskId === leave.id;
+
+              const handleCopyTask = () => {
+                const copyText = `*Tugas Titipan dari ${tName} (${leave.leave_type})*\nAlasan: ${leave.reason}\nInstruksi untuk Guru Piket:\n"${taskText}"`;
+                if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                  navigator.clipboard
+                    .writeText(copyText)
+                    .then(() => {
+                      setIsCopiedDutyTaskId(leave.id);
+                      showToast('success', 'Tugas Disalin!', `Instruksi kelas dari ${tName} berhasil disalin.`);
+                      setTimeout(() => setIsCopiedDutyTaskId(null), 2500);
+                    })
+                    .catch(() => {
+                      showToast('info', 'Tugas Guru Izin', taskText);
+                    });
+                } else {
+                  showToast('info', 'Tugas Guru Izin', taskText);
+                }
+              };
+
+              return (
+                <div
+                  key={leave.id}
+                  className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200 space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-[#0D5C46] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                        {tName.charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-[#0F172A] truncate block">
+                          {tName}
+                        </span>
+                        <span className="text-[11px] text-slate-600 font-mono block">
+                          NPP: {tNpp}
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                        leave.leave_type === 'SAKIT'
+                          ? 'bg-rose-50 text-rose-800 border-rose-200'
+                          : leave.leave_type === 'DINAS_LUAR'
+                          ? 'bg-blue-50 text-blue-800 border-blue-200'
+                          : 'bg-amber-100 text-amber-900 border-amber-300'
+                      }`}
+                    >
+                      {leave.leave_type === 'SAKIT'
+                        ? 'Sakit'
+                        : leave.leave_type === 'DINAS_LUAR'
+                        ? 'Dinas Luar'
+                        : 'Izin'}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-600 leading-tight">
+                    <span className="font-semibold text-[#0F172A]">Keterangan:</span> {leave.reason}
+                  </p>
+
+                  <div className="p-2.5 rounded-xl bg-white border border-amber-200 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider">
+                        Instruksi / Tugas Kelas
+                      </span>
+                      {hasTask && (
+                        <button
+                          type="button"
+                          onClick={handleCopyTask}
+                          className="min-h-9 px-2 text-xs font-bold text-[#0D5C46] hover:bg-emerald-50 rounded-lg cursor-pointer transition-colors"
+                        >
+                          {isCopied ? 'Tersalin' : 'Salin Tugas'}
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs font-semibold text-[#0F172A] leading-relaxed italic">
+                      "{taskText}"
+                    </p>
+                  </div>
+
+                  {tPhone && (
+                    <div className="pt-0.5 flex justify-end">
+                      <a
+                        href={`https://wa.me/${tPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                          `Halo Bapak/Ibu ${tName}, terkait tugas kelas yang dititipkan untuk piket hari ini: "${taskText}".`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-h-10 px-2.5 text-xs font-bold text-[#0D5C46] hover:underline flex items-center gap-1.5"
+                      >
+                        <span>Konfirmasi via WhatsApp</span>
+                        <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  // Koordinator Prioritas 1-Banner Beranda (Maksimal 1 banner aktif & Zero Interruption sebelum absen masuk)
+  const activeHomeBannerNode = (() => {
+    // Prioritas 1: Darurat Kelas SOS Aktif
+    if (activeEmergencies.length > 0) {
+      return (
+        <div className="bg-[#9F1239] text-white rounded-2xl p-4 border border-[#881337] space-y-2.5">
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="w-10 h-10 rounded-xl bg-white text-[#9F1239] flex items-center justify-center shrink-0">
+                <SagaEmergencySosIcon className="w-6 h-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="px-2 py-0.5 bg-amber-300 text-slate-950 text-[10px] font-bold rounded-md uppercase">
+                    SOS Kelas Aktif
+                  </span>
+                  <span className="text-xs text-rose-100 font-semibold">
+                    {activeEmergencies.length} Panggilan Darurat
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm font-bold truncate leading-tight mt-0.5 flex items-center gap-1">
+                  <SagaMapPinIcon tone="dark" className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">
+                    {activeEmergencies[0].room_name}
+                    {activeEmergencies[0].class_name ? ` (${activeEmergencies[0].class_name})` : ''} • {activeEmergencies[0].teacher_name}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsEmergencyModalOpen(true)}
+              className="min-h-11 px-3.5 bg-white hover:bg-rose-50 text-[#9F1239] font-bold text-xs rounded-xl shrink-0 cursor-pointer transition-colors"
+            >
+              Lihat &amp; Tangani
+            </button>
+          </div>
+          {isDutyTeacherToday && (
+            <div className="bg-black/20 rounded-xl px-3 py-2 text-xs font-semibold text-amber-200 border border-white/15">
+              Anda bertugas sebagai Guru Piket hari ini. Segera menuju lokasi bantuan.
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Prioritas 2: Window Pengingat Pulang
+    const dayOfWeekJakarta = getJakartaDayOfWeek();
+    const isFridayJakarta = dayOfWeekJakarta === 5;
+    const isWeekdayJakarta = dayOfWeekJakarta >= 1 && dayOfWeekJakarta <= 5;
+    const targetCheckoutForBanner = (
+      isFridayJakarta
+        ? settings?.reminder_friday_checkout_time || settings?.friday_checkout_start || CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME || '11:00'
+        : settings?.reminder_checkout_time || settings?.work_checkout_start || CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_TIME || '13:00'
+    ).slice(0, 5);
+    const [coH, coM] = targetCheckoutForBanner.split(':').map((n) => parseInt(n, 10));
+    const earlyWarningHour = ((Number.isNaN(coH) ? 13 : coH) - 1 + 24) % 24;
+    const earlyWarningThreshold = `${String(earlyWarningHour).padStart(2, '0')}:${String(Number.isNaN(coM) ? 0 : coM).padStart(2, '0')}`;
+    const currentJakartaHm = getCurrentTimeInJakarta().slice(0, 5);
+    const isCheckoutWindowActive =
+      !isTodayOff.isOff &&
+      Boolean(todayAttendance?.check_in_time) &&
+      !todayAttendance?.check_out_time &&
+      isWeekdayJakarta &&
+      currentJakartaHm >= earlyWarningThreshold;
+
+    if (isCheckoutWindowActive) {
+      return (
+        <CheckoutReminderBanner
+          todayAttendance={todayAttendance}
+          settings={settings}
+          isTodayOff={Boolean(isTodayOff?.isOff)}
+          userId={effectiveUser?.id}
+          onOpenBiometric={handleOpenBiometricModal}
+          onOpenScanner={handleOpenScannerClick}
+          onOpenPolicyModal={() => setIsPolicyModalOpen(true)}
+        />
+      );
+    }
+
+    // Prioritas 3: Maksimal 1 Ringkasan Tugas / Agenda Operasional Hari Ini
+    if (isDutyTeacherToday && activeDutyLeavesToday.length > 0) {
+      return (
+        <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-xl bg-white border border-amber-200 flex items-center justify-center shrink-0">
+              <SagaAdminHubIcon className="w-6 h-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-amber-900 uppercase tracking-wide">
+                Tugas Piket Hari Ini
+              </p>
+              <p className="text-xs sm:text-sm font-bold text-[#0F172A] truncate">
+                {activeDutyLeavesToday.length} Guru Izin dengan Catatan Tugas Kelas
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('ADMIN');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="min-h-11 px-3.5 rounded-xl bg-white hover:bg-amber-100 border border-amber-300 text-xs font-bold text-[#0F172A] shrink-0 cursor-pointer"
+          >
+            Buka Tugas
+          </button>
+        </div>
+      );
+    }
+
+    if (committeeInfo?.isCommittee && isExamPeriodActive) {
+      return (
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+              <SagaMedalRankIcon className="w-6 h-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold text-[#0D5C46] uppercase tracking-wide">
+                SK Kepanitiaan Ujian • T.A. {committeeInfo.academicYear}
+              </p>
+              <p className="text-xs sm:text-sm font-bold text-[#0F172A] truncate">
+                {committeeInfo.roleLabel}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('ADMIN');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="min-h-11 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-[#0F172A] shrink-0 cursor-pointer"
+          >
+            Buka Admin
+          </button>
+        </div>
+      );
+    }
+
+    if (shouldShowDutyCard && activeExamDuty && activeExamDuty.duties.length > 0) {
+      const hasDutyToday = activeExamDuty.duties.some((d) => d.date === getTodayDateInJakarta());
+      return (
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
+              <SagaScheduleIcon className="w-6 h-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold text-[#0D5C46] uppercase tracking-wide">
+                {hasDutyToday ? 'Jadwal Mengawas Hari Ini' : 'Tugas Mengawas Ujian'}
+              </p>
+              <p className="text-xs sm:text-sm font-bold text-[#0F172A] truncate">
+                {activeExamDuty.duties.length} Sesi Mengawas ({selectedExamDutyLevel === 'ALL' ? 'SMP & SMA' : selectedExamDutyLevel})
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setIsExamScheduleReadOnly(true);
+              setExamScheduleInitialTab('my_schedule');
+              setIsExamScheduleModalOpen(true);
+            }}
+            className="min-h-11 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-[#0F172A] shrink-0 cursor-pointer"
+          >
+            Lihat Jadwal
+          </button>
+        </div>
+      );
+    }
+
+    if (todaySchedule) {
+      return (
+        <button
+          type="button"
+          onClick={() => setIsEventsCalendarModalOpen(true)}
+          className="w-full text-left bg-blue-50 hover:bg-blue-100/70 rounded-2xl p-4 border border-blue-200 flex items-center justify-between gap-3 cursor-pointer transition-colors"
+        >
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-xl bg-white border border-blue-200 flex items-center justify-center shrink-0">
+              <SagaCalendarAgendaIcon className="w-6 h-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold text-blue-800 uppercase tracking-wide">
+                Agenda Sekolah Hari Ini
+              </p>
+              <p className="text-xs sm:text-sm font-bold text-[#0F172A] truncate">
+                {todaySchedule.name}
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-[#0D5C46] shrink-0">Detail</span>
+        </button>
+      );
+    }
+
+    // Prioritas 4: Banner Non-Kritis (HANYA setelah absen masuk hari ini dan bukan hari libur)
+    if (hasCheckedInToday && !isTodayOff.isOff) {
+      const isSurveyEligible =
+        Boolean(effectiveUser?.id) &&
+        shouldShowDailySurveyBanner(effectiveUser.id) &&
+        (typeof sessionStorage === 'undefined' ||
+          sessionStorage.getItem(`smart_absensi_survey_banner_dismissed_${effectiveUser.id}`) !== '1');
+      if (isSurveyEligible) {
+        return <DailySurveyReminderBanner />;
+      }
+
+      const isNotifEligible =
+        typeof window !== 'undefined' &&
+        'Notification' in window &&
+        !NotificationService.isPermissionGranted() &&
+        (typeof localStorage === 'undefined' ||
+          (localStorage.getItem(`smart_absensi_notif_banner_dismissed_${effectiveUser?.id || 'guest'}`) !== 'true' &&
+            localStorage.getItem('smart_absensi_notif_banner_dismissed_all') !== 'true'));
+      if (isNotifEligible) {
+        return (
+          <NotificationPermissionBanner
+            user={effectiveUser}
+            onOpenPreferences={() => setIsPreferencesModalOpen(true)}
+          />
+        );
+      }
+
+      const isPwaEligible =
+        typeof window !== 'undefined' &&
+        !pwaService.isStandalone() &&
+        (typeof localStorage === 'undefined' || localStorage.getItem('smart_absensi_pwa_dismissed') !== 'true');
+      if (isPwaEligible) {
+        return <PWAInstallPrompt />;
+      }
+    }
+
+    return null;
+  })();
+
+  return (
+    <div className="min-h-dvh bg-[#F8FAFC] text-[#0F172A] pb-28 md:pb-12">
+      {/* ── PREVIEW MODE WARNING BANNER ───────────────────────────────────── */}
+      {isPreviewMode && !isDualRoleUser && (
+        <div className="bg-slate-800 text-slate-100 px-4 py-2 text-xs font-semibold text-center border-b border-slate-700">
+          MODE PREVIEW GURU (ADMIN / KEPSEK) — Menggunakan data simulasi guru.
+        </div>
+      )}
+
+      {/* ── TOP HEADER RINGKAS GAYA SUPER-APP ───────────────────────────── */}
+      <GuruDashboardHeader
+        greeting={getTimeBasedGreeting()}
+        userName={effectiveUser.full_name}
+        avatarUrl={effectiveUser.avatar_url}
+        institutionName={settings.institution_name || 'Portal Smart Absensi Guru'}
+        dateLabel={new Date().toLocaleDateString('id-ID', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })}
+        unreadCount={unreadCount}
+        isDualRoleUser={isDualRoleUser}
+        onSwitchRoleMode={onSwitchRoleMode}
+        onOpenNotifications={() => {
+          if (activeTab !== 'NOTIFIKASI') {
+            setNotifReturnTab(activeTab);
+          }
+          setActiveTab('NOTIFIKASI');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
+
+      {/* ── NAVIGASI DESKTOP / TABLET (MD+) ─────────────────────────────── */}
+      <GuruDesktopNavBar
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          if (tab === 'BERANDA') setBerandaLayer('HOME');
+          if (tab === 'AKUN') setProfilSubView('MAIN');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onPressAbsen={handleOpenAttendanceChoice}
+      />
+
+      <main className="w-full max-w-120 md:max-w-3xl mx-auto px-4 md:px-6 pt-4 space-y-5">
+        {/* ── TAB 1: BERANDA UTAMA (SUPER-APP CLEAN HIERARCHY) ─────────────── */}
+        {activeTab === 'BERANDA' && berandaLayer === 'HOME' && (
+          <>
+            {/* 1. Hero Card Utama Absensi (Solid Hijau Tua #0D5C46) */}
             {(() => {
               const isFriday = getJakartaDayOfWeek() === 5;
               const checkoutStart = (isFriday
-                ? (settings.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START)
-                : (settings.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START)).slice(0, 5);
+                ? settings.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START
+                : settings.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START
+              ).slice(0, 5);
               const checkinStart = (settings.work_checkin_start || CONSTANTS.DEFAULTS.WORK_CHECKIN_START).slice(0, 5);
+              const checkinEnd = (settings.work_checkin_end || '07:30').slice(0, 5);
 
               const todayDateJakarta = getTodayDateInJakarta();
               const nowTimeJakarta = getCurrentTimeInJakarta().slice(0, 5);
@@ -3500,93 +3574,67 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               const isAutoCheckInToday = allowOverrideScan && isAutoCheckInRecord(todayAttendance);
               const isAutoCheckOutToday = isAutoCheckOutRecord(todayAttendance);
 
-              let statusLabel = 'Belum Absen';
-              let statusBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
-              let ctaText = 'Absen Masuk Sekarang';
-              let ctaAction: () => void = handleOpenAttendanceChoice;
-              let isCtaDisabled = false;
+              let statusVariant: SagaAttendanceStatusVariant = 'WAITING';
+              let statusHeadline = 'Belum Absen Masuk';
+              let scheduleHint = `Batas tepat waktu ${checkinEnd.replace(':', '.')} WIB • Pulang ${checkoutStart.replace(':', '.')} WIB`;
 
               if (isTodayOff.isOff) {
-                statusLabel = 'Hari Libur';
-                statusBadgeStyle = 'bg-slate-100 text-slate-700 border-slate-200';
-                ctaText = `Hari Libur (${isTodayOff.reason || 'Tidak Ada KBM'})`;
-                isCtaDisabled = true;
+                statusVariant = 'HOLIDAY';
+                statusHeadline = 'Hari Libur Sekolah';
+                scheduleHint = isTodayOff.reason || 'Tidak ada kewajiban presensi hari ini';
               } else if (isAutoCheckInToday) {
                 const isReadyToCheckout = nowTimeJakarta >= checkoutStart;
-                if (isReadyToCheckout) {
-                  statusLabel = isAutoCheckOutToday ? 'Auto Sistem (Dapat Diganti)' : 'Auto Masuk • Siap Pulang';
-                  statusBadgeStyle = 'bg-blue-50 text-blue-800 border-blue-200';
-                  ctaText = isAutoCheckOutToday ? 'Ganti dengan Absen Asli' : 'Absen Pulang Sekarang';
-                  ctaAction = handleOpenAttendanceChoice;
-                } else {
-                  statusLabel = 'Auto Masuk (Dapat Diganti)';
-                  statusBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
-                  ctaText = 'Absen Masuk Mandiri Sekarang';
-                  ctaAction = handleOpenAttendanceChoice;
-                }
+                statusVariant = isReadyToCheckout ? 'READY_OUT' : 'WAITING';
+                statusHeadline = isReadyToCheckout
+                  ? isAutoCheckOutToday
+                    ? 'Presensi Sistem • Ganti Mandiri'
+                    : 'Waktunya Absen Pulang'
+                  : 'Presensi Sistem Aktif';
+                scheduleHint = 'Ketuk Scan QR atau Sidik Jari untuk mencatat absensi mandiri';
               } else if (todayAttendance?.check_out_time) {
-                statusLabel = isAutoCheckOutToday ? 'Presensi Selesai (Auto Pulang)' : 'Presensi Selesai';
-                statusBadgeStyle = 'bg-emerald-50 text-emerald-800 border-emerald-200';
-                ctaText = 'Lihat Rekap Kehadiran Hari Ini';
-                ctaAction = () => setIsRecapModalOpen(true);
+                statusVariant = 'DONE';
+                statusHeadline = `Presensi Selesai • ${formatTimeForInput(todayAttendance.check_out_time).replace(':', '.')} WIB`;
+                scheduleHint = todayAttendance.check_in_time
+                  ? `Masuk ${formatTimeForInput(todayAttendance.check_in_time).replace(':', '.')} WIB`
+                  : isAutoCheckOutToday
+                  ? 'Tercatat pulang otomatis sistem'
+                  : 'Kehadiran hari ini lengkap';
               } else if (todayAttendance?.check_in_time) {
                 const isReadyToCheckout = nowTimeJakarta >= checkoutStart;
-
                 if (isReadyToCheckout) {
-                  statusLabel = 'Siap Check-out';
-                  statusBadgeStyle = 'bg-blue-50 text-blue-800 border-blue-200';
-                  ctaText = 'Absen Pulang Sekarang';
-                  ctaAction = handleOpenAttendanceChoice;
+                  statusVariant = 'READY_OUT';
+                  statusHeadline = 'Waktunya Absen Pulang';
+                  scheduleHint = `Masuk ${formatTimeForInput(todayAttendance.check_in_time).replace(':', '.')} WIB • Siap absen pulang`;
                 } else {
-                  statusLabel = 'Sudah Check-in';
-                  statusBadgeStyle = 'bg-emerald-50 text-emerald-800 border-emerald-200';
-                  ctaText = `Absen Pulang (Mulai ${checkoutStart} WIB)`;
-                  ctaAction = () => {
-                    const dayLabel = isFriday ? "hari Jum'at" : "hari ini";
-                    showToast(
-                      'warning',
-                      'Absensi Pulang Belum Dibuka',
-                      `Anda sudah melakukan absensi masuk pada pukul ${formatTimeForInput(todayAttendance.check_in_time)} WIB. Jadwal absensi pulang ${dayLabel} baru dibuka mulai pukul ${checkoutStart} WIB ke atas (Waktu Jakarta). Anda harus melakukan absensi pulang nanti saat jam kepulangan telah tiba.`
-                    );
-                  };
+                  statusVariant = 'CHECKED_IN';
+                  statusHeadline = `Sudah Absen • ${formatTimeForInput(todayAttendance.check_in_time).replace(':', '.')} WIB`;
+                  scheduleHint = `Absen pulang dibuka mulai ${checkoutStart.replace(':', '.')} WIB`;
                 }
               } else if (pendingCorrectionToday?.checkInTime) {
                 const isReadyToCheckout = nowTimeJakarta >= checkoutStart;
-
                 if (isReadyToCheckout) {
-                  statusLabel = 'Koreksi Diajukan • Siap Pulang';
-                  statusBadgeStyle = 'bg-blue-50 text-blue-800 border-blue-200';
-                  ctaText = 'Absen Pulang Sekarang';
-                  ctaAction = handleOpenAttendanceChoice;
+                  statusVariant = 'READY_OUT';
+                  statusHeadline = 'Waktunya Absen Pulang';
+                  scheduleHint = `Koreksi masuk ${String(pendingCorrectionToday.checkInTime).slice(0, 5).replace(':', '.')} WIB diajukan`;
                 } else {
-                  statusLabel = 'Koreksi Masuk Diajukan';
-                  statusBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
-                  ctaText = `Absen Pulang (Mulai ${checkoutStart} WIB)`;
-                  ctaAction = () => {
-                    const dayLabel = isFriday ? "hari Jum'at" : "hari ini";
-                    showToast(
-                      'warning',
-                      'Absensi Pulang Belum Dibuka',
-                      `Koreksi jam masuk telah diajukan. Jadwal absensi pulang ${dayLabel} baru dibuka mulai pukul ${checkoutStart} WIB ke atas (Waktu Jakarta). Anda harus melakukan absensi pulang nanti saat jam kepulangan telah tiba.`
-                    );
-                  };
+                  statusVariant = 'CHECKED_IN';
+                  statusHeadline = `Koreksi Masuk • ${String(pendingCorrectionToday.checkInTime).slice(0, 5).replace(':', '.')} WIB`;
+                  scheduleHint = `Absen pulang dibuka mulai ${checkoutStart.replace(':', '.')} WIB`;
                 }
-              } else {
-                // Belum absen masuk: periksa apakah jam sekarang < checkinStart (06:00 WIB)
-                const isBeforeCheckin = nowTimeJakarta < checkinStart;
-                if (isBeforeCheckin) {
-                  statusLabel = 'Belum Dibuka';
-                  statusBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
-                  ctaText = `Absen Masuk (Buka ${checkinStart} WIB)`;
-                  ctaAction = () => {
-                    showToast(
-                      'warning',
-                      'Presensi Masuk Belum Dibuka',
-                      `Presensi masuk sekolah hanya dapat dilakukan mulai pukul ${checkinStart} WIB ke atas (Waktu Jakarta). Harap menunggu hingga jam presensi resmi dibuka.`
-                    );
-                  };
-                }
+              } else if (nowTimeJakarta < checkinStart) {
+                statusVariant = 'BEFORE_OPEN';
+                statusHeadline = `Presensi Dibuka ${checkinStart.replace(':', '.')} WIB`;
+                scheduleHint = `Jam masuk sekolah sampai ${checkinEnd.replace(':', '.')} WIB`;
               }
+
+              const currentTimeLabel = `${currentTime
+                .toLocaleTimeString('id-ID', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  timeZone: 'Asia/Jakarta',
+                })
+                .replace(/:/g, '.')} WIB`;
 
               const cleanGpsText = gpsHealth.text
                 .replace(/[📍🟢🟡🔴]|⚠️/gu, '')
@@ -3595,1110 +3643,32 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 .trim();
 
               return (
-                <section className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
-                  {/* Header: Title + Status Badge */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-teal-50 border border-teal-200/80 text-teal-800 flex items-center justify-center shrink-0 shadow-2xs">
-                        <Clock className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-                          Log Presensi Hari Ini
-                        </h4>
-                      </div>
-                    </div>
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full border shrink-0 ${statusBadgeStyle} shadow-2xs`}>
-                      {isTodayOff.isOff && <Coffee className="w-3.5 h-3.5 text-slate-500" />}
-                      {todayAttendance?.check_out_time && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
-                      {todayAttendance?.check_in_time && !todayAttendance.check_out_time && <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />}
-                      <span>{statusLabel}</span>
-                    </span>
-                  </div>
-
-                  {/* 4 Kolom Log Jam & Jadwal Sekolah (Presisi Horizontal & Vertikal 100%) */}
-                  <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
-                    {/* Check In */}
-                    <div className={`py-2.5 px-1 rounded-xl border text-center flex flex-col items-center justify-center transition-all ${
-                      todayAttendance?.check_in_time
-                        ? 'bg-emerald-50/60 border-emerald-200/80'
-                        : pendingCorrectionToday?.checkInTime
-                        ? 'bg-amber-50/60 border-amber-200/80'
-                        : 'bg-slate-50/80 border-slate-200/70'
-                    }`}>
-                      <span className="text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap text-center block leading-none">
-                        Check In
-                      </span>
-                      <p className={`text-sm sm:text-base font-black font-mono mt-1.5 leading-none tracking-tight text-center ${
-                        todayAttendance?.check_in_time
-                          ? 'text-emerald-700'
-                          : pendingCorrectionToday?.checkInTime
-                          ? 'text-amber-700'
-                          : 'text-slate-400'
-                      }`}>
-                        {todayAttendance?.check_in_time
-                          ? todayAttendance.check_in_time.substring(0, 5)
-                          : pendingCorrectionToday?.checkInTime
-                          ? `${pendingCorrectionToday.checkInTime.substring(0, 5)}*`
-                          : '--:--'}
-                      </p>
-                    </div>
-
-                    {/* Check Out */}
-                    <div className={`py-2.5 px-1 rounded-xl border text-center flex flex-col items-center justify-center transition-all ${
-                      todayAttendance?.check_out_time
-                        ? 'bg-teal-50/60 border-teal-200/80'
-                        : 'bg-slate-50/80 border-slate-200/70'
-                    }`}>
-                      <span className="text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap text-center block leading-none">
-                        Check Out
-                      </span>
-                      <p className={`text-sm sm:text-base font-black font-mono mt-1.5 leading-none tracking-tight text-center ${
-                        todayAttendance?.check_out_time ? 'text-teal-700' : 'text-slate-400'
-                      }`}>
-                        {todayAttendance?.check_out_time ? todayAttendance.check_out_time.substring(0, 5) : '--:--'}
-                      </p>
-                    </div>
-
-                    {/* Batas In */}
-                    <div className="py-2.5 px-1 rounded-xl border border-slate-200/60 bg-slate-50/50 text-center flex flex-col items-center justify-center">
-                      <span className="text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap text-center block leading-none">
-                        Batas In
-                      </span>
-                      <p className="text-sm sm:text-base font-bold font-mono text-slate-600 mt-1.5 leading-none tracking-tight text-center">
-                        {settings.work_checkin_end?.substring(0, 5) || '07:30'}
-                      </p>
-                    </div>
-
-                    {/* Mulai Out */}
-                    <div className="py-2.5 px-1 rounded-xl border border-slate-200/60 bg-slate-50/50 text-center flex flex-col items-center justify-center">
-                      <span className="text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap text-center block leading-none">
-                        Mulai Out
-                      </span>
-                      <p className="text-sm sm:text-base font-bold font-mono text-slate-600 mt-1.5 leading-none tracking-tight text-center">
-                        {checkoutStart}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Main Action Area: Holiday Announcement vs Primary CTA */}
-                  {isTodayOff.isOff ? (
-                    <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50/90 border border-slate-200/80 flex items-center gap-3 shadow-2xs">
-                      <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200/80 text-teal-800 flex items-center justify-center shrink-0 shadow-2xs">
-                        <Coffee className="w-5 h-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
-                          {isTodayOff.reason || 'Hari Libur'}
-                        </h5>
-                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                          Tidak ada kegiatan KBM atau kewajiban presensi hari ini. Selamat beristirahat!
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={isCtaDisabled}
-                      onClick={ctaAction}
-                      className="w-full h-12 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs bg-[#023246] hover:bg-[#034560] text-white active:scale-[0.98]"
-                    >
-                      {((!todayAttendance && !pendingCorrectionToday) ||
-                        (todayAttendance && !todayAttendance.check_out_time) ||
-                        (pendingCorrectionToday && !todayAttendance?.check_out_time)) && (
-                        <Fingerprint className="w-5 h-5 text-cyan-300 shrink-0" />
-                      )}
-                      <span>{ctaText}</span>
-                    </button>
-                  )}
-
-                  {/* Quick Attendance Methods: Balanced 50-50 Grid */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={handleOpenBiometricModal}
-                      className="h-10 rounded-xl bg-slate-50/90 hover:bg-teal-50/60 border border-slate-200/80 hover:border-teal-300 text-slate-700 hover:text-teal-900 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98] shadow-2xs"
-                    >
-                      <Fingerprint className="w-4 h-4 text-teal-700 shrink-0" />
-                      <span>Sidik Jari</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenScannerClick}
-                      className="h-10 rounded-xl bg-slate-50/90 hover:bg-teal-50/60 border border-slate-200/80 hover:border-teal-300 text-slate-700 hover:text-teal-900 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98] shadow-2xs"
-                    >
-                      <QrCode className="w-4 h-4 text-teal-700 shrink-0" />
-                      <span>Scan QR</span>
-                    </button>
-                  </div>
-
-                  {/* 👥 Papan Presensi Semua Guru Hari Ini & Non-Popup Direct Tour */}
-                  <div id="tour-teacher-daily-board-entry" className="space-y-2 pt-0.5">
-                    {/* Non-Popup Direct Guidance Coachmark (Hanya jika belum pernah dilihat) */}
-                    {isTeacherBoardTourActive && (
-                      <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-[#023246] via-[#18536B] to-teal-800 p-3.5 text-white shadow-md border border-teal-400/40 space-y-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-400/25 text-teal-200 border border-teal-300/40 text-[10px] font-black uppercase tracking-wider">
-                            <Sparkles className="w-3 h-3 text-amber-300" />
-                            <span>Fitur Baru Presensi</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleDismissTeacherBoardTour}
-                            className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-                            title="Tutup petunjuk"
-                            aria-label="Tutup petunjuk"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        <div className="space-y-1">
-                          <h5 className="text-xs sm:text-sm font-black text-white leading-snug">
-                            Pantau Kehadiran Rekan Guru Hari Ini
-                          </h5>
-                          <p className="text-[11px] text-teal-100/90 leading-relaxed">
-                            Bapak/Ibu Guru sekarang dapat langsung melihat status kehadiran seluruh rekan guru (datang, pulang, atau izin) secara real-time di tombol berikut:
-                          </p>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-white/15">
-                          <button
-                            type="button"
-                            onClick={handleOpenTeacherBoardFromTour}
-                            className="h-8.5 px-3 rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 font-black text-xs inline-flex items-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer"
-                          >
-                            <span>Buka Sekarang</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleDismissTeacherBoardTour}
-                            className="h-8.5 px-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] transition-all active:scale-95 cursor-pointer"
-                          >
-                            Mengerti ✓
-                          </button>
-                        </div>
-
-                        {/* Panah animasi mengarah langsung ke tombol di bawahnya */}
-                        <div className="flex justify-center -mb-2 mt-0.5">
-                          <ChevronDown className="w-4 h-4 text-teal-200 animate-bounce" />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tombol Papan Presensi Semua Guru */}
-                    <button
-                      type="button"
-                      id="btn-teacher-daily-board"
-                      onClick={() => {
-                        if (isTeacherBoardTourActive) {
-                          handleDismissTeacherBoardTour();
-                        }
-                        setIsTeacherBoardOpen(true);
-                      }}
-                      className={`w-full min-h-11.5 px-3.5 py-2.5 rounded-2xl border text-left flex items-center justify-between gap-2.5 transition-all cursor-pointer active:scale-[0.98] ${
-                        isTeacherBoardTourActive
-                          ? 'bg-teal-50/90 border-teal-400 ring-2 ring-teal-500/70 shadow-sm'
-                          : 'bg-slate-50/90 hover:bg-teal-50/70 border-slate-200/90 hover:border-teal-300 text-slate-800'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-colors ${
-                          isTeacherBoardTourActive ? 'bg-teal-700 text-white' : 'bg-teal-600 text-white'
-                        }`}>
-                          <Users className="w-4.5 h-4.5" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs font-black text-slate-900 tracking-tight">
-                              Papan Presensi Semua Guru
-                            </span>
-                            {isTeacherBoardTourActive ? (
-                              <span className="px-1.5 py-0.2 rounded-md bg-amber-400 text-slate-950 font-black text-[9px] uppercase tracking-wide shadow-2xs animate-pulse">
-                                Baru ✨
-                              </span>
-                            ) : (
-                              <span className="px-1.5 py-0.2 rounded-md bg-teal-100 text-teal-800 font-extrabold text-[9px] uppercase tracking-wide border border-teal-200/80">
-                                Hadir • Pulang • Izin
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[10.5px] text-slate-500 font-medium truncate mt-0.5">
-                            Lihat rekan yang sudah hadir, pulang, atau izin hari ini
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 text-teal-800 shrink-0 font-bold text-xs pl-1">
-                        <span className="hidden sm:inline">Buka</span>
-                        <ChevronRight className="w-4 h-4 text-teal-600" />
-                      </div>
-                    </button>
-                  </div>
-
-                  {/* Dedicated Full-Width GPS Diagnostic Status Bar */}
-                  <button
-                    type="button"
-                    onClick={() => setIsLocationModalOpen(true)}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50/70 hover:bg-slate-100/70 border border-slate-200/70 text-xs transition-colors cursor-pointer active:scale-[0.99] shadow-2xs"
-                    title="Klik untuk melihat peta radar lokasi GPS"
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${
-                          gpsHealth.status === 'READY'
-                            ? 'bg-emerald-500'
-                            : gpsHealth.status === 'INVALID'
-                            ? 'bg-rose-500'
-                            : 'bg-amber-500 animate-pulse'
-                        }`}
-                      />
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="text-[11px] font-medium text-slate-600 truncate">
-                        Status GPS: <strong className="text-slate-800 font-bold">{cleanGpsText}</strong>
-                      </span>
-                    </div>
-                    <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-teal-800 hover:text-teal-950 shrink-0 ml-2">
-                      <span>Radar Peta</span>
-                      <ChevronRight className="w-3 h-3" />
-                    </span>
-                  </button>
-                </section>
+                <GuruAttendanceHeroCard
+                  statusVariant={statusVariant}
+                  statusHeadline={statusHeadline}
+                  scheduleHint={scheduleHint}
+                  currentTimeLabel={currentTimeLabel}
+                  isOnline={isOnline}
+                  gpsStatus={gpsHealth.status}
+                  gpsText={cleanGpsText || 'Mengukur lokasi GPS'}
+                  onScanQr={handleOpenScannerClick}
+                  onBiometric={handleOpenBiometricModal}
+                  onLeave={handleOpenLeaveModal}
+                  onOpenLocation={() => setIsLocationModalOpen(true)}
+                  onOpenTeacherBoard={() => setIsTeacherBoardOpen(true)}
+                />
               );
             })()}
 
-            {/* 🌟 2. CARD RINGKASAN KEHADIRAN BULAN INI (ATTENDANCE THIS MONTH MODEL) ── */}
-            {(() => {
-              const hadirCount = attendanceHistory.filter((r) => r.status === 'HADIR').length;
-              const terlambatCount = attendanceHistory.filter((r) => r.status === 'TERLAMBAT').length;
-              const izinCount = attendanceHistory.filter((r) => r.status === 'IZIN' || r.status === 'SAKIT').length;
-              const alpaCount = attendanceHistory.filter((r) => r.status === 'ALFA').length;
-              const totalRecorded = hadirCount + terlambatCount + izinCount + alpaCount;
-              const totalHadir = hadirCount + terlambatCount;
+            {/* 2. Kisi Menu 8 Layanan Utama (4x2 Gaya Gojek) */}
+            <GuruQuickMenuGrid
+              menuIds={quickIconIds}
+              activeEmergenciesCount={activeEmergencies.length}
+              onSelectMenu={handleQuickIconClick}
+              onOpenCustomize={() => setIsCustomizeIconsModalOpen(true)}
+            />
 
-              // Perhitungan Cerdas Berbasis Hari Kerja Efektif (Smart Working Days Engine)
-              const workingDaysInfo = getMonthWorkingDays(selectedMonth, selectedYear, true, settings);
-              const totalMonthWorkingDays = Math.max(workingDaysInfo.totalMonthWorkingDays, 20);
-              const elapsedWorkingDays = workingDaysInfo.isCurrentMonth
-                ? Math.max(workingDaysInfo.elapsedWorkingDays, totalRecorded)
-                : totalMonthWorkingDays;
-              const remainingWorkingDays = Math.max(0, totalMonthWorkingDays - elapsedWorkingDays);
-
-              // 1. Kepatuhan Berjalan s.d. Hari Ini (Disiplin Terlaksana)
-              const complianceRate = elapsedWorkingDays > 0
-                ? Math.min(100, Math.round((totalHadir / elapsedWorkingDays) * 100))
-                : 100;
-
-              // 2. Akumulasi Terhadap Target Sebulan Penuh
-              const monthlyProgressRate = totalMonthWorkingDays > 0
-                ? Math.min(100, Math.round((totalHadir / totalMonthWorkingDays) * 100))
-                : 0;
-
-              const monthNames = [
-                'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-                'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-              ];
-              const monthLabel = `${monthNames[selectedMonth - 1] || 'Bulan Ini'} ${selectedYear}`;
-
-              return (
-                <section className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
-                  {/* Header: Title + Context Badge + Action Button */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-teal-50 border border-teal-200/80 text-teal-800 flex items-center justify-center shrink-0 shadow-2xs">
-                        <CalendarDays className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-                            Rekap Presensi
-                          </h4>
-                          <span className="text-[10px] sm:text-[11px] font-bold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200/70 shrink-0">
-                            {monthLabel}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsRecapModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-teal-900 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 px-3 py-1.5 rounded-xl transition-all cursor-pointer active:scale-95 shrink-0 shadow-2xs"
-                    >
-                      <span>Detail</span>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                    </button>
-                  </div>
-
-                  {/* Smart Attendance Performance Bar (Transparan & Cerdas) */}
-                  <div className="space-y-2 bg-slate-50/70 p-3 rounded-2xl border border-slate-200/70">
-                    <div className="flex items-center justify-between text-xs font-bold px-0.5 gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5 text-slate-700">
-                        <span className="text-slate-600">Kehadiran s.d. Hari Ini:</span>
-                        <strong className="text-teal-900 font-black text-sm">{complianceRate}%</strong>
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          ({totalHadir}/{elapsedWorkingDays} hari kerja berlalu)
-                        </span>
-                      </div>
-                      <div className="text-right ml-auto">
-                        <span className="text-[11px] font-bold text-slate-600">
-                          Target Sebulan: <strong className="text-teal-950 font-black">{totalHadir}/{totalMonthWorkingDays}</strong> Hari ({monthlyProgressRate}%)
-                        </span>
-                        {remainingWorkingDays > 0 && (
-                          <span className="text-[10px] text-slate-400 block font-normal">
-                            (Sisa {remainingWorkingDays} hari lagi)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Multi-segment Timeline Progress Bar terhadap Hari Kerja Sebulan Penuh */}
-                    <div className="space-y-1.5">
-                      <div className="h-2 w-full bg-slate-200/80 rounded-full overflow-hidden flex gap-0.5 p-0.5">
-                        {hadirCount > 0 && (
-                          <div
-                            style={{ width: `${(hadirCount / totalMonthWorkingDays) * 100}%` }}
-                            className="h-full bg-emerald-500 rounded-full transition-all"
-                            title={`Hadir Tepat Waktu: ${hadirCount} hari`}
-                          />
-                        )}
-                        {terlambatCount > 0 && (
-                          <div
-                            style={{ width: `${(terlambatCount / totalMonthWorkingDays) * 100}%` }}
-                            className="h-full bg-amber-500 rounded-full transition-all"
-                            title={`Terlambat: ${terlambatCount} hari`}
-                          />
-                        )}
-                        {izinCount > 0 && (
-                          <div
-                            style={{ width: `${(izinCount / totalMonthWorkingDays) * 100}%` }}
-                            className="h-full bg-sky-500 rounded-full transition-all"
-                            title={`Izin/Sakit: ${izinCount} hari`}
-                          />
-                        )}
-                        {alpaCount > 0 && (
-                          <div
-                            style={{ width: `${(alpaCount / totalMonthWorkingDays) * 100}%` }}
-                            className="h-full bg-rose-500 rounded-full transition-all"
-                            title={`Alpa: ${alpaCount} hari`}
-                          />
-                        )}
-                        {remainingWorkingDays > 0 && (
-                          <div
-                            style={{ width: `${(remainingWorkingDays / totalMonthWorkingDays) * 100}%` }}
-                            className="h-full bg-slate-300/60 rounded-full transition-all"
-                            title={`Sisa Hari Kerja: ${remainingWorkingDays} hari tersisa`}
-                          />
-                        )}
-                      </div>
-
-                      {/* Legend Timeline Ringkas & Rapi */}
-                      <div className="flex items-center justify-between text-[10px] text-slate-500 px-0.5 pt-0.5 flex-wrap gap-1">
-                        <span className="inline-flex items-center gap-1 font-medium">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                          <span>Hadir ({hadirCount})</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1 font-medium">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                          <span>Terlambat ({terlambatCount})</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1 font-medium">
-                          <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
-                          <span>Izin ({izinCount})</span>
-                        </span>
-                        {remainingWorkingDays > 0 && (
-                          <span className="inline-flex items-center gap-1 font-medium text-slate-400">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />
-                            <span>Sisa ({remainingWorkingDays})</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 4 Metric Cards (Bebas Truncation / Tidak Terpotong) */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-                    {/* Hadir */}
-                    <div
-                      onClick={() => setIsRecapModalOpen(true)}
-                      className="group bg-linear-to-b from-emerald-50/70 to-emerald-50/20 hover:from-emerald-50 hover:to-emerald-50/50 p-3 rounded-2xl border border-emerald-200/70 hover:border-emerald-300 transition-all cursor-pointer active:scale-[0.98] shadow-2xs text-center flex flex-col items-center justify-between"
-                    >
-                      <div className="w-7 h-7 rounded-xl bg-emerald-100/90 text-emerald-700 flex items-center justify-center shrink-0 shadow-2xs">
-                        <CheckCircle2 className="w-4 h-4" />
-                      </div>
-                      <div className="my-1">
-                        <p className="text-2xl sm:text-3xl font-black text-slate-900 leading-none font-mono tracking-tight group-hover:text-emerald-950 transition-colors">
-                          {hadirCount}
-                        </p>
-                      </div>
-                      <div className="space-y-0.5 text-center">
-                        <span className="text-xs font-bold text-slate-800 block leading-tight">Hadir</span>
-                        <span className="text-[9.5px] sm:text-[10px] font-semibold text-emerald-700 block leading-none">Tepat Waktu</span>
-                      </div>
-                    </div>
-
-                    {/* Terlambat */}
-                    <div
-                      onClick={() => setIsRecapModalOpen(true)}
-                      className="group bg-linear-to-b from-amber-50/70 to-amber-50/20 hover:from-amber-50 hover:to-amber-50/50 p-3 rounded-2xl border border-amber-200/70 hover:border-amber-300 transition-all cursor-pointer active:scale-[0.98] shadow-2xs text-center flex flex-col items-center justify-between"
-                    >
-                      <div className="w-7 h-7 rounded-xl bg-amber-100/90 text-amber-700 flex items-center justify-center shrink-0 shadow-2xs">
-                        <Clock className="w-4 h-4" />
-                      </div>
-                      <div className="my-1">
-                        <p className="text-2xl sm:text-3xl font-black text-slate-900 leading-none font-mono tracking-tight group-hover:text-amber-950 transition-colors">
-                          {terlambatCount}
-                        </p>
-                      </div>
-                      <div className="space-y-0.5 text-center">
-                        <span className="text-xs font-bold text-slate-800 block leading-tight">Terlambat</span>
-                        <span className="text-[9.5px] sm:text-[10px] font-semibold text-amber-700 block leading-none">&gt; 07:30 WIB</span>
-                      </div>
-                    </div>
-
-                    {/* Izin/Sakit */}
-                    <div
-                      onClick={() => setIsRecapModalOpen(true)}
-                      className="group bg-linear-to-b from-sky-50/70 to-sky-50/20 hover:from-sky-50 hover:to-sky-50/50 p-3 rounded-2xl border border-sky-200/70 hover:border-sky-300 transition-all cursor-pointer active:scale-[0.98] shadow-2xs text-center flex flex-col items-center justify-between"
-                    >
-                      <div className="w-7 h-7 rounded-xl bg-sky-100/90 text-sky-700 flex items-center justify-center shrink-0 shadow-2xs">
-                        <FileText className="w-4 h-4" />
-                      </div>
-                      <div className="my-1">
-                        <p className="text-2xl sm:text-3xl font-black text-slate-900 leading-none font-mono tracking-tight group-hover:text-sky-950 transition-colors">
-                          {izinCount}
-                        </p>
-                      </div>
-                      <div className="space-y-0.5 text-center">
-                        <span className="text-xs font-bold text-slate-800 block leading-tight">Izin / Sakit</span>
-                        <span className="text-[9.5px] sm:text-[10px] font-semibold text-sky-700 block leading-none">Surat Resmi</span>
-                      </div>
-                    </div>
-
-                    {/* Alpa */}
-                    <div
-                      onClick={() => setIsRecapModalOpen(true)}
-                      className={`group ${
-                        alpaCount > 0
-                          ? 'bg-linear-to-b from-rose-50/70 to-rose-50/20 hover:from-rose-50 border-rose-200/80 hover:border-rose-300'
-                          : 'bg-linear-to-b from-slate-50/70 to-slate-50/20 hover:from-slate-50 border-slate-200/80 hover:border-slate-300'
-                      } p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] shadow-2xs text-center flex flex-col items-center justify-between`}
-                    >
-                      <div
-                        className={`w-7 h-7 rounded-xl ${
-                          alpaCount > 0 ? 'bg-rose-100/90 text-rose-700' : 'bg-slate-200/70 text-slate-500'
-                        } flex items-center justify-center shrink-0 shadow-2xs`}
-                      >
-                        {alpaCount > 0 ? <AlertTriangle className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
-                      </div>
-                      <div className="my-1">
-                        <p
-                          className={`text-2xl sm:text-3xl font-black leading-none font-mono tracking-tight ${
-                            alpaCount > 0 ? 'text-rose-600' : 'text-slate-400'
-                          } transition-colors`}
-                        >
-                          {alpaCount}
-                        </p>
-                      </div>
-                      <div className="space-y-0.5 text-center">
-                        <span className="text-xs font-bold text-slate-800 block leading-tight">Alpa</span>
-                        <span
-                          className={`text-[9.5px] sm:text-[10px] font-semibold ${
-                            alpaCount > 0 ? 'text-rose-700' : 'text-slate-400'
-                          } block leading-none`}
-                        >
-                          Tanpa Ket.
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              );
-            })()}
-
-            {/* 🌟 2.5 CARD LENCANA PENGHARGAAN & APRESIASI KEPSEK (MONITORING PERFORMA DISIPLIN) ── */}
-            <section className="bg-white rounded-3xl p-3.5 sm:p-5 border border-slate-200/90 shadow-sm space-y-3">
-              {/* Header Card */}
-              <div className="flex items-center justify-between gap-2 px-0.5">
-                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <div className="w-8 h-8 rounded-xl bg-linear-to-br from-[#18536B] to-[#023246] text-amber-300 flex items-center justify-center text-sm shadow-2xs shrink-0">
-                    <Award className="w-4.5 h-4.5 text-amber-300" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-xs sm:text-sm font-black text-slate-800 leading-tight">
-                      Lencana Penghargaan &amp; Apresiasi Kepsek
-                    </h3>
-                    <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500 truncate mt-0.5">
-                      Monitoring performa disiplin internal sekolah
-                    </p>
-                  </div>
-                </div>
-
-                <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-bold rounded-lg bg-amber-50 text-amber-800 border border-amber-200/70 shrink-0">
-                  {activeMonthName} {selectedYear}
-                </span>
-              </div>
-
-              {/* 👑 Highlight Poin Paling Banyak */}
-              {disciplineLeaderboard?.topTeacher && disciplineLeaderboard.topTeacher.totalPoints > 0 ? (
-                <div
-                  onClick={() => setIsDisciplineBadgeModalOpen(true)}
-                  className="bg-linear-to-br from-amber-50 via-white to-amber-50/50 rounded-2xl p-3 sm:p-3.5 border border-amber-300/80 shadow-2xs hover:border-amber-400 transition-all cursor-pointer space-y-2 group"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-amber-900 text-[10px] sm:text-[11px] font-extrabold tracking-wide uppercase">
-                      <span className="text-sm">👑</span>
-                      <span>{isCurrentCalendarMonth ? 'Poin Terbanyak Bulan Berjalan' : `Poin Tertinggi Rekap ${activeMonthName}`}</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-amber-200/80 transition-colors shrink-0">
-                      <span>Rincian</span>
-                      <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 pt-0.5">
-                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
-                      <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-xs sm:text-sm shrink-0 border border-amber-300/60 shadow-xs overflow-hidden">
-                        <span>{disciplineLeaderboard.topTeacher.name ? disciplineLeaderboard.topTeacher.name.charAt(0) : 'G'}</span>
-                        {disciplineLeaderboard.topTeacher.avatar_url && (
-                          <img
-                            src={disciplineLeaderboard.topTeacher.avatar_url}
-                            alt={disciplineLeaderboard.topTeacher.name}
-                            className="absolute inset-0 w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4
-                          className="text-xs sm:text-sm font-black text-slate-900 leading-snug truncate group-hover:text-[#023246]"
-                          title={disciplineLeaderboard.topTeacher.name || 'Guru'}
-                        >
-                          {formatShortTeacherName(disciplineLeaderboard.topTeacher.name)}
-                        </h4>
-                        <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                          {disciplineLeaderboard.topTeacher.position || 'Guru Pengajar'}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <div className="flex items-end gap-0.5 h-3.5 w-6 bg-amber-100/80 p-0.5 rounded">
-                            {(() => {
-                              const onTime = disciplineLeaderboard.topTeacher.hadirTepatWaktuCount ?? 0;
-                              const h1 = Math.min(12, Math.max(3, Math.round((onTime / 7) * 10)));
-                              const h2 = Math.min(12, Math.max(4, Math.round((onTime / 7) * 12)));
-                              const h3 = Math.min(12, Math.max(3, Math.round((onTime / 7) * 9)));
-                              const h4 = Math.min(12, Math.max(5, Math.round((onTime / 7) * 11)));
-                              return (
-                                <>
-                                  <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h1}px` }} />
-                                  <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h2}px` }} />
-                                  <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h3}px` }} />
-                                  <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h4}px` }} />
-                                </>
-                              );
-                            })()}
-                          </div>
-                          <span className="text-[9px] font-bold text-amber-900">
-                            📊 {disciplineLeaderboard.topTeacher.hadirTepatWaktuCount ?? 0} Hari On-Time
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow-2xs flex items-center gap-1 justify-end">
-                        <span>⭐</span>
-                        <span>{disciplineLeaderboard.topTeacher.totalPoints} Poin</span>
-                      </div>
-                      <span className="text-[9px] sm:text-[10px] font-bold text-amber-800 block mt-0.5 sm:mt-1">
-                        Juara 1 🥇<span className="hidden sm:inline"> ({disciplineLeaderboard.topTeacher.hadirTepatWaktuCount ?? 0} Hari On-Time)</span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  onClick={() => setIsDisciplineBadgeModalOpen(true)}
-                  className="bg-linear-to-br from-slate-50 via-white to-slate-50/50 rounded-2xl p-3 sm:p-3.5 border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all cursor-pointer space-y-2 group"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-slate-700 text-[10px] sm:text-[11px] font-extrabold tracking-wide uppercase">
-                      <span className="text-sm">📊</span>
-                      <span>{isCurrentCalendarMonth ? 'Klasemen Bulan Berjalan' : `Rekap ${activeMonthName}`}</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-slate-200 transition-colors shrink-0">
-                      <span>Lihat Rincian</span>
-                      <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 pt-0.5">
-                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
-                      <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-bold text-base shrink-0 border border-slate-200 shadow-xs">
-                        <span>🏆</span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-800 leading-snug truncate">
-                          Belum Ada Peringkat Teratas
-                        </h4>
-                        <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                          Akumulasi poin kedisiplinan bulan ini sedang berlangsung
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold shadow-2xs flex items-center gap-1 justify-end">
-                        <span>⭐</span>
-                        <span>0 Poin</span>
-                      </div>
-                      <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 block mt-0.5 sm:mt-1">
-                        Klasemen Terbuka
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Ringkasan Performa Guru yang Login & Tombol Layer Penjelasan */}
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
-                <div className="min-w-0 flex-1">
-                  <span className="text-[9.5px] sm:text-[11px] text-slate-500 font-medium block">
-                    Performa Disiplin Anda:
-                  </span>
-                  <p className="text-[10.5px] sm:text-xs font-black text-slate-800 truncate">
-                    #{disciplineLeaderboard?.currentUserRank ?? 1} dari {disciplineLeaderboard?.totalTeachers ?? 12} Guru{' '}
-                    <span className="text-emerald-600 font-bold">({effectiveTotalPoints} Poin)</span>
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setIsPointHistoryModalOpen(true)}
-                    className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-amber-50 hover:bg-amber-100 active:scale-[0.98] border border-amber-200/80 text-[10.5px] sm:text-[11px] font-bold text-amber-950 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
-                    title="Lihat rincian riwayat perolehan poin Anda"
-                  >
-                    <span>⭐</span>
-                    <span>Riwayat Poin</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsDisciplineBadgeModalOpen(true)}
-                    className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200/80 text-[10.5px] sm:text-[11px] font-bold text-[#023246] flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
-                  >
-                    <span>Layer Penjelasan</span>
-                    <span className="text-cyan-800">→</span>
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            {/* 🌟 2.6 SUARA PENDIDIK & HASIL SURVEY GURU (100% ANONIM) ── */}
-            <GuruSurveyVoiceCard />
-
-            {/* 🌟 3. FITUR UTAMA GURU (8 IKON KUSTOM: 2 BARIS X 4 KOLOM) ─────────── */}
-            <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-3.5">
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                    Menu Utama
-                  </span>
-                  <span className="text-[10px] font-semibold text-slate-400">
-                    8 Layanan Pilihan
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCustomizeIconsModalOpen(true)}
-                  className="px-2 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-600 text-[10.5px] font-bold border border-slate-200/80 flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
-                  title="Atur Susunan 8 Ikon Menu Utama"
-                >
-                  <Settings2 className="w-3 h-3 text-slate-500" />
-                  <span>Atur Ikon</span>
-                </button>
-              </div>
-
-              {/* 8 Icon Grid: 2 Baris x 4 Kolom */}
-              <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
-                {quickIconIds.map((iconId) => {
-                  if (iconId === 'sarpras_inventory' && !isSarprasOfficer) return null;
-                  const item = ALL_QUICK_ICONS.find((i) => i.id === iconId) || ALL_QUICK_ICONS[0];
-                  const IconComponent = item.icon;
-                  const isExternal = false;
-
-                  // Engagement quest badge (+5 Poin / ✓ 5p)
-                  const questBadge = (() => {
-                    if (item.id === 'mood') {
-                      return hasFilledMoodToday
-                        ? { text: '✓ 5p', isDone: true }
-                        : { text: '+5 Poin', isDone: false };
-                    }
-                    if (item.id === 'complaint') {
-                      return hasSubmittedComplaintToday
-                        ? { text: '✓ 5p', isDone: true }
-                        : { text: '+5 Poin', isDone: false };
-                    }
-                    if (item.id === 'student_good') {
-                      return hasAwardedMeritToday
-                        ? { text: '✓ 5p', isDone: true }
-                        : { text: '+5 Poin', isDone: false };
-                    }
-                    if (item.id === 'student_discipline') {
-                      return hasRecordedDemeritToday
-                        ? { text: '✓ 5p', isDone: true }
-                        : { text: '+5 Poin', isDone: false };
-                    }
-                    return null;
-                  })();
-
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => handleQuickIconClick(item.id)}
-                      className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                      title={item.description}
-                    >
-                      <div
-                        className={`w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-linear-to-b ${item.colorClass} text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative`}
-                      >
-                        <IconComponent className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.8]" />
-                        {isExternal && (
-                          <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-amber-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
-                            Link
-                          </span>
-                        )}
-                        {item.id === 'emergency' && activeEmergencies.length > 0 && (
-                          <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-600 rounded-full animate-ping ring-2 ring-white" />
-                        )}
-                        {questBadge && (
-                          <span
-                            className={`absolute -top-1.5 -right-1.5 px-1 py-0.2 text-[8px] font-black rounded-full ring-1.5 ring-white shadow-2xs whitespace-nowrap ${
-                              questBadge.isDone
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-amber-400 text-slate-950'
-                            }`}
-                          >
-                            {questBadge.text}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                        {item.title}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Poin Karakter Siswa: Kebaikan & Kedisiplinan (Sinkron GradeMaster OS) */}
-              <div className="pt-2.5 pb-1 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-2 px-0.5">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-[11px] font-extrabold text-slate-800 tracking-tight truncate">
-                      Poin Karakter Siswa
-                    </span>
-                    <span className="px-1.5 py-0.2 text-[8px] font-black bg-emerald-100 text-emerald-800 rounded-md shrink-0">
-                      Live Sync
-                    </span>
-                  </div>
-                  <span className="text-[9px] font-semibold text-slate-400 shrink-0">
-                    GradeMaster OS
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (effectiveUser) {
-                        WebTrafficService.recordFeatureVisit({
-                          user_id: effectiveUser.id,
-                          user_name: effectiveUser.full_name,
-                          user_npp: effectiveUser.nip,
-                          user_role: effectiveUser.role,
-                          feature_id: 'student_good',
-                        });
-                      }
-                      setStudentBehaviorInitialTab('KEBAIKAN');
-                      setStudentBehaviorReturnTarget('HOME');
-                      setBerandaLayer('STUDENT_BEHAVIOR');
-                    }}
-                    className="p-2 sm:p-2.5 rounded-2xl bg-linear-to-r from-emerald-50 to-teal-50/70 hover:from-emerald-100/70 hover:to-teal-100/70 active:scale-[0.98] border border-emerald-200/80 flex items-center gap-2 transition-all cursor-pointer group shadow-2xs"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                      <Sparkles className="w-4 h-4 text-amber-300" />
-                    </div>
-                    <div className="text-left min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <p className="text-[11px] sm:text-xs font-black text-emerald-950 truncate leading-tight">
-                          + Poin Kebaikan
-                        </p>
-                        <span
-                          className={`px-1.5 py-0.2 text-[8.5px] font-black rounded-md border shrink-0 ${
-                            hasAwardedMeritToday
-                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                              : 'bg-amber-100 text-amber-900 border-amber-300'
-                          }`}
-                        >
-                          {hasAwardedMeritToday ? '✓ +5 Pts' : '+5 Poin'}
-                        </span>
-                      </div>
-                      <p className="text-[9px] sm:text-[10px] font-semibold text-emerald-700/90 truncate mt-0.5">
-                        Apresiasi &amp; Prestasi
-                      </p>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (effectiveUser) {
-                        WebTrafficService.recordFeatureVisit({
-                          user_id: effectiveUser.id,
-                          user_name: effectiveUser.full_name,
-                          user_npp: effectiveUser.nip,
-                          user_role: effectiveUser.role,
-                          feature_id: 'student_discipline',
-                        });
-                      }
-                      setStudentBehaviorInitialTab('KEDISIPLINAN');
-                      setStudentBehaviorReturnTarget('HOME');
-                      setBerandaLayer('STUDENT_BEHAVIOR');
-                    }}
-                    className="p-2 sm:p-2.5 rounded-2xl bg-linear-to-r from-rose-50 to-amber-50/60 hover:from-rose-100/70 hover:to-amber-100/70 active:scale-[0.98] border border-rose-200/80 flex items-center gap-2 transition-all cursor-pointer group shadow-2xs"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                      <AlertTriangle className="w-4 h-4 text-amber-200" />
-                    </div>
-                    <div className="text-left min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <p className="text-[11px] sm:text-xs font-black text-rose-950 truncate leading-tight">
-                          - Kedisiplinan
-                        </p>
-                        <span
-                          className={`px-1.5 py-0.2 text-[8.5px] font-black rounded-md border shrink-0 ${
-                            hasRecordedDemeritToday
-                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                              : 'bg-amber-100 text-amber-900 border-amber-300'
-                          }`}
-                        >
-                          {hasRecordedDemeritToday ? '✓ +5 Pts' : '+5 Poin'}
-                        </span>
-                      </div>
-                      <p className="text-[9px] sm:text-[10px] font-semibold text-rose-700/90 truncate mt-0.5">
-                        Pelanggaran Disiplin
-                      </p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* 🚨 Quick Emergency Call (SOS UKS / Piket) */}
-              <div className="pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsEmergencyModalOpen(true)}
-                  className="w-full p-2 sm:p-2.5 rounded-2xl bg-linear-to-r from-rose-50 to-red-50/70 hover:from-rose-100/80 hover:to-red-100/80 active:scale-[0.98] border border-rose-200/90 flex items-center justify-between transition-all cursor-pointer group shadow-2xs"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                      <ShieldAlert className="w-4 h-4 text-amber-300" />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-[11px] sm:text-xs font-black text-rose-950 truncate leading-tight">
-                          🚨 Panggilan Darurat Kelas (SOS)
-                        </p>
-                        {activeEmergencies.length > 0 && (
-                          <span className="px-1.5 py-0.2 text-[8px] font-black bg-rose-600 text-white rounded-full">
-                            {activeEmergencies.length} Aktif
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[9px] sm:text-[10px] font-semibold text-rose-700/90 truncate">
-                        Panggil Guru Piket &amp; UKS (Siswa pingsan / cedera)
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-extrabold text-rose-700 group-hover:text-rose-900 shrink-0 px-2 py-1 rounded-lg bg-white/80 border border-rose-200">
-                    Panggil SOS →
-                  </span>
-                </button>
-              </div>
-
-              {/* 🏷️ Akses Cepat Generator Kartu Peserta Ujian & Barcode Siswa */}
-              <div className="pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (effectiveUser) {
-                      WebTrafficService.recordFeatureVisit({
-                        user_id: effectiveUser.id,
-                        user_name: effectiveUser.full_name,
-                        user_npp: effectiveUser.nip,
-                        user_role: effectiveUser.role,
-                        feature_id: 'exam_card',
-                      });
-                    }
-                    setIsExamCardModalOpen(true);
-                  }}
-                  className="w-full p-2 sm:p-2.5 rounded-2xl bg-linear-to-r from-amber-50 to-orange-50/70 hover:from-amber-100/80 hover:to-orange-100/80 active:scale-[0.98] border border-amber-200/90 flex items-center justify-between transition-all cursor-pointer group shadow-2xs"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-linear-to-br from-amber-600 to-amber-700 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                      <QrCode className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-[11px] sm:text-xs font-black text-amber-950 truncate leading-tight">
-                          🏷️ Cetak Kartu Ujian &amp; Barcode Siswa
-                        </p>
-                        <span className="px-1.5 py-0.2 text-[8px] font-black bg-amber-500 text-white rounded-full">
-                          A4
-                        </span>
-                      </div>
-                      <p className="text-[9px] sm:text-[10px] font-semibold text-amber-800/90 truncate">
-                        Format 4 kartu/lembar A4 lengkap barcode NISN &amp; stempel
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-extrabold text-amber-800 group-hover:text-amber-950 shrink-0 px-2 py-1 rounded-lg bg-white/80 border border-amber-200">
-                    Buka →
-                  </span>
-                </button>
-              </div>
-
-              {/* 🎮 Platform Game PID (Pekan Inovasi Digital - Akses Langsung Guru) */}
-              <div className="pt-2 border-t border-slate-100">
-                <div className="rounded-2xl bg-linear-to-r from-violet-900 via-indigo-900 to-[#023246] p-3 sm:p-3.5 text-white shadow-xs border border-violet-700/40 space-y-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-violet-600/80 text-white flex items-center justify-center shrink-0 shadow-2xs border border-violet-400/30">
-                        <Gamepad2 className="w-5 h-5 text-amber-300" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-xs sm:text-sm font-black text-white truncate leading-tight">
-                            Platform Game PID
-                          </p>
-                          <span className="px-1.5 py-0.2 rounded-md bg-amber-400 text-slate-950 text-[8.5px] font-black uppercase tracking-wider shrink-0">
-                            3D Ready • PID
-                          </span>
-                        </div>
-                        <p className="text-[10px] sm:text-[10.5px] text-violet-200 truncate mt-0.5 font-medium">
-                          School Slice 3D &amp; wahana gamifikasi edukasi sekolah
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-0.5">
-                    {/* Tombol 1: Link Langsung ke Platform Game PID */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (typeof window !== 'undefined') {
-                          window.open(getGamePidPlatformUrl(), '_blank', 'noopener,noreferrer');
-                        }
-                      }}
-                      className="py-2 px-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 font-black text-[11px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs truncate"
-                      title="Buka platform game PID di tab baru"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">Buka Platform ↗</span>
-                    </button>
-
-                    {/* Tombol 2: Buka Ruang Wadah Game PID di Aplikasi (Non-Popup) */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setGamePidReturnTarget('HOME');
-                        setBerandaLayer('GAME_PID');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      className="py-2 px-2.5 rounded-xl bg-white/15 hover:bg-white/25 active:scale-[0.98] text-white border border-white/25 font-black text-[11px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs truncate"
-                      title="Lihat arena & mode game di SAGA (Non-Popup)"
-                    >
-                      <Gamepad2 className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-                      <span className="truncate">Ruang Game PID →</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Akses Cepat Ujian Lisan di Menu Utama (Siap Pakai sesuai Penugasan Admin - Non-Popup) */}
-              <div className="pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOralExamReturnTarget('HOME');
-                    setActiveTab('BERANDA');
-                    setBerandaLayer('ORAL_EXAM');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className={`w-full py-2.5 px-3.5 rounded-2xl active:scale-[0.98] border text-xs font-bold flex items-center justify-between transition-all cursor-pointer group ${
-                    guruOralAssignments.length > 0
-                      ? 'bg-emerald-50/90 hover:bg-emerald-100/80 border-emerald-200 text-emerald-950'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200/80 text-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-white ${
-                      guruOralAssignments.length > 0 ? 'bg-emerald-600' : 'bg-[#023246]'
-                    }`}>
-                      <Languages className="w-4 h-4" />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-extrabold text-xs">
-                          Penilaian Ujian Lisan (Bahasa &amp; BTQ)
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-white/90 border border-emerald-200 text-[9.5px] font-extrabold text-emerald-800 shrink-0">
-                          {getOralExamPeriodStatus().badgeText}
-                        </span>
-                      </div>
-                      <span className={`block truncate text-[10.5px] font-medium ${
-                        guruOralAssignments.length > 0 ? 'text-emerald-700' : 'text-slate-500'
-                      }`}>
-                        {guruOralAssignments.length > 0
-                          ? `Siap pakai: ${guruOralAssignments[0].roomNumber} (${guruOralAssignments[0].className === 'SMA' ? 'SMA' : `Kls ${guruOralAssignments[0].className}`}) • ${ORAL_EXAM_SCHEDULE_LABEL}`
-                          : `Lihat hasil nilai semua penguji • Jadwal: ${ORAL_EXAM_SCHEDULE_LABEL}`}
-                      </span>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 shrink-0 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
-                </button>
-              </div>
-
-              {/* Tulisan & Tombol More: Pindah Layer ke Semua Fitur */}
-              <div className="pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBerandaLayer('ALL_FEATURES');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="w-full py-2.5 px-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200/80 text-xs font-bold text-[#023246] flex items-center justify-between transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-6 h-6 rounded-lg bg-[#023246] text-white flex items-center justify-center shrink-0 shadow-2xs">
-                      <LayoutGrid className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="truncate">Lihat Semua Menu &amp; Layanan (More)</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-[11px] font-bold text-cyan-800 group-hover:text-[#023246] shrink-0">
-                    <span>More</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* 🌟 4. JADWAL MENGAJAR HARI INI ───────────────────────────────── */}
+            {/* 3. Jadwal Mengajar Hari Ini */}
             {(() => {
               const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
               const todayDayName = dayNames[new Date().getDay()];
@@ -4709,478 +3679,251 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 return slotDay === targetDayNum;
               });
 
-              let activeOrNextSlot = todaySlots.find((s) => {
-                const status = getSlotLiveStatus(s.time, currentTime);
-                return status === 'CURRENT';
-              });
+              let activeOrNextSlot = todaySlots.find((s) => getSlotLiveStatus(s.time, currentTime) === 'CURRENT');
               if (!activeOrNextSlot) {
-                activeOrNextSlot = todaySlots.find((s) => {
-                  const status = getSlotLiveStatus(s.time, currentTime);
-                  return status === 'NEXT';
-                });
+                activeOrNextSlot = todaySlots.find((s) => getSlotLiveStatus(s.time, currentTime) === 'NEXT');
               }
               if (!activeOrNextSlot) {
-                activeOrNextSlot = todaySlots.find((s) => {
-                  const status = getSlotLiveStatus(s.time, currentTime);
-                  return status === 'UPCOMING';
-                });
+                activeOrNextSlot = todaySlots.find((s) => getSlotLiveStatus(s.time, currentTime) === 'UPCOMING');
               }
               if (!activeOrNextSlot && todaySlots.length > 0) {
                 activeOrNextSlot = todaySlots[todaySlots.length - 1];
               }
 
               const slotStatus = activeOrNextSlot ? getSlotLiveStatus(activeOrNextSlot.time, currentTime) : null;
+              const otherDaysSummary = [
+                ...new Set(
+                  teachingSlots
+                    .map((s) => s.day || (s.day_of_week != null ? getDayNameIndonesian(s.day_of_week) : ''))
+                    .filter(Boolean)
+                ),
+              ].join(', ');
 
-              if (todaySlots.length === 0) {
-                const hasOtherDays = teachingSlots.length > 0;
-                const otherDaysList = [
-                  ...new Set(
-                    teachingSlots
-                      .map((s) => s.day || (s.day_of_week != null ? getDayNameIndonesian(s.day_of_week) : ''))
-                      .filter(Boolean)
-                  ),
-                ].join(', ');
-
-                return (
-                  <section className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-500 shrink-0">
-                        <Calendar className="w-5 h-5 text-[#023246]" />
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-slate-800 leading-tight">
-                          Tidak Ada Jadwal Mengajar Hari Ini
-                        </h4>
-                        {hasOtherDays ? (
-                          <p className="text-[11px] text-emerald-700 font-semibold truncate">
-                            Tersedia {teachingSlots.length} jadwal di hari lain ({otherDaysList})
-                          </p>
-                        ) : (
-                          <p className="text-[11px] text-slate-400 font-medium">
-                            Hari {todayDayName} (Belum ada jadwal terdaftar)
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsScheduleModalOpen(true)}
-                      className="text-xs font-bold text-[#023246] hover:underline shrink-0 px-2 py-1 cursor-pointer"
-                    >
-                      {hasOtherDays ? 'Lihat Jadwal →' : 'Jadwal Mingguan →'}
-                    </button>
-                  </section>
-                );
-              }
+              const activeSlotPreview = activeOrNextSlot
+                ? {
+                    subject: activeOrNextSlot.subject,
+                    className: activeOrNextSlot.className,
+                    timeText: `${
+                      activeOrNextSlot.start_time && activeOrNextSlot.end_time
+                        ? `${sanitizeTimeString(activeOrNextSlot.start_time)} - ${sanitizeTimeString(activeOrNextSlot.end_time)}`
+                        : activeOrNextSlot.time
+                        ? activeOrNextSlot.time
+                            .replace(' WIB', '')
+                            .split('-')
+                            .map((t) => sanitizeTimeString(t.trim()))
+                            .join(' - ')
+                        : '08:00 - 08:40'
+                    } WIB`,
+                    room: activeOrNextSlot.room || 'Kelas',
+                  }
+                : null;
 
               return (
-                <section className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                        Jadwal Mengajar Hari Ini
-                      </span>
-                      <span className="text-[11px] text-slate-400 font-medium">• {todayDayName}</span>
-                    </div>
-
-                    {slotStatus === 'CURRENT' ? (
-                      <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold rounded-full">
-                        Sedang Berlangsung
-                      </span>
-                    ) : slotStatus === 'NEXT' ? (
-                      <span className="px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold rounded-full">
-                        Berikutnya
-                      </span>
-                    ) : slotStatus === 'FINISHED' ? (
-                      <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-medium rounded-full">
-                        Selesai
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold rounded-full">
-                        Mendatang
-                      </span>
-                    )}
-                  </div>
-
-                  {activeOrNextSlot && (
-                    <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200/60 space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <h4 className="text-sm font-bold text-[#023246] truncate">
-                          {activeOrNextSlot.subject}
-                        </h4>
-                        <span className="px-2 py-0.5 bg-white text-slate-700 border border-slate-200 text-[11px] font-bold rounded-lg shrink-0">
-                          {activeOrNextSlot.className}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-slate-500 font-medium pt-0.5">
-                        <span className="flex items-center gap-1 font-mono font-semibold text-slate-700">
-                          ⏱️ {activeOrNextSlot.start_time && activeOrNextSlot.end_time
-                            ? `${sanitizeTimeString(activeOrNextSlot.start_time)} - ${sanitizeTimeString(activeOrNextSlot.end_time)}`
-                            : activeOrNextSlot.time
-                              ? activeOrNextSlot.time.replace(' WIB', '').split('-').map((t) => sanitizeTimeString(t.trim())).join(' - ')
-                              : '08:00 - 08:40'} WIB
-                        </span>
-                        <span>📍 {activeOrNextSlot.room || 'Kelas'}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="pt-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setIsScheduleModalOpen(true)}
-                      className="text-xs font-bold text-[#023246] hover:underline flex items-center justify-between w-full transition-colors cursor-pointer"
-                    >
-                      <span>
-                        {todaySlots.length > 1
-                          ? `Lihat semua jadwal hari ini (${todaySlots.length} mapel)`
-                          : 'Lihat jadwal mingguan'}
-                      </span>
-                      <span className="text-slate-400">›</span>
-                    </button>
-                  </div>
-                </section>
+                <GuruTodayScheduleCard
+                  todayDayName={todayDayName}
+                  totalTodaySlots={todaySlots.length}
+                  activeSlot={activeSlotPreview}
+                  slotStatus={slotStatus}
+                  hasOtherDays={teachingSlots.length > 0}
+                  otherDaysSummary={otherDaysSummary}
+                  onOpenSchedule={() => setIsScheduleModalOpen(true)}
+                />
               );
             })()}
 
-
-
-            {/* 🌟 5. CATATAN & AKTIVITAS UNTUK ANDA ──────────────────────────── */}
-            {(() => {
-              interface InfoItem {
-                id: string;
-                icon: React.ReactNode;
-                title: string;
-                description: string;
-                action: () => void;
-                badge?: string;
-                badgeColor?: string;
-              }
-
-              const items: InfoItem[] = [];
-
-              // 1. Guru Piket Hari Ini
-              if (isDutyTeacherToday) {
-                const dutyFellows = fellowDutyTeachers.length > 0
-                  ? ` (Rekan: ${fellowDutyTeachers.map((t) => t.teacher_name).join(', ')})`
-                  : '';
-                items.push({
-                  id: 'duty',
-                  icon: <Radio className="w-5 h-5 text-cyan-600 animate-pulse" />,
-                  title: 'Tugas Guru Piket Hari Ini',
-                  description: (todayDutyDetails?.notes || 'Bantu absensi kartu RFID siswa & ketertiban gerbang') + dutyFellows,
-                  action: () => setIsStudentKioskOpen(true),
-                  badge: 'Terminal RFID →',
-                  badgeColor: 'text-cyan-800 bg-cyan-50 border-cyan-300',
-                });
-
-                if (activeDutyLeavesToday.length > 0) {
-                  items.push({
-                    id: 'duty_leaves_task',
-                    icon: <span className="text-base">📋</span>,
-                    title: `Tugas Titipan: ${activeDutyLeavesToday.length} Guru Izin`,
-                    description: activeDutyLeavesToday
-                      .map(
-                        (l) =>
-                          `${l.teacher_name || l.user_name || 'Guru'}: ${
-                            l.duty_teacher_notes
-                              ? `"${l.duty_teacher_notes.slice(0, 35)}..."`
-                              : l.reason
-                          }`
-                      )
-                      .join(' • '),
-                    action: () => {
-                      const el = document.getElementById('duty-teacher-tasks-banner');
-                      if (el) el.scrollIntoView({ behavior: 'smooth' });
-                    },
-                    badge: 'Lihat Tugas →',
-                    badgeColor: 'text-amber-900 bg-amber-50 border-amber-300',
-                  });
-                }
-              }
-
-              // 2. Status Izin Aktif
-              if (userLeaves.length > 0) {
-                const latest = userLeaves[0];
-                const statusText =
-                  latest.approval_status === 'APPROVED'
-                    ? 'Disetujui'
-                    : latest.approval_status === 'REJECTED'
-                    ? 'Ditolak'
-                    : 'Menunggu Persetujuan';
-                items.push({
-                  id: 'leave_status',
-                  icon: <span className="text-base">📋</span>,
-                  title: `Status Izin: ${statusText}`,
-                  description: `${latest.leave_type} (${latest.start_date}) • ${latest.reason}`,
-                  action: () => {
-                    setActiveTab('RIWAYAT');
-                    setHistorySubTab('LEAVES');
-                  },
-                  badge: 'Detail Izin →',
-                  badgeColor:
-                    latest.approval_status === 'APPROVED'
-                      ? 'text-emerald-800 bg-emerald-50 border-emerald-300'
-                      : 'text-amber-800 bg-amber-50 border-amber-300',
-                });
-              }
-
-              // 3. Smart Alarm KBM & Piket
-              if (smartAlarmStatus.type !== 'NO_SCHEDULE') {
-                items.push({
-                  id: 'smart_alarm',
-                  icon: <span className="text-base">⏰</span>,
-                  title: 'Pengingat KBM & Kelas',
-                  description: smartAlarmStatus.message,
-                  action: () => {
-                    SoundService.playNotificationChime();
-                    if (smartAlarmStatus.speechText) {
-                      SpeechService.speak(smartAlarmStatus.speechText);
-                    }
-                    showToast('info', 'Alarm KBM', 'Suara pengingat berfungsi normal.');
-                  },
-                  badge: 'Tes Suara',
-                  badgeColor: 'text-blue-800 bg-blue-50 border-blue-300',
-                });
-              }
-
-              // 4. Pengumuman Sekolah Terbaru
-              if (notifications.length > 0) {
-                items.push({
-                  id: 'announcement',
-                  icon: <span className="text-base">📢</span>,
-                  title: notifications[0].title,
-                  description: notifications[0].message,
-                  action: () => setIsAnnouncementModalOpen(true),
-                  badge: 'Buka Warta',
-                  badgeColor: 'text-indigo-800 bg-indigo-50 border-indigo-300',
-                });
-              }
-
-              // 5. Poin Apresiasi Dedikasi
-              items.push({
-                id: 'appreciation',
-                icon: <span className="text-base">⭐</span>,
-                title: `Poin Apresiasi: ${effectiveTotalPoints} Poin`,
-                description: `${appreciationScore.level} • Dedikasi pengajar bulan ini`,
-                action: () => setIsDisciplineBadgeModalOpen(true),
-                badge: 'Peringkat & Layer →',
-                badgeColor: 'text-amber-800 bg-amber-50 border-amber-300',
-              });
-
-              // 6. Lokasi & Peta GPS
-              const rawAllowed = getEffectiveAllowedRadius(settings.geofence_radius);
-              const effectiveAllowedRadius = (typeof navigator !== 'undefined' && !navigator.onLine)
-                ? Math.max(rawAllowed, 500)
-                : rawAllowed;
-              const coordsAccuracy = userCoords?.accuracy ? ` (±${Math.round(userCoords.accuracy)}m)` : '';
-              items.push({
-                id: 'location',
-                icon: <span className="text-base">📍</span>,
-                title: 'Peta & Geofence Sekolah',
-                description: `Radius izin: ${effectiveAllowedRadius}m • GPS: ${gpsHealth.text.replace('📍 ', '')}${coordsAccuracy}`,
-                action: () => setIsLocationModalOpen(true),
-                badge: 'Lihat Peta',
-                badgeColor: 'text-slate-700 bg-slate-100 border-slate-300',
-              });
-
-              const visibleItems = isInfoExpanded ? items : items.slice(0, 2);
-
-              return (
-                <section className="space-y-2">
-                  <div className="flex items-center justify-between px-0.5">
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      Catatan &amp; Aktivitas
-                    </h3>
-                    <span className="text-[11px] text-slate-400 font-medium">
-                      {items.length} Info
-                    </span>
-                  </div>
-
-                  <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
-                    {visibleItems.map((item, idx) => (
-                      <div
-                        key={item.id}
-                        onClick={item.action}
-                        className={`p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${
-                          idx > 0 ? 'border-t border-slate-100' : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-2xl bg-slate-50 border border-slate-200/60 flex items-center justify-center text-base shrink-0">
-                            {item.icon}
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-bold text-slate-800 leading-tight truncate">
-                              {item.title}
-                            </h4>
-                            <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                              {item.description}
-                            </p>
-                          </div>
-                        </div>
-                        {item.badge ? (
-                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border shrink-0 ${item.badgeColor}`}>
-                            {item.badge}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 font-bold text-sm shrink-0">›</span>
-                        )}
-                      </div>
-                    ))}
-
-                    {items.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={() => setIsInfoExpanded(!isInfoExpanded)}
-                        className="w-full py-2.5 px-4 text-xs font-bold text-[#023246] hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer flex items-center justify-center gap-1 border-t border-slate-100"
-                      >
-                        <span>{isInfoExpanded ? 'Tampilkan Lebih Sedikit ▴' : `Lihat Semua Catatan (${items.length}) ▾`}</span>
-                      </button>
-                    )}
-                  </div>
-                </section>
-              );
-            })()}
+            {/* 4. Koordinator Prioritas 1-Banner */}
+            {activeHomeBannerNode}
           </>
         )}
 
-        {/* ── LAYER: SEMUA FITUR GURU (PINDAH LAYER, BUKAN CARD / POPUP) ─── */}
+        {/* ── TAB ADMIN: ADMINISTRASI & KARYA GURU ─────────────────────────── */}
+        {activeTab === 'ADMIN' && (
+          <GuruAdminHubTabView
+            oralExamBadgeText={getOralExamPeriodStatus().badgeText}
+            oralExamSubtitle={
+              guruOralAssignments.length > 0
+                ? `${guruOralAssignments[0].roomNumber} (${
+                    guruOralAssignments[0].className === 'SMA' ? 'SMA' : `Kls ${guruOralAssignments[0].className}`
+                  }) • ${ORAL_EXAM_SCHEDULE_LABEL}`
+                : `Nilai penguji • ${ORAL_EXAM_SCHEDULE_LABEL}`
+            }
+            isSarprasOfficer={isSarprasOfficer}
+            activeEmergenciesCount={activeEmergencies.length}
+            streakDays={streakInfo?.currentStreak ?? 0}
+            userPoints={effectiveTotalPoints}
+            userRank={disciplineLeaderboard?.currentUserRank ?? 1}
+            activeAssignmentSection={activeAssignmentCardsNode}
+            onOpenAdministration={() => setIsAdministrationModalOpen(true)}
+            onOpenOralExam={() => {
+              setOralExamReturnTarget('HOME');
+              setActiveTab('BERANDA');
+              setBerandaLayer('ORAL_EXAM');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenExamCreator={() => handleQuickIconClick('buat_soal_ai')}
+            onOpenQuestionCorrection={() => handleQuickIconClick('koreksi_soal')}
+            onOpenExamCard={() => handleQuickIconClick('exam_card')}
+            onOpenSchedule={() => setIsScheduleModalOpen(true)}
+            onOpenMaterials={() => setIsTeachingMaterialsModalOpen(true)}
+            onOpenNotulen={() => handleQuickIconClick('notulen')}
+            onOpenBimtek={() => handleQuickIconClick('bimtek')}
+            onOpenCalendar={() => setIsEventsCalendarModalOpen(true)}
+            onOpenHomeroom={() => handleQuickIconClick('homeroom_plan')}
+            onOpenStudents={() => setIsStudentDirectoryModalOpen(true)}
+            onOpenClassroom={() => setIsClassroomModalOpen(true)}
+            onOpenStudentBehavior={(tab) =>
+              handleQuickIconClick(tab === 'KEBAIKAN' ? 'student_good' : 'student_discipline')
+            }
+            onOpenCounseling={() => handleQuickIconClick('counseling_bk')}
+            onOpenTeacherBoard={() => setIsTeacherBoardOpen(true)}
+            onOpenChallenge={() => {
+              setActiveTab('BERANDA');
+              setBerandaLayer('CHALLENGE');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenLeaderboard={() => setIsDisciplineBadgeModalOpen(true)}
+            onOpenSurveyAnalytics={() => {
+              setSurveyAnalyticsReturnTarget('ADMIN');
+              setActiveTab('BERANDA');
+              setBerandaLayer('SURVEY_ANALYTICS');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenRfidKiosk={() => setIsStudentKioskOpen(true)}
+            onOpenGamePid={() => handleQuickIconClick('game_pid')}
+            onOpenSarpras={() => setIsSarprasModalOpen(true)}
+            onOpenEmergency={() => setIsEmergencyModalOpen(true)}
+          />
+        )}
+
+        {/* ── LAYER: SEMUA FITUR GURU (PENGGANTI POPUP) ───────────────────── */}
         {activeTab === 'BERANDA' && berandaLayer === 'ALL_FEATURES' && (
-          <section className="space-y-3.5">
-            {/* Top Navigation Bar: Tombol Kembali ke Beranda */}
-            <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-slate-200/90 shadow-sm flex items-center justify-between gap-3">
+          <section className="space-y-4">
+            {/* Top Navigation Bar */}
+            <div className="bg-white rounded-2xl p-3.5 border border-slate-200 flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => {
                   setBerandaLayer('HOME');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200 text-xs font-bold text-[#023246] transition-all cursor-pointer"
+                className="min-h-11 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-bold text-[#0F172A] transition-colors cursor-pointer"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-4 h-4 shrink-0" />
                 <span>Kembali ke Beranda</span>
               </button>
-              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
-                Layer Semua Fitur
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Semua Layanan
               </span>
             </div>
 
             {/* Banner Header Layer */}
-            <div className="bg-linear-to-r from-[#023246] to-[#18536B] rounded-3xl p-4 sm:p-5 text-white shadow-sm flex items-center justify-between gap-3">
+            <div className="bg-[#0D5C46] rounded-2xl p-4 sm:p-5 text-white flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm sm:text-base font-black">Semua Menu &amp; Fitur Guru</h2>
-                <p className="text-[11px] sm:text-xs text-cyan-100/90 mt-0.5 font-medium">
-                  Akses modul operasional presensi, akademik KBM, dan layanan sekolah
+                <h2 className="text-base font-bold">Semua Menu &amp; Fitur Guru</h2>
+                <p className="text-xs text-emerald-100 mt-0.5 font-medium">
+                  Akses modul presensi, akademik KBM, dan layanan administrasi sekolah
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white shrink-0">
-                <LayoutGrid className="w-5 h-5" />
+              <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                <SagaMoreAppsIcon tone="dark" className="w-6 h-6" />
               </div>
             </div>
 
-            {/* Grid Lengkap Seluruh Fitur Guru dengan Icon Blue Squircle */}
-            <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-6">
+            {/* Grid Lengkap Seluruh Fitur Guru (Wadah Putih Bersih + Doodle Berwarna) */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-6">
               {/* Kategori 1: Presensi & Absensi */}
               <div className="space-y-3">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider px-0.5">
                   Presensi &amp; Absensi
                 </h3>
                 <div className="grid grid-cols-4 gap-y-4 gap-x-2">
-                  {/* Absen Sekarang */}
                   <button
                     type="button"
                     onClick={handleOpenAttendanceChoice}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <Fingerprint className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaFingerprintIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Presensi
                     </span>
                   </button>
 
-                  {/* Sidik Jari HP */}
                   <button
                     type="button"
                     onClick={handleOpenBiometricModal}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <Fingerprint className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaFingerprintIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Sidik Jari
                     </span>
                   </button>
 
-                  {/* Scan Barcode QR */}
                   <button
                     type="button"
                     onClick={handleOpenScannerClick}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <QrCode className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaScanQrIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Scan QR
                     </span>
                   </button>
 
-                  {/* Izin & Cuti */}
                   <button
                     type="button"
                     onClick={handleOpenLeaveModal}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <Clock className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaLeavePermitIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Izin Cuti
                     </span>
                   </button>
 
-                  {/* Koreksi Absen */}
                   <button
                     type="button"
                     onClick={() => handleOpenCorrectionModal()}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <FileEdit className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaEditPencilIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Koreksi Absen
                     </span>
                   </button>
 
-                  {/* Rekap Presensi */}
                   <button
                     type="button"
                     onClick={() => setIsRecapModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <BarChart3 className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaHistoryIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Rekap
                     </span>
                   </button>
 
-                  {/* Peta Lokasi GPS */}
                   <button
                     type="button"
                     onClick={() => setIsLocationModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <MapPin className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaMapPinIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Lokasi GPS
                     </span>
                   </button>
@@ -5188,199 +3931,173 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </div>
 
               {/* Kategori 2: Akademik & KBM */}
-              <div className="space-y-3 pt-2 border-t border-slate-100">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+              <div className="space-y-3 pt-4 border-t border-slate-100">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider px-0.5">
                   Akademik &amp; KBM
                 </h3>
                 <div className="grid grid-cols-4 gap-y-4 gap-x-2">
-                  {/* Jadwal KBM */}
                   <button
                     type="button"
                     onClick={() => setIsScheduleModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <Calendar className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaScheduleIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Jadwal
                     </span>
                   </button>
 
-                  {/* Ruang Kelas & Rombel */}
                   <button
                     type="button"
                     onClick={() => setIsClassroomModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <School className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaClassroomIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Kelas
                     </span>
                   </button>
 
-                  {/* Direktori Siswa & RFID */}
                   <button
                     type="button"
                     onClick={() => setIsStudentDirectoryModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <GraduationCap className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0 relative">
+                      <SagaStudentsIcon className="w-8 h-8" />
                       {isDutyTeacherToday && (
-                        <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-cyan-500 text-white rounded-full min-w-3 text-center ring-2 ring-white">
+                        <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[9px] font-bold bg-[#0D5C46] text-white rounded-full ring-2 ring-white">
                           RFID
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Siswa
                     </span>
                   </button>
 
-                  {/* Ruang Wali Kelas (Rencana Studi Kelas 9) */}
                   <button
                     type="button"
-                    onClick={() => {
-                      if (effectiveUser) {
-                        WebTrafficService.recordFeatureVisit({
-                          user_id: effectiveUser.id,
-                          user_name: effectiveUser.full_name,
-                          user_npp: effectiveUser.nip,
-                          user_role: effectiveUser.role,
-                          feature_id: 'homeroom_plan',
-                        });
-                      }
-                      setIsHomeroomModalOpen(true);
-                    }}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                    title="Ruang Wali Kelas: Rencana Studi Siswa"
+                    onClick={() => handleQuickIconClick('homeroom_plan')}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-purple-700 to-indigo-900 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <GraduationCap className="w-6 h-6 stroke-[1.8] text-purple-200" />
-                      <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-purple-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0 relative">
+                      <SagaHomeroomIcon className="w-8 h-8" />
+                      <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[9px] font-bold bg-[#0D5C46] text-white rounded-full ring-2 ring-white">
                         Kls 9
                       </span>
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-purple-800 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Wali Kelas
                     </span>
                   </button>
 
-                  {/* Bahan Ajar KBM */}
                   <button
                     type="button"
-                    onClick={() => setIsTeachingMaterialsModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    onClick={() => handleQuickIconClick('buat_soal_ai')}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <BookOpen className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaCreateExamIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Materi
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
+                      Buat Soal
                     </span>
                   </button>
 
-                  {/* Kalender Acara */}
                   <button
                     type="button"
-                    onClick={() => setIsEventsCalendarModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    onClick={() => handleQuickIconClick('koreksi_soal')}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <CalendarRange className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaGradingIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Acara
-                    </span>
-                  </button>
-
-                  {/* Notulen Rapat AI */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (effectiveUser) {
-                        WebTrafficService.recordFeatureVisit({
-                          user_id: effectiveUser.id,
-                          user_name: effectiveUser.full_name,
-                          user_npp: effectiveUser.nip,
-                          user_role: effectiveUser.role,
-                          feature_id: 'notulen',
-                        });
-                      }
-                      setNotulenReturnTarget('ALL_FEATURES');
-                      setBerandaLayer('NOTULEN');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                    title="Notulen Rapat AI & Arsip Risalah Sekolah"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <NotebookPen className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Notulen
-                    </span>
-                  </button>
-
-                  {/* Koreksi Soal & Input Nilai (In-App) */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (effectiveUser) {
-                        WebTrafficService.recordFeatureVisit({
-                          user_id: effectiveUser.id,
-                          user_name: effectiveUser.full_name,
-                          user_npp: effectiveUser.nip,
-                          user_role: effectiveUser.role,
-                          feature_id: 'koreksi_soal',
-                        });
-                      }
-                      setIsQuestionCorrectionModalOpen(true);
-                    }}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                    title="Koreksi Soal & Input Nilai"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <ClipboardCheck className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Koreksi Soal
                     </span>
                   </button>
 
-                  {/* Cetak Kartu Peserta Ujian & Barcode Siswa */}
+                  <button
+                    type="button"
+                    onClick={() => setIsTeachingMaterialsModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaBookMaterialIcon className="w-8 h-8" />
+                    </div>
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
+                      Materi
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsEventsCalendarModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaCalendarAgendaIcon className="w-8 h-8" />
+                    </div>
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
+                      Acara
+                    </span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {
-                      if (effectiveUser) {
-                        WebTrafficService.recordFeatureVisit({
-                          user_id: effectiveUser.id,
-                          user_name: effectiveUser.full_name,
-                          user_npp: effectiveUser.nip,
-                          user_role: effectiveUser.role,
-                          feature_id: 'exam_card',
-                        });
-                      }
-                      setIsExamCardModalOpen(true);
+                      setNotulenReturnTarget('ALL_FEATURES');
+                      setBerandaLayer('NOTULEN');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                    title="Cetak Kartu Peserta Ujian & Barcode Siswa (A4)"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-amber-600 to-yellow-800 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <QrCode className="w-6 h-6 stroke-[1.8]" />
-                      <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-amber-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaNotulenIcon className="w-8 h-8" />
+                    </div>
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
+                      Notulen
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBimtekReturnTarget('ALL_FEATURES');
+                      setBerandaLayer('BIMTEK');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaBimtekIcon className="w-8 h-8" />
+                    </div>
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
+                      Bimtek
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickIconClick('exam_card')}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0 relative">
+                      <SagaExamCardIcon className="w-8 h-8" />
+                      <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[9px] font-bold bg-amber-500 text-white rounded-full ring-2 ring-white">
                         A4
                       </span>
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-amber-800 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Kartu Ujian
                     </span>
                   </button>
 
-                  {/* Penilaian Ujian Lisan (Bahasa & BTQ - Non-Popup Siap Pakai) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -5389,54 +4106,38 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       setBerandaLayer('ORAL_EXAM');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                     title={`Penilaian Ujian Lisan Bahasa & BTQ (${ORAL_EXAM_SCHEDULE_LABEL})`}
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-emerald-700 to-teal-900 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <Languages className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0 relative">
+                      <SagaOralExamIcon className="w-8 h-8" />
                       {guruOralAssignments.length > 0 && (
-                        <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-emerald-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
+                        <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[9px] font-bold bg-[#0D5C46] text-white rounded-full ring-2 ring-white">
                           Tugas
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-emerald-800 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Ujian Lisan
                     </span>
                   </button>
 
-                  {/* Game PID (Arena Gamifikasi & Kuis Edukasi) */}
                   <button
                     type="button"
-                    onClick={() => {
-                      if (effectiveUser) {
-                        WebTrafficService.recordFeatureVisit({
-                          user_id: effectiveUser.id,
-                          user_name: effectiveUser.full_name,
-                          user_npp: effectiveUser.nip,
-                          user_role: effectiveUser.role,
-                          feature_id: 'game_pid',
-                        });
-                      }
-                      setGamePidReturnTarget('ALL_FEATURES');
-                      setBerandaLayer('GAME_PID');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                    title="Game PID: Arena Permainan Edukasi Digital"
+                    onClick={() => handleQuickIconClick('game_pid')}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-violet-600 to-indigo-800 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <Gamepad2 className="w-6 h-6 stroke-[1.8]" />
-                      <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-amber-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0 relative">
+                      <SagaGamePidIcon className="w-8 h-8" />
+                      <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[9px] font-bold bg-amber-400 text-slate-950 rounded-full ring-2 ring-white">
                         Baru
                       </span>
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-violet-800 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Game PID
                     </span>
                   </button>
 
-                  {/* Poin Kebaikan Siswa */}
                   <button
                     type="button"
                     onClick={() => {
@@ -5444,26 +4145,25 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       setStudentBehaviorReturnTarget('ALL_FEATURES');
                       setBerandaLayer('STUDENT_BEHAVIOR');
                     }}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <Sparkles className="w-6 h-6 stroke-[1.8] text-amber-300" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0 relative">
+                      <SagaCheckBadgeIcon className="w-8 h-8" />
                       <span
-                        className={`absolute -top-1.5 -right-1.5 px-1 py-0.2 text-[8px] font-black rounded-full ring-1.5 ring-white shadow-2xs whitespace-nowrap ${
+                        className={`absolute -top-1.5 -right-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded-full ring-2 ring-white whitespace-nowrap ${
                           hasAwardedMeritToday
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-amber-400 text-slate-950'
+                            ? 'bg-[#0D5C46] text-white'
+                            : 'bg-amber-300 text-slate-950'
                         }`}
                       >
-                        {hasAwardedMeritToday ? '✓ 5p' : '+5 Poin'}
+                        {hasAwardedMeritToday ? 'Selesai' : '+5 Poin'}
                       </span>
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-emerald-700 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Poin Kebaikan
                     </span>
                   </button>
 
-                  {/* Poin Kedisiplinan Siswa */}
                   <button
                     type="button"
                     onClick={() => {
@@ -5471,67 +4171,51 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       setStudentBehaviorReturnTarget('ALL_FEATURES');
                       setBerandaLayer('STUDENT_BEHAVIOR');
                     }}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-rose-600 to-red-700 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <AlertTriangle className="w-6 h-6 stroke-[1.8] text-amber-200" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0 relative">
+                      <SagaEmergencySosIcon className="w-8 h-8" />
                       <span
-                        className={`absolute -top-1.5 -right-1.5 px-1 py-0.2 text-[8px] font-black rounded-full ring-1.5 ring-white shadow-2xs whitespace-nowrap ${
+                        className={`absolute -top-1.5 -right-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded-full ring-2 ring-white whitespace-nowrap ${
                           hasRecordedDemeritToday
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-amber-400 text-slate-950'
+                            ? 'bg-[#0D5C46] text-white'
+                            : 'bg-amber-300 text-slate-950'
                         }`}
                       >
-                        {hasRecordedDemeritToday ? '✓ 5p' : '+5 Poin'}
+                        {hasRecordedDemeritToday ? 'Selesai' : '+5 Poin'}
                       </span>
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-rose-700 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Kedisiplinan
                     </span>
                   </button>
 
-                  {/* Catatan Bimbingan Konseling (BK) */}
                   <button
                     type="button"
-                    onClick={() => {
-                      if (effectiveUser) {
-                        WebTrafficService.recordFeatureVisit({
-                          user_id: effectiveUser.id,
-                          user_name: effectiveUser.full_name,
-                          user_npp: effectiveUser.nip,
-                          user_role: effectiveUser.role,
-                          feature_id: 'counseling_bk',
-                        });
-                      }
-                      setCounselingReturnTarget('ALL_FEATURES');
-                      setBerandaLayer('COUNSELING_BK');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                    title="Catatan Bimbingan Konseling (BK) & Nawasena Sync"
+                    onClick={() => handleQuickIconClick('counseling_bk')}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-emerald-700 to-teal-900 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <HeartHandshake className="w-6 h-6 stroke-[1.8] text-emerald-200" />
-                      <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-blue-500 text-white rounded-full min-w-3 text-center ring-2 ring-white">
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0 relative">
+                      <SagaCounselingIcon className="w-8 h-8" />
+                      <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[9px] font-bold bg-blue-700 text-white rounded-full ring-2 ring-white">
                         BK
                       </span>
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-emerald-800 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Catatan BK
                     </span>
                   </button>
 
-                  {/* Terminal RFID Siswa (Jika Piket Aktif) */}
                   {isDutyTeacherToday && (
                     <button
                       type="button"
                       onClick={() => setIsStudentKioskOpen(true)}
-                      className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                      className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                     >
-                      <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                        <Radio className="w-6 h-6 stroke-[1.8] text-cyan-300" />
+                      <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                        <SagaRfidKioskIcon className="w-8 h-8" />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                         Kiosk RFID
                       </span>
                     </button>
@@ -5540,147 +4224,139 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </div>
 
               {/* Kategori 3: Layanan & Pengaturan */}
-              <div className="space-y-3 pt-2 border-t border-slate-100">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+              <div className="space-y-3 pt-4 border-t border-slate-100">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider px-0.5">
                   Layanan &amp; Pengaturan
                 </h3>
                 <div className="grid grid-cols-4 gap-y-4 gap-x-2">
-                  {/* Panggilan Darurat Kelas (SOS UKS & Piket) */}
                   <button
                     type="button"
                     onClick={() => setIsEmergencyModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-rose-600 to-red-700 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <ShieldAlert className="w-6 h-6 stroke-[1.8] text-amber-300" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0 relative">
+                      <SagaEmergencySosIcon className="w-8 h-8" />
                       {activeEmergencies.length > 0 && (
-                        <span className="absolute -top-1 -right-1 px-1.5 py-0.2 text-[8px] font-black bg-white text-rose-700 rounded-full min-w-3 text-center ring-2 ring-rose-600 animate-bounce">
+                        <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[9px] font-bold bg-[#DC2626] text-white rounded-full ring-2 ring-white">
                           {activeEmergencies.length}
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-rose-700 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       SOS Kelas
                     </span>
                   </button>
 
-                  {/* Pengumuman */}
                   <button
                     type="button"
                     onClick={() => setIsAnnouncementModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <Megaphone className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0 relative">
+                      <SagaBellIcon className="w-8 h-8" />
                       {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 px-1.5 py-0.2 text-[8px] font-black bg-red-600 text-white rounded-full min-w-3.5 text-center ring-2 ring-white">
+                        <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[9px] font-bold bg-[#DC2626] text-white rounded-full ring-2 ring-white">
                           {unreadCount}
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Pengumuman
                     </span>
                   </button>
 
-                  {/* Kotak Aspirasi Guru */}
                   <button
                     type="button"
                     onClick={() => setIsComplaintModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <MessageSquare className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0 relative">
+                      <SagaAspirationIcon className="w-8 h-8" />
                       <span
-                        className={`absolute -top-1.5 -right-1.5 px-1 py-0.2 text-[8px] font-black rounded-full ring-1.5 ring-white shadow-2xs whitespace-nowrap ${
+                        className={`absolute -top-1.5 -right-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded-full ring-2 ring-white whitespace-nowrap ${
                           hasSubmittedComplaintToday
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-amber-400 text-slate-950'
+                            ? 'bg-[#0D5C46] text-white'
+                            : 'bg-amber-300 text-slate-950'
                         }`}
                       >
-                        {hasSubmittedComplaintToday ? '✓ 5p' : '+5 Poin'}
+                        {hasSubmittedComplaintToday ? 'Selesai' : '+5 Poin'}
                       </span>
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Aspirasi
                     </span>
                   </button>
 
-                  {/* Mood Harian */}
                   <button
                     type="button"
                     onClick={() => setIsMoodModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <Smile className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0 relative">
+                      <SagaMoodFaceIcon mood="VERY_HAPPY" className="w-8 h-8" />
                       <span
-                        className={`absolute -top-1.5 -right-1.5 px-1 py-0.2 text-[8px] font-black rounded-full ring-1.5 ring-white shadow-2xs whitespace-nowrap ${
+                        className={`absolute -top-1.5 -right-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded-full ring-2 ring-white whitespace-nowrap ${
                           hasFilledMoodToday
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-amber-400 text-slate-950'
+                            ? 'bg-[#0D5C46] text-white'
+                            : 'bg-amber-300 text-slate-950'
                         }`}
                       >
-                        {hasFilledMoodToday ? '✓ 5p' : '+5 Poin'}
+                        {hasFilledMoodToday ? 'Selesai' : '+5 Poin'}
                       </span>
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Mood
                     </span>
                   </button>
 
-                  {/* Ubah PIN */}
                   <button
                     type="button"
                     onClick={() => setIsChangePinOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <Lock className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaKeyPinIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Ubah PIN
                     </span>
                   </button>
 
-                  {/* Aturan & SK */}
                   <button
                     type="button"
                     onClick={() => setIsTermsModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <FileText className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaBookMaterialIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Aturan
                     </span>
                   </button>
 
-                  {/* Ekspor Laporan */}
                   <button
                     type="button"
                     onClick={() => setIsExportModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <FileSpreadsheet className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaPrinterIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Ekspor
                     </span>
                   </button>
 
-                  {/* Tentang Aplikasi */}
                   <button
                     type="button"
                     onClick={() => handleOpenAboutLayer('ALL_FEATURES')}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <Info className="w-6 h-6 stroke-[1.8]" />
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center group-active:scale-95 transition-transform shrink-0">
+                      <SagaInfoCircleIcon className="w-8 h-8" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    <span className="text-xs font-semibold text-[#0F172A] mt-1.5 leading-tight text-center line-clamp-2 w-full">
                       Tentang
                     </span>
                   </button>
@@ -5695,52 +4371,48 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 setBerandaLayer('HOME');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-50 active:scale-98 border border-slate-200/90 shadow-xs text-xs font-bold text-[#023246] flex items-center justify-center gap-2 transition-all cursor-pointer min-h-12"
+              className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-[#0F172A] flex items-center justify-center gap-2 transition-colors cursor-pointer min-h-12"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 shrink-0" />
               <span>Kembali ke Beranda Utama</span>
             </button>
           </section>
         )}
 
-        {/* ── LAYER: TANTANGAN DISIPLIN & MISI LENGKAP (PINDAH LAYER BESAR & LENGKAP) ─── */}
+        {/* ── LAYER: TANTANGAN DISIPLIN & MISI LENGKAP ─── */}
         {activeTab === 'BERANDA' && berandaLayer === 'CHALLENGE' && (
-          <section className="space-y-3.5 animate-fadeIn">
-            {/* Top Navigation Bar: Tombol Kembali ke Beranda */}
-            <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-slate-200/90 shadow-sm flex items-center justify-between gap-3">
+          <section className="space-y-4">
+            <div className="bg-white rounded-2xl p-3.5 border border-slate-200 flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => {
                   setBerandaLayer('HOME');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200 text-xs font-bold text-[#023246] transition-all cursor-pointer"
+                className="min-h-11 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-bold text-[#0F172A] transition-colors cursor-pointer"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-4 h-4 shrink-0" />
                 <span>Kembali ke Beranda</span>
               </button>
-              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
-                Layer Papan Tantangan
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Papan Tantangan
               </span>
             </div>
 
-            {/* Banner Header Layer */}
-            <div className="bg-linear-to-r from-[#023246] to-[#18536B] rounded-3xl p-4 sm:p-5 text-white shadow-sm flex items-center justify-between gap-3">
+            <div className="bg-[#0D5C46] rounded-2xl p-4 sm:p-5 text-white flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm sm:text-base font-black flex items-center gap-2">
-                  <span>🔥</span>
+                <h2 className="text-base font-bold flex items-center gap-2">
                   <span>Tantangan Disiplin &amp; Misi Pendidik</span>
                 </h2>
-                <p className="text-[11px] sm:text-xs text-cyan-100/90 mt-0.5 font-medium">
-                  Bangun konsistensi rekor kehadiran on-time dan maksimalkan pemanfaatan fitur absensi
+                <p className="text-xs text-emerald-100 mt-0.5 font-medium">
+                  Bangun konsistensi rekor kehadiran tepat waktu dan lengkapi aktivitas harian
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white shrink-0 text-xl">
-                🏆
+              <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                <SagaChallengeTrophyIcon tone="dark" className="w-6 h-6" />
               </div>
             </div>
 
-            {/* Widget Tantangan Harian & Streak Duolingo Style (Versi Besar & Lengkap) */}
             <TeacherDailyChallengeWidget
               streakInfo={streakInfo}
               quests={dailyQuests}
@@ -5753,42 +4425,40 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               totalPoints={effectiveTotalPoints}
             />
 
-            {/* Shortcut Kartu Piagam & Peringkat Guru */}
-            <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-3">
+            <div className="bg-white rounded-2xl p-4 border border-slate-200">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-base shrink-0">
-                    ⭐
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                    <SagaMedalRankIcon className="w-6 h-6" />
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black text-slate-900 leading-tight">
+                  <div className="min-w-0">
+                    <h3 className="text-xs sm:text-sm font-bold text-[#0F172A] leading-tight">
                       Peringkat &amp; Piagam Penghargaan
                     </h3>
-                    <p className="text-[10.5px] text-slate-500 font-medium">
-                      Peringkat #{(disciplineLeaderboard?.currentUserRank) ?? 1} dari {(disciplineLeaderboard?.totalTeachers) ?? 12} Guru ({effectiveTotalPoints} PTS)
+                    <p className="text-xs text-slate-600 font-medium truncate">
+                      Peringkat #{(disciplineLeaderboard?.currentUserRank) ?? 1} dari {(disciplineLeaderboard?.totalTeachers) ?? 12} Guru ({effectiveTotalPoints} Poin)
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsDisciplineBadgeModalOpen(true)}
-                  className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                  className="min-h-11 px-3.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold transition-colors cursor-pointer shrink-0"
                 >
-                  Klasemen →
+                  Klasemen
                 </button>
               </div>
             </div>
 
-            {/* Tombol Kembali di Bawah Layer */}
             <button
               type="button"
               onClick={() => {
                 setBerandaLayer('HOME');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-50 active:scale-98 border border-slate-200/90 shadow-xs text-xs font-bold text-[#023246] flex items-center justify-center gap-2 transition-all cursor-pointer min-h-12"
+              className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-bold text-[#0F172A] flex items-center justify-center gap-2 transition-colors cursor-pointer min-h-12"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 shrink-0" />
               <span>Kembali ke Beranda Utama</span>
             </button>
           </section>
@@ -5799,8 +4469,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           <AboutAppView
             onBack={handleBackFromAboutLayer}
             backLabel={
-              aboutReturnTarget === 'PROFIL'
-                ? 'Kembali ke Profil'
+              aboutReturnTarget === 'AKUN'
+                ? 'Kembali ke Akun'
                 : aboutReturnTarget === 'ALL_FEATURES'
                 ? 'Kembali ke Semua Fitur'
                 : 'Kembali ke Beranda'
@@ -5857,15 +4527,22 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           <div className="fixed inset-0 z-50 bg-[#F4F6F8] overflow-y-auto">
             <SurveyAnalyticsView
               onBack={() => {
-                setBerandaLayer(surveyAnalyticsReturnTarget === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
-                if (surveyAnalyticsReturnTarget === 'PROFIL') {
-                  setActiveTab('PROFIL');
+                if (surveyAnalyticsReturnTarget === 'AKUN') {
+                  setActiveTab('AKUN');
+                  setBerandaLayer('HOME');
+                } else if (surveyAnalyticsReturnTarget === 'ADMIN') {
+                  setActiveTab('ADMIN');
+                  setBerandaLayer('HOME');
+                } else {
+                  setBerandaLayer(surveyAnalyticsReturnTarget === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
                 }
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               backLabel={
-                surveyAnalyticsReturnTarget === 'PROFIL'
-                  ? 'Kembali ke Profil'
+                surveyAnalyticsReturnTarget === 'AKUN'
+                  ? 'Kembali ke Akun'
+                  : surveyAnalyticsReturnTarget === 'ADMIN'
+                  ? 'Kembali ke Administrasi Guru'
                   : surveyAnalyticsReturnTarget === 'ALL_FEATURES'
                   ? 'Kembali ke Semua Fitur'
                   : 'Kembali ke Beranda'
@@ -5927,22 +4604,27 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         )}
 
         {/* ── TAB 2: RIWAYAT BULANAN ──────────────────────────────────────── */}
-        {activeTab === 'RIWAYAT' && (
-          <section className="space-y-3 sm:space-y-4">
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card space-y-3 sm:space-y-4">
+        {activeTab === 'RIWAYAT' && (() => {
+          const izinRiwayatCount = attendanceHistory.filter((r) => r.status === 'IZIN' || r.status === 'SAKIT').length;
+          const alpaRiwayatCount = attendanceHistory.filter((r) => r.status === 'ALFA').length;
+
+          return (
+          <section className="space-y-4">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
               {/* Riwayat Category Sub-Tab Switcher */}
-              <div className="flex bg-slate-100 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl gap-1 border border-slate-200/80">
+              <div className="grid grid-cols-3 bg-slate-100 p-1 rounded-xl gap-1 border border-slate-200">
                 <button
                   type="button"
                   onClick={() => setHistorySubTab('ATTENDANCE')}
-                  className={`flex-1 py-1.5 sm:py-2 text-[11px] sm:text-xs font-extrabold rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 ${
+                  className={`min-h-11 py-2 px-1 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
                     historySubTab === 'ATTENDANCE'
-                      ? 'bg-white text-[#023246] shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-white text-[#0F172A] border border-slate-200'
+                      : 'text-slate-600 hover:text-[#0F172A]'
                   }`}
                 >
-                  <span>📅 Presensi</span>
-                  <span className="px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full text-[9px] sm:text-[10px]">
+                  <SagaScheduleIcon className="w-4 h-4 shrink-0 hidden min-[380px]:block" />
+                  <span className="truncate">Presensi</span>
+                  <span className="px-1.5 py-0.5 bg-slate-200 text-slate-800 rounded-full text-[10px] font-bold shrink-0">
                     {attendanceHistory.length}
                   </span>
                 </button>
@@ -5950,14 +4632,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setHistorySubTab('LEAVES')}
-                  className={`flex-1 py-1.5 sm:py-2 text-[11px] sm:text-xs font-extrabold rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 ${
+                  className={`min-h-11 py-2 px-1 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
                     historySubTab === 'LEAVES'
-                      ? 'bg-white text-[#023246] shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-white text-[#0F172A] border border-slate-200'
+                      : 'text-slate-600 hover:text-[#0F172A]'
                   }`}
                 >
-                  <span>📝 Izin / Cuti</span>
-                  <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[9px] sm:text-[10px]">
+                  <SagaLeavePermitIcon className="w-4 h-4 shrink-0 hidden min-[380px]:block" />
+                  <span className="truncate">Izin / Cuti</span>
+                  <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-900 font-bold rounded-full text-[10px] shrink-0">
                     {userLeaves.length}
                   </span>
                 </button>
@@ -5965,14 +4648,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setHistorySubTab('COMPLAINTS')}
-                  className={`flex-1 py-1.5 sm:py-2 text-[11px] sm:text-xs font-extrabold rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 ${
+                  className={`min-h-11 py-2 px-1 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
                     historySubTab === 'COMPLAINTS'
-                      ? 'bg-white text-[#023246] shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-white text-[#0F172A] border border-slate-200'
+                      : 'text-slate-600 hover:text-[#0F172A]'
                   }`}
                 >
-                  <span>💬 Aspirasi</span>
-                  <span className="px-1.5 py-0.2 bg-amber-100 text-amber-900 font-bold rounded-full text-[9px] sm:text-[10px]">
+                  <SagaAspirationIcon className="w-4 h-4 shrink-0 hidden min-[380px]:block" />
+                  <span className="truncate">Aspirasi</span>
+                  <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 font-bold rounded-full text-[10px] shrink-0">
                     {userComplaints.length}
                   </span>
                 </button>
@@ -5980,19 +4664,20 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
               {/* SUB-TAB 1: PRESENSI HARIAN */}
               {historySubTab === 'ATTENDANCE' && (
-                <div className="space-y-3 sm:space-y-4">
-                  <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
                     <div>
-                      <h2 className="font-black text-[#023246] text-xs sm:text-base">Presensi & Statistik</h2>
-                      <p className="text-[10px] sm:text-xs text-slate-400 font-semibold">Tampilkan data presensi per bulan</p>
+                      <h2 className="font-bold text-[#0F172A] text-base">Presensi &amp; Statistik</h2>
+                      <p className="text-xs text-slate-500 font-medium">Data kehadiran per bulan</p>
                     </div>
 
                     {/* Dynamic Month / Year Filter Controls */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                       <select
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
-                        className="text-[11px] sm:text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg sm:rounded-xl px-2 py-1 text-slate-700 outline-none"
+                        className="min-h-11 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-2.5 text-[#0F172A] outline-none"
+                        aria-label="Pilih bulan riwayat"
                       >
                         {monthNamesIndonesian.map((mName, idx) => (
                           <option key={idx + 1} value={idx + 1}>
@@ -6004,7 +4689,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       <select
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
-                        className="text-[11px] sm:text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg sm:rounded-xl px-2 py-1 text-slate-700 outline-none"
+                        className="min-h-11 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-2.5 text-[#0F172A] outline-none"
+                        aria-label="Pilih tahun riwayat"
                       >
                         <option value={2026}>2026</option>
                         <option value={2025}>2025</option>
@@ -6016,54 +4702,77 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsExportModalOpen(true)}
-                    className="w-full py-2.5 px-3 bg-linear-to-r from-[#0D7A5F] to-[#095744] hover:from-[#095744] hover:to-[#023246] text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs active:scale-98 cursor-pointer"
+                    className="w-full min-h-12 py-2.5 px-4 bg-[#0D5C46] hover:bg-[#094736] active:bg-[#07382B] text-white text-xs sm:text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <span>🖨️</span> CETAK LAPORAN PRESENSI SAYA (PDF / EXCEL BER-QR CODE)
+                    <SagaPrinterIcon tone="dark" className="w-4 h-4 shrink-0" />
+                    <span>Cetak Laporan Presensi Saya (PDF / Excel)</span>
                   </button>
 
                   {/* View Mode Toggle Switcher: CALENDAR vs LIST */}
-                  <div className="flex items-center justify-between gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200/80">
-                    <span className="text-[11px] font-extrabold text-slate-700 pl-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                    <span className="text-xs font-semibold text-slate-700 pl-2">
                       Mode Tampilan:
                     </span>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => setHistoryViewMode('CALENDAR')}
-                        className={`px-3 py-1 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                        className={`min-h-10 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
                           historyViewMode === 'CALENDAR'
-                            ? 'bg-[#023246] text-white shadow-xs'
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                            ? 'bg-[#0D5C46] text-white'
+                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        <span>📅 Kalender Grid</span>
+                        <SagaScheduleIcon tone={historyViewMode === 'CALENDAR' ? 'dark' : 'light'} className="w-4 h-4 shrink-0" />
+                        <span>Kalender</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setHistoryViewMode('LIST')}
-                        className={`px-3 py-1 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                        className={`min-h-10 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
                           historyViewMode === 'LIST'
-                            ? 'bg-[#023246] text-white shadow-xs'
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                            ? 'bg-[#0D5C46] text-white'
+                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        <span>📋 Daftar Log</span>
+                        <SagaHistoryIcon tone={historyViewMode === 'LIST' ? 'dark' : 'light'} className="w-4 h-4 shrink-0" />
+                        <span>Daftar Log</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Dynamic Stats Cards */}
-                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3 text-xs">
-                    <div className="p-3 bg-[#C8F2E0]/40 rounded-xl sm:rounded-2xl border border-[#0D7A5F]/20 space-y-0.5">
-                      <span className="text-[9px] sm:text-[10px] font-bold text-[#0D7A5F] block uppercase truncate">Kehadiran {activeMonthName}</span>
-                      <p className="text-lg sm:text-xl font-black text-[#023246]">{attendancePercentage}%</p>
-                      <span className="text-[9px] sm:text-[10px] text-slate-500 font-semibold block truncate">{hadirCount + terlambatCount} dari {effectiveWorkingDays} Hari Kerja</span>
+                  <div className="grid grid-cols-2 gap-2.5 text-xs">
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 space-y-0.5">
+                      <span className="text-[11px] font-bold text-[#0D5C46] block uppercase truncate">Kehadiran {activeMonthName}</span>
+                      <p className="text-xl font-bold text-[#0F172A]">{attendancePercentage}%</p>
+                      <span className="text-[11px] text-slate-600 font-medium block truncate">{hadirCount + terlambatCount} dari {effectiveWorkingDays} Hari Kerja</span>
                     </div>
 
-                    <div className="p-3 bg-amber-50 rounded-xl sm:rounded-2xl border border-amber-200 space-y-0.5">
-                      <span className="text-[9px] sm:text-[10px] font-bold text-amber-800 block uppercase">Terlambat</span>
-                      <p className="text-lg sm:text-xl font-black text-amber-950">{terlambatCount} <span className="text-xs font-bold text-amber-700">Kali</span></p>
-                      <span className="text-[9px] sm:text-[10px] text-slate-500 font-semibold block truncate">{terlambatPercent.toFixed(0)}% dari presensi</span>
+                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-0.5">
+                      <span className="text-[11px] font-bold text-amber-800 block uppercase">Terlambat</span>
+                      <p className="text-xl font-bold text-amber-950">{terlambatCount} <span className="text-xs font-semibold text-amber-700">Kali</span></p>
+                      <span className="text-[11px] text-slate-600 font-medium block truncate">{terlambatPercent.toFixed(0)}% dari presensi</span>
+                    </div>
+                  </div>
+
+                  {/* Ringkasan Status Bulanan */}
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[11px] font-medium text-slate-600 block">Hadir</span>
+                      <span className="text-base font-bold text-[#0D5C46] font-mono">{hadirCount}</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[11px] font-medium text-slate-600 block">Terlambat</span>
+                      <span className="text-base font-bold text-amber-700 font-mono">{terlambatCount}</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[11px] font-medium text-slate-600 block">Izin/Sakit</span>
+                      <span className="text-base font-bold text-blue-700 font-mono">{izinRiwayatCount}</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[11px] font-medium text-slate-600 block">Alpa</span>
+                      <span className={`text-base font-bold font-mono ${alpaRiwayatCount > 0 ? 'text-rose-700' : 'text-slate-500'}`}>{alpaRiwayatCount}</span>
                     </div>
                   </div>
 
@@ -6074,20 +4783,20 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     renderCalendarGrid()
                   ) : (
                     <div className="space-y-2 pt-1">
-                      <h3 className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">Catatan Harian {activeMonthName} {selectedYear}</h3>
-                      
+                      <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Catatan Harian {activeMonthName} {selectedYear}</h3>
+
                       {attendanceHistory.length === 0 ? (
                         <EmptyState
-                          icon="📅"
+                          icon={<SagaEmptyListIllustration className="w-12 h-12" />}
                           title="Belum Ada Presensi Bulan Ini"
                           description={`Belum ada rekaman presensi pada ${activeMonthName} ${selectedYear}. Mulai dengan melakukan scan QR Code absensi.`}
                         />
                       ) : (
                         attendanceHistory.map((rec) => (
-                          <div key={rec.id} className="p-3 rounded-xl sm:rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200 flex items-center justify-between text-xs transition-colors">
+                          <div key={rec.id} className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-between text-xs transition-colors">
                             <div className="space-y-0.5">
-                              <p className="font-extrabold text-[#023246] text-xs">{rec.date}</p>
-                              <p className="text-[10px] text-slate-500 font-semibold">
+                              <p className="font-bold text-[#0F172A] text-xs">{rec.date}</p>
+                              <p className="text-[11px] text-slate-600 font-medium">
                                 Masuk: {rec.check_in_time ? rec.check_in_time.substring(0, 5) : '--:--'} • Pulang: {rec.check_out_time ? rec.check_out_time.substring(0, 5) : '--:--'}
                               </p>
                             </div>
@@ -6105,53 +4814,53 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
               {/* SUB-TAB 2: RIWAYAT PENGAJUAN IZIN / CUTI */}
               {historySubTab === 'LEAVES' && (
-                <div className="space-y-3 sm:space-y-4">
-                  <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 gap-2">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 gap-2">
                     <div>
-                      <h2 className="font-black text-[#023246] text-xs sm:text-base">Permohonan Izin & Cuti</h2>
-                      <p className="text-[10px] sm:text-xs text-slate-400 font-semibold">Daftar pengajuan izin dikirim</p>
+                      <h2 className="font-bold text-[#0F172A] text-base">Permohonan Izin &amp; Cuti</h2>
+                      <p className="text-xs text-slate-500 font-medium">Daftar pengajuan izin dikirim</p>
                     </div>
 
                     <Button
                       variant="primary"
                       onClick={() => setIsLeaveModalOpen(true)}
-                      className="px-2.5 py-1 text-xs font-bold flex items-center gap-1 cursor-pointer rounded-lg sm:rounded-xl shrink-0"
+                      className="min-h-11 px-3 py-2 text-xs font-bold flex items-center gap-1.5 cursor-pointer rounded-xl shrink-0"
                     >
-                      <span>➕ Ajukan Izin</span>
+                      <span>Ajukan Izin</span>
                     </Button>
                   </div>
 
                   {/* Leaves Overview Badges Summary */}
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center text-xs">
-                    <div className="p-1.5 sm:p-2.5 bg-amber-50 rounded-xl border border-amber-200 min-w-0">
-                      <span className="text-[9px] sm:text-[10px] font-extrabold text-amber-800 uppercase block truncate">Menunggu</span>
-                      <p className="text-xs sm:text-base font-black text-amber-950 mt-0.5">
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200 min-w-0">
+                      <span className="text-[10px] font-bold text-amber-800 uppercase block truncate">Menunggu</span>
+                      <p className="text-base font-bold text-amber-950 mt-0.5">
                         {userLeaves.filter((l) => l.approval_status === 'PENDING').length}
                       </p>
                     </div>
 
-                    <div className="p-1.5 sm:p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 min-w-0">
-                      <span className="text-[9px] sm:text-[10px] font-extrabold text-emerald-800 uppercase block truncate">Disetujui</span>
-                      <p className="text-xs sm:text-base font-black text-emerald-950 mt-0.5">
+                    <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 min-w-0">
+                      <span className="text-[10px] font-bold text-emerald-800 uppercase block truncate">Disetujui</span>
+                      <p className="text-base font-bold text-emerald-950 mt-0.5">
                         {userLeaves.filter((l) => l.approval_status === 'APPROVED').length}
                       </p>
                     </div>
 
-                    <div className="p-1.5 sm:p-2.5 bg-red-50 rounded-xl border border-red-200 min-w-0">
-                      <span className="text-[9px] sm:text-[10px] font-extrabold text-red-800 uppercase block truncate">Ditolak</span>
-                      <p className="text-xs sm:text-base font-black text-red-950 mt-0.5">
+                    <div className="p-2.5 bg-red-50 rounded-xl border border-red-200 min-w-0">
+                      <span className="text-[10px] font-bold text-red-800 uppercase block truncate">Ditolak</span>
+                      <p className="text-base font-bold text-red-950 mt-0.5">
                         {userLeaves.filter((l) => l.approval_status === 'REJECTED').length}
                       </p>
                     </div>
                   </div>
 
                   {/* List of Leave Applications */}
-                  <div className="space-y-2 pt-1">
+                  <div className="space-y-2.5 pt-1">
                     {isLoadingLeaves ? (
                       <SkeletonList count={3} />
                     ) : userLeaves.length === 0 ? (
                       <EmptyState
-                        icon="📝"
+                        icon={<SagaEmptyListIllustration className="w-12 h-12" />}
                         title="Belum Ada Pengajuan Izin"
                         description="Anda belum pernah mengajukan izin atau cuti. Tekan tombol 'Ajukan Izin' di atas jika Anda perlu izin tidak hadir."
                       />
@@ -6166,48 +4875,54 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
                         const statusText =
                           leave.approval_status === 'APPROVED'
-                            ? '✓ DISETUJUI'
+                            ? 'DISETUJUI'
                             : leave.approval_status === 'REJECTED'
-                            ? '✕ DITOLAK'
-                            : '⏳ MENUNGGU REVIEW';
+                            ? 'DITOLAK'
+                            : 'MENUNGGU';
 
                         return (
                           <div
                             key={leave.id}
-                            className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200 text-xs space-y-1.5 transition-all"
+                            className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div>
-                                <span className="inline-block px-1.5 py-0.2 rounded-md text-[9px] sm:text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-200 mb-0.5">
+                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-900 border border-blue-200 mb-1">
                                   {leave.leave_type}
                                 </span>
-                                <h4 className="font-extrabold text-slate-900 text-[11px] sm:text-xs">
+                                <h4 className="font-bold text-[#0F172A] text-xs">
                                   {leave.start_date} {leave.end_date !== leave.start_date ? `s/d ${leave.end_date}` : ''}
                                 </h4>
                               </div>
 
-                              <span className={`px-1.5 py-0.5 text-[9px] sm:text-[10px] font-black rounded-md sm:rounded-lg border shrink-0 ${statusColor}`}>
-                                {statusText}
+                              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md border shrink-0 inline-flex items-center gap-1 ${statusColor}`}>
+                                {leave.approval_status === 'APPROVED' ? (
+                                  <SagaCheckBadgeIcon className="w-3 h-3 shrink-0" />
+                                ) : leave.approval_status === 'PENDING' ? (
+                                  <SagaClockStatusIcon className="w-3 h-3 shrink-0" />
+                                ) : null}
+                                <span>{statusText}</span>
                               </span>
                             </div>
 
-                            <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium leading-relaxed bg-white p-2 rounded-lg sm:rounded-xl border border-slate-200">
+                            <p className="text-xs text-slate-700 font-medium leading-relaxed bg-white p-2.5 rounded-xl border border-slate-200">
                               "{leave.reason}"
                             </p>
 
                             {leave.attachment_url && (
-                              <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-emerald-700 font-bold">
-                                <span>📎</span> Ada Lampiran Surat/Bukti Foto
+                              <div className="flex items-center gap-1.5 text-[11px] text-[#0D5C46] font-semibold">
+                                <SagaAttachmentClipIcon className="w-3.5 h-3.5 shrink-0" />
+                                <span>Ada Lampiran Surat / Bukti Foto</span>
                               </div>
                             )}
 
                             {leave.approval_notes && (
-                              <p className="text-[9px] sm:text-[10px] text-slate-500 font-semibold italic bg-amber-50/60 p-1.5 rounded-lg border border-amber-200/60">
+                              <p className="text-[11px] text-slate-600 font-medium italic bg-amber-50 p-2 rounded-lg border border-amber-200">
                                 Catatan Kepala Sekolah: {leave.approval_notes}
                               </p>
                             )}
 
-                            <span className="text-[9px] text-slate-400 font-mono block pt-0.5">
+                            <span className="text-[10px] text-slate-500 font-mono block pt-0.5">
                               Diajukan pada: {new Date(leave.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                           </div>
@@ -6218,68 +4933,67 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </div>
               )}
 
-              {/* SUB-TAB 3: ASPIRASI & KELUHAN ANONIM (MOBILE NATIVE EXPERIENCE) */}
+              {/* SUB-TAB 3: ASPIRASI & KELUHAN ANONIM */}
               {historySubTab === 'COMPLAINTS' && (
-                <div className="space-y-3.5 sm:space-y-4">
+                <div className="space-y-4">
                   {/* Header Row */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-100">
                     <div>
-                      <h2 className="font-black text-[#023246] text-sm sm:text-base flex items-center gap-2">
-                        <span>💬</span>
+                      <h2 className="font-bold text-[#0F172A] text-base flex items-center gap-2">
+                        <SagaAspirationIcon className="w-5 h-5 shrink-0" />
                         <span>Aspirasi &amp; Keluhan Saya</span>
                       </h2>
-                      <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5">
-                        Daftar catatan rahasia yang Anda kirimkan ke pihak manajemen sekolah
+                      <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        Daftar catatan rahasia yang Anda kirimkan ke manajemen sekolah
                       </p>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => setIsComplaintModalOpen(true)}
-                      className="min-h-11 sm:min-h-9 px-4 py-2 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-black rounded-xl transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 self-start sm:self-auto w-full sm:w-auto"
+                      className="min-h-11 px-4 py-2 bg-[#0D5C46] hover:bg-[#094736] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 self-start sm:self-auto w-full sm:w-auto"
                     >
-                      <span>+</span>
                       <span>Tulis Catatan Baru</span>
                     </button>
                   </div>
 
                   {/* 100% Guaranteed Privacy Assurance Pill */}
-                  <div className="bg-linear-to-r from-emerald-50 via-teal-50/60 to-emerald-50/80 border border-emerald-200/90 p-3.5 rounded-2xl flex items-start gap-3 shadow-2xs">
-                    <div className="w-8 h-8 rounded-xl bg-[#0D7A5F] text-white flex items-center justify-center text-sm shrink-0 shadow-xs ring-2 ring-emerald-300/60">
-                      🔒
+                  <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-white border border-emerald-200 flex items-center justify-center shrink-0">
+                      <SagaDeviceShieldIcon className="w-5 h-5" />
                     </div>
                     <div className="text-xs leading-relaxed min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-black text-[#023246] text-xs">
+                        <span className="font-bold text-[#0F172A] text-xs">
                           Identitas Anda 100% Terjaga
                         </span>
-                        <span className="px-2 py-0.2 bg-emerald-100 text-emerald-900 border border-emerald-300 text-[9px] font-black rounded-full">
+                        <span className="px-2 py-0.5 bg-white text-[#0D5C46] border border-emerald-300 text-[10px] font-bold rounded-full">
                           Aman &amp; Terlindungi
                         </span>
                       </div>
                       <p className="text-slate-600 font-medium text-[11px] mt-0.5">
-                        Admin &amp; Kepala Sekolah membaca seluruh isi laporan Anda sebagai <em>"Pendidik Anonim"</em> tanpa pernah mengetahui identitas pengirim.
+                        Admin &amp; Kepala Sekolah membaca isi laporan Anda sebagai <em>"Pendidik Anonim"</em> tanpa mengetahui identitas pengirim.
                       </p>
                     </div>
                   </div>
 
                   {/* Complaints List or Empty State */}
-                  <div className="space-y-3.5">
+                  <div className="space-y-3">
                     {isLoadingComplaints ? (
                       <SkeletonList count={3} />
                     ) : userComplaints.length === 0 ? (
                       <EmptyState
-                        icon="💬"
+                        icon={<SagaEmptyListIllustration className="w-12 h-12" />}
                         title="Belum Ada Catatan atau Aspirasi"
-                        description="Anda belum pernah mengirimkan catatan atau keluhan anonim. Tekan tombol '+ Tulis Catatan Baru' jika ada kendala fasilitas, sistem, jadwal, atau ide masukan untuk kemajuan sekolah."
-                        actionLabel="+ Tulis Aspirasi Pertama"
+                        description="Anda belum pernah mengirimkan catatan atau keluhan anonim. Tekan tombol 'Tulis Catatan Baru' jika ada masukan untuk sekolah."
+                        actionLabel="Tulis Aspirasi Pertama"
                         onAction={() => setIsComplaintModalOpen(true)}
                       />
                     ) : (
                       userComplaints.map((item) => {
                         const catMeta = ComplaintRepository.CATEGORY_META[item.category] || {
                           label: item.category,
-                          emoji: '💡',
+                          emoji: '',
                           colorClass: 'text-slate-800',
                           bgClass: 'bg-slate-100',
                           borderClass: 'border-slate-200',
@@ -6295,16 +5009,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                         return (
                           <div
                             key={item.id}
-                            className="p-4 sm:p-4.5 rounded-2xl sm:rounded-3xl bg-white hover:bg-slate-50/60 border border-slate-200/90 text-xs space-y-3 transition-all shadow-card"
+                            className="p-4 rounded-2xl bg-white border border-slate-200 text-xs space-y-3"
                           >
                             {/* Card Top Meta */}
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex flex-wrap items-center gap-1.5">
-                                <span className={`px-2.5 py-1 rounded-xl text-[11px] font-black border flex items-center gap-1.5 shadow-2xs ${catMeta.bgClass} ${catMeta.colorClass} ${catMeta.borderClass}`}>
-                                  <span>{catMeta.emoji}</span>
+                                <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border inline-flex items-center gap-1.5 ${catMeta.bgClass} ${catMeta.colorClass} ${catMeta.borderClass}`}>
+                                  <SagaAspirationIcon className="w-3.5 h-3.5 shrink-0" />
                                   <span>{catMeta.label}</span>
                                 </span>
-                                <span className="text-[11px] font-mono text-slate-400 font-medium">
+                                <span className="text-[11px] font-mono text-slate-500 font-medium">
                                   {new Date(item.created_at).toLocaleDateString('id-ID', {
                                     day: 'numeric',
                                     month: 'short',
@@ -6316,34 +5030,35 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                                 </span>
                               </div>
 
-                              <span className={`px-2.5 py-1 text-[11px] font-black rounded-xl border shrink-0 shadow-2xs flex items-center gap-1.5 ${statusMeta.bgClass} ${statusMeta.colorClass} ${statusMeta.borderClass}`}>
-                                {item.status === 'SUBMITTED' && (
-                                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                                )}
-                                {item.status === 'IN_REVIEW' && (
-                                  <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse shrink-0" />
+                              <span className={`px-2.5 py-1 text-[11px] font-bold rounded-xl border shrink-0 inline-flex items-center gap-1.5 ${statusMeta.bgClass} ${statusMeta.colorClass} ${statusMeta.borderClass}`}>
+                                {(item.status === 'SUBMITTED' || item.status === 'IN_REVIEW') && (
+                                  <span
+                                    className={`w-2 h-2 rounded-full shrink-0 ${
+                                      item.status === 'SUBMITTED' ? 'bg-amber-500' : 'bg-sky-500'
+                                    }`}
+                                  />
                                 )}
                                 <span>{statusMeta.label}</span>
                               </span>
                             </div>
 
                             {/* Complaint Body Message */}
-                            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 text-xs sm:text-sm text-slate-800 font-medium leading-relaxed">
+                            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs sm:text-sm text-[#0F172A] font-medium leading-relaxed">
                               "{item.content}"
                             </div>
 
                             {/* Official School Management Response */}
                             {item.admin_response ? (
-                              <div className="bg-emerald-50/90 border border-emerald-300/90 border-l-4 border-l-[#0D7A5F] p-3.5 rounded-2xl space-y-1.5 shadow-2xs">
-                                <div className="flex items-center justify-between text-xs font-black text-emerald-950">
+                              <div className="bg-emerald-50 border border-emerald-300 border-l-4 border-l-[#0D5C46] p-3.5 rounded-xl space-y-1.5">
+                                <div className="flex flex-wrap items-center justify-between gap-1 text-xs font-bold text-emerald-950">
                                   <span className="flex items-center gap-1.5">
-                                    <span>💬</span>
+                                    <SagaAspirationIcon className="w-4 h-4 shrink-0" />
                                     <span>
-                                      Tanggapan Resmi ({item.responded_by_role === 'KEPSEK' ? '👑 Kepala Sekolah' : '🛡️ Tim Manajemen Sekolah'}):
+                                      Tanggapan Resmi ({item.responded_by_role === 'KEPSEK' ? 'Kepala Sekolah' : 'Tim Manajemen Sekolah'}):
                                     </span>
                                   </span>
                                   {item.responded_at && (
-                                    <span className="font-mono text-[10px] text-emerald-800 font-bold">
+                                    <span className="font-mono text-[10px] text-[#0D5C46] font-bold">
                                       {new Date(item.responded_at).toLocaleDateString('id-ID', {
                                         day: 'numeric',
                                         month: 'short',
@@ -6354,13 +5069,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-xs sm:text-sm text-slate-900 font-semibold leading-relaxed">
+                                <p className="text-xs sm:text-sm text-[#0F172A] font-medium leading-relaxed">
                                   {item.admin_response}
                                 </p>
                               </div>
                             ) : (
-                              <div className="text-[11px] text-amber-800 bg-amber-50/80 px-3 py-2 rounded-xl border border-amber-200/70 flex items-center gap-2 font-medium">
-                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                              <div className="text-[11px] text-amber-800 bg-amber-50 px-3 py-2 rounded-xl border border-amber-200 flex items-center gap-2 font-medium">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                                 <span>Catatan telah diterima server &amp; menunggu peninjauan pihak sekolah.</span>
                               </div>
                             )}
@@ -6373,83 +5088,98 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               )}
             </div>
           </section>
-        )}
+          );
+        })()}
 
-        {/* ── TAB 3: NOTIFIKASI ───────────────────────────────────────────── */}
+        {/* ── TAB 3: NOTIFIKASI (Akses lewat Ikon Lonceng Header) ──────────── */}
         {activeTab === 'NOTIFIKASI' && (
-          <section className="space-y-3 sm:space-y-4">
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card space-y-3 sm:space-y-4">
-              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 p-1 flex items-center justify-center border border-emerald-100 shadow-2xs shrink-0 overflow-hidden">
-                    <img
-                      src="/school-logo.png"
-                      alt="Logo Sekolah"
-                      className="w-full h-full object-contain"
-                      onError={(e) => {
-                        const target = e.currentTarget;
-                        target.style.display = 'none';
-                        if (target.parentElement) {
-                          target.parentElement.innerHTML = '<span class="text-sm">🔔</span>';
-                        }
-                      }}
-                    />
+          <section className="space-y-4">
+            <div className="flex items-center justify-between gap-2 bg-white p-3.5 rounded-2xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab(notifReturnTab);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="min-h-11 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-bold text-[#0F172A] transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4 shrink-0" />
+                <span>Kembali</span>
+              </button>
+              <span className="text-xs font-semibold text-slate-500">
+                {unreadCount > 0 ? `${unreadCount} belum dibaca` : 'Semua terbaca'}
+              </span>
+            </div>
+
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
+                    <SagaBellIcon className="w-5 h-5 text-[#0D5C46]" />
                   </div>
-                  <div>
-                    <h2 className="font-black text-[#023246] text-xs sm:text-base">Notifikasi & Pengumuman</h2>
-                    <p className="text-[10px] sm:text-xs text-slate-400 font-semibold">{unreadCount} belum dibaca</p>
+                  <div className="min-w-0">
+                    <h2 className="font-bold text-[#0F172A] text-base">Notifikasi &amp; Pengumuman</h2>
+                    <p className="text-xs text-slate-500 font-medium">{unreadCount} belum dibaca</p>
                   </div>
                 </div>
                 {unreadCount > 0 && (
                   <button
+                    type="button"
                     onClick={handleMarkAllNotificationsRead}
-                    className="text-xs font-bold text-[#0D7A5F] hover:underline cursor-pointer"
+                    className="min-h-11 px-3 rounded-xl text-xs font-bold text-[#0D5C46] hover:bg-emerald-50 cursor-pointer shrink-0"
                   >
                     Tandai Dibaca
                   </button>
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {notifications.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-6">Tidak ada notifikasi baru.</p>
+                  <EmptyState
+                    icon={<SagaEmptyListIllustration className="w-12 h-12" />}
+                    title="Tidak Ada Notifikasi"
+                    description="Semua pengumuman dan pengingat presensi terbaru akan tampil di sini."
+                  />
                 ) : (
                   notifications.map((n) => (
                     <div
                       key={n.id}
                       onClick={() => handleMarkSingleNotificationRead(n)}
-                      className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border text-xs space-y-1.5 transition-all cursor-pointer ${
+                      className={`p-3.5 sm:p-4 rounded-xl border text-xs space-y-1.5 transition-colors cursor-pointer ${
                         !n.is_read
                           ? n.action_type === 'CORRECTION'
-                            ? 'bg-amber-50/70 border-amber-300/80 hover:border-amber-500 shadow-xs'
-                            : 'bg-[#C8F2E0]/20 border-[#0D7A5F]/30 hover:border-[#0D7A5F]'
-                          : 'bg-slate-50 border-slate-200 opacity-80'
+                            ? 'bg-amber-50 border-amber-300 hover:border-amber-400'
+                            : 'bg-emerald-50 border-emerald-300 hover:border-[#0D5C46]'
+                          : 'bg-slate-50 border-slate-200'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-extrabold text-[#023246] text-xs flex items-center gap-1.5">
-                          {n.action_type === 'CORRECTION' && <span>✏️</span>}
-                          <span>{n.title}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-bold text-[#0F172A] text-xs sm:text-sm flex items-center gap-1.5 min-w-0">
+                          {n.action_type === 'CORRECTION' && (
+                            <SagaEditPencilIcon className="w-4 h-4 shrink-0" />
+                          )}
+                          <span className="truncate">{n.title}</span>
                         </h3>
                         {!n.is_read && (
                           <span
-                            className={`w-2 h-2 rounded-full ${
-                              n.action_type === 'CORRECTION' ? 'bg-amber-500 animate-pulse' : 'bg-[#0D7A5F]'
+                            className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                              n.action_type === 'CORRECTION' ? 'bg-amber-500' : 'bg-[#0D5C46]'
                             }`}
                           />
                         )}
                       </div>
-                      <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium leading-relaxed">
+                      <p className="text-xs text-slate-600 font-medium leading-relaxed">
                         {n.message}
                       </p>
                       <div className="flex items-center justify-between pt-1">
-                        <span className="text-[9px] text-slate-400 font-mono block">
+                        <span className="text-[11px] text-slate-500 font-mono block">
                           {n.created_at ? new Date(n.created_at).toLocaleDateString('id-ID') : 'Hari ini'}
                         </span>
                         {n.action_type === 'CORRECTION' && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-900 bg-amber-100/90 hover:bg-amber-200 px-2 py-0.5 rounded-lg border border-amber-300/80 transition-colors">
-                            <span>✏️ Ajukan Koreksi</span>
-                            <span>➔</span>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300">
+                            <SagaEditPencilIcon className="w-3.5 h-3.5 shrink-0" />
+                            <span>Ajukan Koreksi</span>
+                            <ArrowRight className="w-3 h-3 shrink-0" />
                           </span>
                         )}
                       </div>
@@ -6461,21 +5191,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           </section>
         )}
 
-        {/* ── TAB 4: PROFIL ───────────────────────────────────────────────── */}
-        {activeTab === 'PROFIL' && (
+        {/* ── TAB 4: AKUN ───────────────────────────────────────────────── */}
+        {activeTab === 'AKUN' && (
           profilSubView === 'EDUCATION' ? (
             <TeacherEducationView
               onBack={handleBackFromEducation}
-              backLabel="Kembali ke Profil"
+              backLabel="Kembali ke Akun"
               defaultTab={educationViewTab}
               onOpenBiometricEnroll={handleOpenBiometricModal}
               isBioEnrolled={isBioEnrolled}
             />
           ) : (
-          <section className="space-y-3 sm:space-y-4">
-            <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card space-y-4">
-              <div className="text-center space-y-2 pb-3.5 border-b border-slate-100">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#C8F2E0] text-[#0D7A5F] font-black text-3xl flex items-center justify-center mx-auto shadow-inner border-2 border-[#0D7A5F]/20 overflow-hidden shrink-0 ring-4 ring-emerald-50">
+          <section className="space-y-4">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+              <div className="text-center space-y-2 pb-4 border-b border-slate-100">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-emerald-50 text-[#0D5C46] font-bold text-3xl flex items-center justify-center mx-auto border-2 border-emerald-200 overflow-hidden shrink-0">
                   <UserAvatar
                     avatarUrl={effectiveUser.avatar_url}
                     name={effectiveUser.full_name}
@@ -6485,13 +5215,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </div>
 
                 <div>
-                  <h2 className="font-black text-[#023246] text-base sm:text-lg">{effectiveUser.full_name}</h2>
-                  <p className="text-[11px] sm:text-xs text-slate-500 font-semibold">{effectiveUser.position || 'Guru Pengajar'}</p>
+                  <h2 className="font-bold text-[#0F172A] text-base sm:text-lg">{effectiveUser.full_name}</h2>
+                  <p className="text-xs text-slate-600 font-medium">{effectiveUser.position || 'Guru Pengajar'}</p>
                   {committeeInfo?.isCommittee && isExamPeriodActive && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 font-extrabold text-xs shadow-2xs">
-                      <Award className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 border border-slate-200 text-[#0F172A] font-bold text-xs">
+                      <SagaMedalRankIcon className="w-4 h-4 shrink-0" />
                       <span>{committeeInfo.roleLabel}</span>
-                      <span className="text-[10px] text-indigo-600/80 font-mono">• SK Kepala Sekolah</span>
+                      <span className="text-[11px] text-slate-500 font-mono">• SK Kepala Sekolah</span>
                     </div>
                   )}
                 </div>
@@ -6499,46 +5229,51 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
               {/* Dual-Role Account Switcher Card */}
               {isDualRoleUser && onSwitchRoleMode && (
-                <div className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-cyan-50/80 border border-cyan-200/90 space-y-2.5 shadow-2xs">
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">🔄</span>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0">
+                        <SagaRoleSwitchIcon className="w-5 h-5 text-[#0D5C46]" />
+                      </div>
                       <div>
-                        <h3 className="font-extrabold text-xs text-[#023246]">Akses Peran Ganda</h3>
-                        <p className="text-[10px] text-slate-500 font-medium">
-                          Sedang aktif: <strong className="text-cyan-800">Mode Guru Pendidik</strong>
+                        <h3 className="font-bold text-xs sm:text-sm text-[#0F172A]">Akses Peran Ganda</h3>
+                        <p className="text-xs text-slate-600">
+                          Sedang aktif: <strong className="text-[#0D5C46]">Mode Guru Pendidik</strong>
                         </p>
                       </div>
                     </div>
-                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 border border-cyan-300 shrink-0">
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-[#0D5C46] border border-emerald-200 shrink-0">
                       Dual-Role
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                  <p className="text-xs text-slate-600 leading-relaxed">
                     Akun Anda memiliki hak akses administratif sekolah. Anda dapat beralih ke panel pengelolaan kapan saja.
                   </p>
                   <button
                     type="button"
                     onClick={onSwitchRoleMode}
-                    className="w-full py-2.5 px-3 bg-[#023246] hover:bg-[#023246]/90 text-white font-extrabold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95 cursor-pointer min-h-11"
+                    className="w-full min-h-12 py-2.5 px-4 bg-[#0D5C46] hover:bg-[#094736] text-white font-bold rounded-xl text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <span>⚙️</span> Beralih ke Mode Admin / Operator
+                    <SagaRoleSwitchIcon tone="dark" className="w-4 h-4 shrink-0" />
+                    <span>Beralih ke Mode Admin / Operator</span>
                   </button>
                 </div>
               )}
 
               {/* Teacher Education & Guidance Card */}
-              <div className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-[#0D7A5F]/5 border border-[#0D7A5F]/20 space-y-3 shadow-2xs">
+              <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">📚</span>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-white border border-emerald-200 flex items-center justify-center shrink-0">
+                      <SagaBookMaterialIcon className="w-5 h-5" />
+                    </div>
                     <div>
-                      <h3 className="font-extrabold text-xs text-[#023246]">Pusat Edukasi &amp; Panduan Presensi</h3>
-                      <p className="text-[10px] text-slate-500 font-medium">Tips agar tidak ditolak GPS, sidik jari HP, &amp; cara raih poin</p>
+                      <h3 className="font-bold text-xs sm:text-sm text-[#0F172A]">Pusat Edukasi &amp; Panduan Presensi</h3>
+                      <p className="text-xs text-slate-600">Tips GPS, sidik jari HP, dan perolehan poin disiplin</p>
                     </div>
                   </div>
-                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
-                    Wajib Tahu ✨
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-[#0D5C46] border border-emerald-200 shrink-0">
+                    Panduan
                   </span>
                 </div>
 
@@ -6546,86 +5281,90 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     type="button"
-                    onClick={() => handleOpenEducationLayer('QR', 'PROFIL')}
-                    className="p-2 rounded-xl bg-white hover:bg-emerald-50/70 border border-emerald-200/80 transition-all cursor-pointer flex flex-col items-center gap-1 shadow-2xs active:scale-95 text-center"
+                    onClick={() => handleOpenEducationLayer('QR', 'AKUN')}
+                    className="min-h-20 p-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-emerald-200 transition-colors cursor-pointer flex flex-col items-center justify-center gap-1.5 text-center"
                   >
-                    <span className="text-base">📷</span>
-                    <span className="text-[10px] font-black text-[#023246] leading-tight block">Scan QR &amp; GPS</span>
-                    <span className="text-[9px] text-emerald-700 font-semibold block leading-tight">Trik Wi-Fi &amp; GPS</span>
+                    <SagaScanQrIcon className="w-6 h-6 text-[#0D5C46]" />
+                    <span className="text-xs font-bold text-[#0F172A] leading-tight block">Scan QR &amp; GPS</span>
+                    <span className="text-[11px] text-[#0D5C46] font-medium block leading-tight">Tips Akurasi</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => handleOpenEducationLayer('BIOMETRIC', 'PROFIL')}
-                    className="p-2 rounded-xl bg-white hover:bg-emerald-50/70 border border-emerald-200/80 transition-all cursor-pointer flex flex-col items-center gap-1 shadow-2xs active:scale-95 text-center"
+                    onClick={() => handleOpenEducationLayer('BIOMETRIC', 'AKUN')}
+                    className="min-h-20 p-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-emerald-200 transition-colors cursor-pointer flex flex-col items-center justify-center gap-1.5 text-center"
                   >
-                    <span className="text-base">👆</span>
-                    <span className="text-[10px] font-black text-[#023246] leading-tight block">Sidik Jari HP</span>
-                    <span className="text-[9px] text-emerald-700 font-semibold block leading-tight">Privasi 100% Aman</span>
+                    <SagaFingerprintIcon className="w-6 h-6 text-[#0D5C46]" />
+                    <span className="text-xs font-bold text-[#0F172A] leading-tight block">Sidik Jari HP</span>
+                    <span className="text-[11px] text-[#0D5C46] font-medium block leading-tight">Privasi Aman</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => handleOpenEducationLayer('POINTS', 'PROFIL')}
-                    className="p-2 rounded-xl bg-white hover:bg-emerald-50/70 border border-emerald-200/80 transition-all cursor-pointer flex flex-col items-center gap-1 shadow-2xs active:scale-95 text-center"
+                    onClick={() => handleOpenEducationLayer('POINTS', 'AKUN')}
+                    className="min-h-20 p-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-emerald-200 transition-colors cursor-pointer flex flex-col items-center justify-center gap-1.5 text-center"
                   >
-                    <span className="text-base">🏆</span>
-                    <span className="text-[10px] font-black text-[#023246] leading-tight block">Poin Disiplin</span>
-                    <span className="text-[9px] text-emerald-700 font-semibold block leading-tight">Lencana &amp; Reward</span>
+                    <SagaChallengeTrophyIcon className="w-6 h-6" />
+                    <span className="text-xs font-bold text-[#0F172A] leading-tight block">Poin Disiplin</span>
+                    <span className="text-[11px] text-[#0D5C46] font-medium block leading-tight">Lencana Guru</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => handleOpenEducationLayer('SECURITY', 'PROFIL')}
-                    className="p-2 rounded-xl bg-emerald-50/90 hover:bg-emerald-100 border border-emerald-300 transition-all cursor-pointer flex flex-col items-center gap-1 shadow-2xs active:scale-95 text-center"
+                    onClick={() => handleOpenEducationLayer('SECURITY', 'AKUN')}
+                    className="min-h-20 p-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-emerald-200 transition-colors cursor-pointer flex flex-col items-center justify-center gap-1.5 text-center"
                   >
-                    <span className="text-base">🛡️</span>
-                    <span className="text-[10px] font-black text-emerald-900 leading-tight block">Privasi &amp; Aman</span>
-                    <span className="text-[9px] text-emerald-700 font-bold block leading-tight">Bebas Sadap/Lacak</span>
+                    <SagaDeviceShieldIcon className="w-6 h-6" />
+                    <span className="text-xs font-bold text-[#0F172A] leading-tight block">Privasi &amp; Aman</span>
+                    <span className="text-[11px] text-[#0D5C46] font-medium block leading-tight">Perlindungan Data</span>
                   </button>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => handleOpenEducationLayer('QR', 'PROFIL')}
-                  className="w-full py-2 px-3 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer min-h-10"
+                  onClick={() => handleOpenEducationLayer('QR', 'AKUN')}
+                  className="w-full min-h-11 py-2.5 px-4 bg-[#0D5C46] hover:bg-[#094736] text-white text-xs sm:text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>📖</span> Buka Panduan Lengkap &amp; Solusi Kendala
+                  <SagaBookMaterialIcon tone="dark" className="w-4 h-4 shrink-0" />
+                  <span>Buka Panduan Lengkap &amp; Solusi Kendala</span>
                 </button>
               </div>
 
               {/* Device Binding Status Section */}
-              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
-                <div className="flex items-center justify-between text-xs gap-2">
-                  <span className="font-bold text-slate-700 text-xs">📱 Keamanan Perangkat Presensi (1 Akun = 1 HP)</span>
-                  <span className={`px-2 py-0.5 text-[9px] sm:text-[10px] font-black rounded-full border shrink-0 ${
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between text-xs gap-2">
+                  <span className="font-bold text-[#0F172A] text-xs sm:text-sm flex items-center gap-2">
+                    <SagaDeviceShieldIcon className="w-5 h-5 shrink-0" />
+                    <span>Keamanan Perangkat (1 Akun = 1 HP)</span>
+                  </span>
+                  <span className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full border shrink-0 ${
                     Boolean(effectiveUser?.full_name) && effectiveUser.full_name.toLowerCase().includes('dafa maulana')
-                      ? 'bg-sky-100 text-sky-800 border-sky-300'
+                      ? 'bg-sky-100 text-sky-900 border-sky-300'
                       : deviceBindingStatus.status === 'ACTIVE'
-                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
                       : deviceBindingStatus.status === 'DIFFERENT_DEVICE'
-                      ? 'bg-red-100 text-red-800 border-red-300'
+                      ? 'bg-red-100 text-red-900 border-red-300'
                       : deviceBindingStatus.status === 'UNAVAILABLE'
-                      ? 'bg-orange-100 text-orange-800 border-orange-300'
-                      : 'bg-amber-100 text-amber-800 border-amber-300'
+                      ? 'bg-orange-100 text-orange-900 border-orange-300'
+                      : 'bg-amber-100 text-amber-900 border-amber-300'
                   }`}>
                     {Boolean(effectiveUser?.full_name) && effectiveUser.full_name.toLowerCase().includes('dafa maulana')
-                      ? '🚀 BYPASS MULTI-DEVICE'
+                      ? 'MULTI-PERANGKAT'
                       : deviceBindingStatus.status === 'ACTIVE'
-                      ? '🔒 TERIKAT AKTIF (1 HP)'
+                      ? 'TERIKAT AKTIF (1 HP)'
                       : deviceBindingStatus.status === 'DIFFERENT_DEVICE'
-                      ? '⚠️ HP BERBEDA (DIBLOKIR)'
+                      ? 'HP BERBEDA (DIBLOKIR)'
                       : deviceBindingStatus.status === 'UNAVAILABLE'
-                      ? '⚠️ TIDAK TERVERIFIKASI'
-                      : '🟡 PERLU BINDING'}
+                      ? 'TIDAK TERVERIFIKASI'
+                      : 'PERLU BINDING'}
                   </span>
                 </div>
 
-                <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium leading-relaxed bg-white p-2 rounded-lg sm:rounded-xl border border-slate-200">
+                <p className="text-xs text-slate-600 font-medium leading-relaxed bg-white p-3 rounded-xl border border-slate-200">
                   {deviceBindingStatus.message}
                 </p>
 
-                <div className="flex items-center justify-between text-[9px] sm:text-[10px] font-mono text-slate-500 pt-0.5">
+                <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 pt-0.5">
                   <span>HP Ini: <b>{deviceUUID ? deviceUUID.substring(0, 8) + '...' : 'Browser'}</b></span>
                   <span>Terdaftar: <b>{deviceBindingStatus.registered_uuid ? deviceBindingStatus.registered_uuid.substring(0, 8) + '...' : '-'}</b></span>
                 </div>
@@ -6637,27 +5376,30 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       checkDeviceStatus();
                       showToast('success', 'Status Perangkat Diperbarui', 'Pengecekan ulang binding HP selesai.');
                     }}
-                    className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 font-extrabold text-[10px] sm:text-[11px] rounded-lg border border-slate-300 transition-all cursor-pointer flex items-center gap-1"
+                    className="min-h-11 px-3 bg-white hover:bg-slate-100 text-[#0F172A] font-bold text-xs rounded-xl border border-slate-300 transition-colors cursor-pointer flex items-center gap-1.5"
                   >
-                    <span>🔄 Re-Sync HP</span>
+                    <SagaRoleSwitchIcon className="w-4 h-4 text-[#0D5C46] shrink-0" />
+                    <span>Sinkron Ulang HP</span>
                   </button>
                 </div>
               </div>
 
               {/* Biometric Fingerprint HP Section */}
-              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
-                <div className="flex items-center justify-between text-xs gap-2">
-                  <span className="font-bold text-slate-700 text-xs flex items-center gap-1.5">
-                    <span>👆</span> Sidik Jari HP Guru (Biometric)
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between text-xs gap-2">
+                  <span className="font-bold text-[#0F172A] text-xs sm:text-sm flex items-center gap-2">
+                    <SagaFingerprintIcon className="w-5 h-5 text-[#0D5C46] shrink-0" />
+                    <span>Sidik Jari HP Guru (Biometrik)</span>
                   </span>
-                  <span className={`px-2 py-0.5 text-[9px] sm:text-[10px] font-black rounded-full border shrink-0 ${
-                    isBioEnrolled ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-200 text-slate-700 border-slate-300'
+                  <span className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full border shrink-0 inline-flex items-center gap-1 ${
+                    isBioEnrolled ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-slate-200 text-slate-700 border-slate-300'
                   }`}>
-                    {isBioEnrolled ? '✅ TERDAFTAR DI HP INI' : '⚪ BELUM TERDAFTAR'}
+                    {isBioEnrolled && <SagaCheckBadgeIcon className="w-3.5 h-3.5 shrink-0" />}
+                    <span>{isBioEnrolled ? 'TERDAFTAR DI HP INI' : 'BELUM TERDAFTAR'}</span>
                   </span>
                 </div>
 
-                <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium leading-relaxed bg-white p-2 rounded-lg sm:rounded-xl border border-slate-200">
+                <p className="text-xs text-slate-600 font-medium leading-relaxed bg-white p-3 rounded-xl border border-slate-200">
                   {isBioEnrolled
                     ? 'Sensor sidik jari HP Anda aktif dan siap digunakan untuk presensi masuk & pulang saat berada di area sekolah.'
                     : 'Daftarkan sidik jari HP ini agar Anda bisa langsung absen dengan menyentuh sensor fingerprint HP tanpa perlu scan QR.'}
@@ -6667,57 +5409,85 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <button
                     type="button"
                     onClick={handleOpenBiometricModal}
-                    className="px-3 py-1.5 bg-[#023246] hover:bg-[#0D7A5F] text-white font-extrabold text-[10px] sm:text-[11px] rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                    className="min-h-11 px-3.5 bg-[#0D5C46] hover:bg-[#094736] text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
                   >
-                    <span>👆</span>
-                    <span>{isBioEnrolled ? 'Uji Coba Sidik Jari' : 'Daftarkan Sidik Jari Sekarang'}</span>
+                    <SagaFingerprintIcon tone="dark" className="w-4 h-4 shrink-0" />
+                    <span>{isBioEnrolled ? 'Uji Coba Sidik Jari' : 'Daftarkan Sidik Jari'}</span>
                   </button>
                 </div>
               </div>
 
-              {/* Teacher Appreciation Badge Showcase Section */}
-              <div className="p-3.5 sm:p-4 rounded-2xl bg-[#FFFDF7] border border-amber-200/90 space-y-3 shadow-2xs">
-                <div className="flex items-center justify-between gap-2 border-b border-amber-200/60 pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🎖️</span>
+              {/* Unduh Aplikasi Native / PWA Section */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <SagaAppDownloadIcon className="w-5 h-5 shrink-0" />
                     <div>
-                      <h3 className="font-extrabold text-xs text-[#023246]">Lencana Penghargaan & Apresiasi Kepsek</h3>
-                      <p className="text-[10px] text-slate-500 font-medium">Monitoring performa disiplin internal sekolah</p>
+                      <h3 className="font-bold text-xs sm:text-sm text-[#0F172A]">Unduh Aplikasi SAGA</h3>
+                      <p className="text-xs text-slate-600">Versi Android APK &amp; Windows PC (.exe)</p>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-black rounded-xl shadow-2xs">
+                </div>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('smart_absensi_open_app_install'))}
+                  className="w-full min-h-11 py-2.5 px-4 bg-white hover:bg-slate-100 text-[#0F172A] border border-slate-300 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <SagaAppDownloadIcon className="w-4 h-4 shrink-0" />
+                  <span>Pasang atau Unduh Aplikasi</span>
+                </button>
+              </div>
+
+              {/* Teacher Appreciation Badge Showcase Section */}
+              <div className="p-4 rounded-2xl bg-amber-50/40 border border-amber-200 space-y-3">
+                <div className="flex items-center justify-between gap-2 border-b border-amber-200/70 pb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <SagaMedalRankIcon className="w-6 h-6 shrink-0" />
+                    <div>
+                      <h3 className="font-bold text-xs sm:text-sm text-[#0F172A]">Lencana Penghargaan &amp; Apresiasi</h3>
+                      <p className="text-xs text-slate-600">Monitoring performa disiplin internal sekolah</p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 bg-amber-600 text-white text-xs font-bold rounded-xl shrink-0">
                     {effectiveTotalPoints} Poin
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-2 gap-2.5 text-xs">
                   {appreciationScore.badges.map((badge) => (
                     <div
                       key={badge.id}
-                      className={`p-3 rounded-2xl border space-y-1 transition-all ${
+                      className={`p-3 rounded-2xl border space-y-1.5 ${
                         badge.isUnlocked
-                          ? 'bg-amber-50/60 border-amber-200/90 shadow-2xs text-slate-900'
-                          : 'bg-slate-50/80 border-slate-200 text-slate-400'
+                          ? 'bg-white border-amber-300 text-[#0F172A]'
+                          : 'bg-slate-50 border-slate-200 text-slate-500'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-2xl">{badge.icon}</span>
-                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-lg border ${
+                        {badge.isUnlocked ? (
+                          <SagaMedalRankIcon className="w-6 h-6 shrink-0" />
+                        ) : (
+                          <SagaChallengeTrophyIcon className="w-6 h-6 opacity-45 shrink-0" />
+                        )}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
                           badge.isUnlocked
-                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                            : 'bg-slate-100 text-slate-500 border-slate-200'
+                            ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
                         }`}>
-                          {badge.isUnlocked ? 'TERBUKA ✨' : `${badge.progressPercent}%`}
+                          {badge.isUnlocked ? 'TERBUKA' : `${badge.progressPercent}%`}
                         </span>
                       </div>
-                      <h4 className="font-extrabold text-[11px] text-slate-900 leading-tight pt-1">{badge.title}</h4>
-                      <p className="text-[9px] text-slate-500 leading-relaxed font-medium">{badge.description}</p>
+                      <h4 className="font-bold text-xs text-[#0F172A] leading-tight pt-0.5">{badge.title}</h4>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">{badge.description}</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="p-2.5 bg-amber-50/40 rounded-xl border border-amber-200/60 text-[10px] text-slate-600 font-medium leading-relaxed">
-                  💡 <b>Catatan Kepala Sekolah:</b> Poin dan lencana kehadiran ini dihitung otomatis untuk pertimbangan apresiasi dan reward periodik guru teladan sekolah.
+                <div className="p-3 bg-white rounded-xl border border-amber-200 text-xs text-slate-600 leading-relaxed flex items-start gap-2">
+                  <SagaInfoCircleIcon className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    <b>Catatan Kepala Sekolah:</b> Poin dan lencana kehadiran dihitung otomatis untuk pertimbangan apresiasi periodik guru teladan sekolah.
+                  </span>
                 </div>
               </div>
 
@@ -6725,98 +5495,101 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               <VoiceSettingsCard teacherName={effectiveUser.full_name} institutionName={settings.institution_name} />
 
               {/* Syarat & Ketentuan Section */}
-              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#0D7A5F]/5 border border-[#0D7A5F]/20 space-y-2">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-base">📜</span>
-                    <span className="font-bold text-xs text-[#023246]">Syarat & Ketentuan Presensi</span>
+                    <SagaBookMaterialIcon className="w-5 h-5 shrink-0" />
+                    <span className="font-bold text-xs sm:text-sm text-[#0F172A]">Syarat &amp; Ketentuan Presensi</span>
                   </div>
-                  <span className="text-[10px] font-extrabold text-[#0D7A5F] bg-[#0D7A5F]/10 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-bold text-[#0D5C46] bg-emerald-100 px-2.5 py-0.5 rounded-full">
                     Resmi
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-600 leading-relaxed">
-                  Aturan penggunaan presensi digital, geofence GPS, binding HP, serta tata cara pengajuan izin & koreksi absen.
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Aturan penggunaan presensi digital, geofence GPS, binding HP, serta tata cara pengajuan izin &amp; koreksi absen.
                 </p>
                 <button
                   type="button"
                   onClick={() => setIsTermsModalOpen(true)}
-                  className="w-full mt-1 py-2 px-3 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer"
+                  className="w-full min-h-11 py-2.5 px-4 bg-[#0D5C46] hover:bg-[#094736] text-white text-xs sm:text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>📋</span> Lihat Syarat &amp; Ketentuan Lengkap
+                  <SagaBookMaterialIcon tone="dark" className="w-4 h-4 shrink-0" />
+                  <span>Lihat Syarat &amp; Ketentuan Lengkap</span>
                 </button>
               </div>
 
               {/* Hasil Survei & Suara Guru Section */}
-              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-2">
-                <div className="flex items-center justify-between">
+              <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-base">📊</span>
-                    <span className="font-extrabold text-xs text-emerald-950">Suara Guru &amp; Rencana Solusi Sekolah</span>
+                    <SagaAspirationIcon className="w-5 h-5 shrink-0" />
+                    <span className="font-bold text-xs sm:text-sm text-[#0F172A]">Suara Guru &amp; Solusi Sekolah</span>
                   </div>
-                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-bold text-[#0D5C46] bg-emerald-100 px-2.5 py-0.5 rounded-full shrink-0">
                     100% Anonim
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-600 leading-relaxed">
-                  Evaluasi bersama seluruh pendidik, grafik tingkat kepuasan guru, serta langkah perbaikan nyata yang disiapkan pihak sekolah.
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Evaluasi bersama seluruh pendidik, grafik tingkat kepuasan guru, serta langkah perbaikan nyata dari sekolah.
                 </p>
                 <button
                   type="button"
                   id="btn-guru-open-survey-analytics"
                   onClick={() => {
-                    setSurveyAnalyticsReturnTarget('PROFIL');
+                    setSurveyAnalyticsReturnTarget('AKUN');
                     setActiveTab('BERANDA');
                     setBerandaLayer('SURVEY_ANALYTICS');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="w-full mt-1 py-2.5 px-3 bg-[#023246] hover:bg-[#18536B] text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer min-h-11"
+                  className="w-full min-h-11 py-2.5 px-4 bg-[#0D5C46] hover:bg-[#094736] text-white text-xs sm:text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>📊</span> Buka Layer Suara Guru &amp; Solusi Sekolah
+                  <SagaAspirationIcon tone="dark" className="w-4 h-4 shrink-0" />
+                  <span>Buka Suara Guru &amp; Solusi Sekolah</span>
                 </button>
               </div>
 
               {/* Tentang Aplikasi & Pengembang Section */}
-              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#023246]/5 border border-[#023246]/15 space-y-2">
-                <div className="flex items-center justify-between">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-base">ℹ️</span>
-                    <span className="font-bold text-xs text-[#023246]">Tentang Aplikasi &amp; Pengembang</span>
+                    <SagaInfoCircleIcon className="w-5 h-5 shrink-0" />
+                    <span className="font-bold text-xs sm:text-sm text-[#0F172A]">Tentang Aplikasi &amp; Pengembang</span>
                   </div>
-                  <span className="text-[10px] font-extrabold text-[#023246] bg-[#023246]/10 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-bold text-[#0F172A] bg-slate-200 px-2.5 py-0.5 rounded-full shrink-0">
                     Dafa Maulana, S.Pd
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-600 leading-relaxed">
-                  Inovasi mandiri Guru Informatika bersama AI Agent Google Gemini / Antigravity. Dari scan barcode hingga biometrik sidik jari (100% Zero Budget).
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Inovasi mandiri Guru Informatika bersama AI Agent Google Gemini / Antigravity. Dari scan barcode hingga biometrik sidik jari.
                 </p>
                 <button
                   type="button"
-                  onClick={() => handleOpenAboutLayer('PROFIL')}
-                  className="w-full mt-1 py-2 px-3 bg-[#023246] hover:bg-[#1E5670] text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer"
+                  onClick={() => handleOpenAboutLayer('AKUN')}
+                  className="w-full min-h-11 py-2.5 px-4 bg-white hover:bg-slate-100 text-[#0F172A] border border-slate-300 text-xs sm:text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>📖</span> Lihat Informasi &amp; Kisah Pengembang
+                  <SagaInfoCircleIcon className="w-4 h-4 shrink-0" />
+                  <span>Lihat Informasi &amp; Kisah Pengembang</span>
                 </button>
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-2 pt-1">
+              <div className="space-y-2.5 pt-1">
                 <Button
                   variant="secondary"
                   onClick={() => setIsChangePinOpen(true)}
-                  leftIcon={<KeyIcon className="w-4 h-4 text-slate-700" />}
-                  className="w-full text-xs font-extrabold py-3 flex items-center justify-center gap-2 cursor-pointer rounded-xl min-h-11"
+                  leftIcon={<SagaKeyPinIcon className="w-4 h-4 text-[#0F172A]" />}
+                  className="w-full text-xs sm:text-sm font-bold py-3 flex items-center justify-center gap-2 cursor-pointer rounded-xl min-h-12"
                 >
-                  UBAH PIN KEAMANAN 6-DIGIT
+                  Ubah PIN Keamanan 6-Digit
                 </Button>
 
                 <Button
                   variant="danger"
                   onClick={logout}
-                  leftIcon={<LogOutIcon className="w-4 h-4 text-white" />}
-                  className="w-full text-xs font-extrabold py-3 flex items-center justify-center gap-2 cursor-pointer rounded-xl min-h-11"
+                  leftIcon={<SagaLogoutDoorIcon tone="dark" className="w-4 h-4" />}
+                  className="w-full text-xs sm:text-sm font-bold py-3 flex items-center justify-center gap-2 cursor-pointer rounded-xl min-h-12"
                 >
-                  KELUAR DARI AKUN (LOGOUT)
+                  Keluar dari Akun
                 </Button>
               </div>
             </div>
@@ -6825,73 +5598,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         )}
       </main>
 
-      {/* ── MOBILE BOTTOM NAVIGATION DOCK (Compact & Sleek) ── */}
-      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-120 mx-auto bg-white/95 backdrop-blur-xl border-t border-[#DDD9D0] px-2 py-1.5 z-40 shadow-xl rounded-t-2xl">
-        <div className="flex items-center justify-around relative">
-          <button
-            onClick={() => {
-              setActiveTab('BERANDA');
-              setBerandaLayer('HOME');
-            }}
-            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-11 justify-center active:scale-95 ${
-              activeTab === 'BERANDA' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
-            }`}
-          >
-            <HomeIcon className={`w-5 h-5 ${activeTab === 'BERANDA' ? 'text-[#023246]' : 'text-slate-400'}`} />
-            <span>Beranda</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('RIWAYAT')}
-            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-11 justify-center active:scale-95 ${
-              activeTab === 'RIWAYAT' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
-            }`}
-          >
-            <ChartIcon className={`w-5 h-5 ${activeTab === 'RIWAYAT' ? 'text-[#023246]' : 'text-slate-400'}`} />
-            <span>Riwayat</span>
-          </button>
-
-          {/* Center Compact FAB Scanner Button */}
-          <div className="relative -top-3 flex flex-col items-center">
-            <button
-              onClick={handleOpenAttendanceChoice}
-              className="w-12 h-12 rounded-2xl bg-[#023246] hover:bg-[#0D7A5F] text-white flex items-center justify-center shadow-md ring-4 ring-white active:scale-95 transition-all cursor-pointer min-h-12 min-w-12"
-              title="Presensi (Pilih Sidik Jari atau Scan Barcode)"
-            >
-              <QrCodeScanIcon className="w-6 h-6 text-white" />
-            </button>
-            <span className="text-[9px] font-extrabold text-[#023246] mt-0.5">Absen</span>
-          </div>
-
-          <button
-            onClick={() => setActiveTab('NOTIFIKASI')}
-            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer relative min-h-11 justify-center active:scale-95 ${
-              activeTab === 'NOTIFIKASI' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
-            }`}
-          >
-            {unreadCount > 0 && (
-              <span className="absolute top-0.5 right-2 px-1.5 py-0.2 text-[8px] font-black bg-red-600 text-white rounded-full min-w-4 text-center ring-2 ring-white animate-pulse">
-                {unreadCount}
-              </span>
-            )}
-            <BellIcon className={`w-5 h-5 ${activeTab === 'NOTIFIKASI' ? 'text-[#023246]' : unreadCount > 0 ? 'text-amber-500 animate-bell-ring' : 'text-slate-400'}`} />
-            <span>Notif</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab('PROFIL');
-              setProfilSubView('MAIN');
-            }}
-            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-11 justify-center active:scale-95 ${
-              activeTab === 'PROFIL' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
-            }`}
-          >
-            <UserIcon className={`w-5 h-5 ${activeTab === 'PROFIL' ? 'text-[#023246]' : 'text-slate-400'}`} />
-            <span>Profil</span>
-          </button>
-        </div>
-      </nav>
+      {/* ── MOBILE BOTTOM NAVIGATION DOCK (5-SLOT SUPER-APP) ── */}
+      <GuruBottomNavBar
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          if (tab === 'BERANDA') setBerandaLayer('HOME');
+          if (tab === 'AKUN') setProfilSubView('MAIN');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onPressAbsen={handleOpenAttendanceChoice}
+      />
 
       {/* Leave Application Modal */}
       <LeaveApplicationModal
@@ -6916,7 +5633,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       />
 
       {/* Change PIN Modal */}
-      <Modal isOpen={isChangePinOpen} onClose={() => setIsChangePinOpen(false)} title="🔑 Ubah PIN Keamanan 6-Digit">
+      <Modal isOpen={isChangePinOpen} onClose={() => setIsChangePinOpen(false)} title="Ubah PIN Keamanan 6-Digit">
         <form onSubmit={handleChangePinSubmit} className="space-y-4 py-1">
           <div className="space-y-1">
             <label className="block text-xs font-semibold text-slate-700">PIN Baru (6 Angka)</label>
@@ -6972,7 +5689,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         <Modal
           isOpen={true}
           onClose={() => setSelectedCalendarDay(null)}
-          title={`📅 Detail Presensi: ${selectedCalendarDay.dateStr}`}
+          title={`Detail Presensi: ${selectedCalendarDay.dateStr}`}
           maxWidth="md"
         >
           <div className="space-y-4 py-1">
@@ -6997,12 +5714,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </div>
             ) : selectedCalendarDay.isHoliday ? (
               <div className="p-3.5 bg-slate-100 rounded-2xl border border-slate-200 text-xs text-slate-700 font-bold flex items-center gap-2">
-                <span className="text-lg">🏖️</span>
+                <SagaHolidayIcon className="w-5 h-5 shrink-0" />
                 <span>{selectedCalendarDay.holidayDesc || 'Hari Libur Kerja / Akhir Pekan'}</span>
               </div>
             ) : (
               <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 font-bold flex items-center gap-2">
-                <span>⚠️</span>
+                <SagaInfoCircleIcon className="w-5 h-5 shrink-0" />
                 <span>Tidak ada catatan presensi fisik pada tanggal ini.</span>
               </div>
             )}
@@ -7016,9 +5733,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   setSelectedCalendarDay(null);
                   handleOpenCorrectionModal(targetDay);
                 }}
-                className="text-xs font-bold flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold flex items-center gap-1.5 cursor-pointer"
               >
-                <span>✏️ Ajukan Koreksi Date Ini</span>
+                <SagaEditPencilIcon className="w-4 h-4 shrink-0" />
+                <span>Ajukan Koreksi Tanggal Ini</span>
               </Button>
               <Button variant="primary" type="button" onClick={() => setSelectedCalendarDay(null)} className="text-xs font-bold cursor-pointer">
                 Tutup
@@ -7132,7 +5850,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         hasRecordedDemeritToday={hasRecordedDemeritToday}
         onOpenComplaintModal={() => setIsComplaintModalOpen(true)}
         onOpenMoodModal={() => setIsMoodModalOpen(true)}
-        onOpenVoiceSettings={() => setActiveTab('PROFIL')}
+        onOpenVoiceSettings={() => setActiveTab('AKUN')}
         onOpenTermsModal={() => setIsTermsModalOpen(true)}
         onOpenChangePin={() => setIsChangePinOpen(true)}
         onLogout={logout}
@@ -7165,9 +5883,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         }}
         onOpenTeacherBoard={() => {
           setIsMoreFeaturesModalOpen(false);
-          if (isTeacherBoardTourActive) {
-            handleDismissTeacherBoardTour();
-          }
           setIsTeacherBoardOpen(true);
         }}
         onOpenGamePidModal={() => {

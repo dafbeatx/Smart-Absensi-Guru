@@ -1,16 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { UserProfile } from '../../../types/database.types';
 import type { TeacherLeaderboardItem } from '../../../utils/teacher-appreciation.utils';
 import { getDisciplinePeriodMetadata } from '../../../utils/teacher-appreciation.utils';
+import { ArrowRight, X } from 'lucide-react';
 import {
-  Trophy,
-  Award,
-  Sparkles,
-  ArrowRight,
-  ShieldCheck,
-  X,
-  Printer,
-} from 'lucide-react';
+  SagaChallengeTrophyIcon,
+  SagaDeviceShieldIcon,
+  SagaMedalRankIcon,
+  SagaPrinterIcon,
+  SagaSparkAiIcon,
+} from '../../../components/ui/SagaServiceIcons';
 import { TeacherExcellenceCertificateModal } from './TeacherExcellenceCertificateModal';
 
 interface TopDisciplineCelebrationModalProps {
@@ -41,6 +40,16 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const defaultPeriod = React.useMemo(() => getDisciplinePeriodMetadata('CURRENT_MONTH').label, []);
   const effectivePeriod = periodMonthYear || defaultPeriod;
+
+  useEffect(() => {
+    if (!isOpen || rank < 1 || rank > 3) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen, rank]);
+
   if (!isOpen || rank < 1 || rank > 3) return null;
 
   const isRank1 = rank === 1;
@@ -55,34 +64,28 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
     ? 'Peringkat 3 Pendidik Terdisiplin'
     : `Peringkat #${rank} Pendidik Terdisiplin`;
 
-  const rankBadgeEmoji = isRank1 ? '🥇' : isRank2 ? '🥈' : isRank3 ? '🥉' : '🎖️';
-
   const rankTheme = isRank1
     ? {
-        border: 'border-amber-300',
-        bg: 'from-amber-500/15 via-white to-amber-50/40',
-        badgeBg: 'bg-amber-400 text-slate-950',
+        border: 'sm:border-amber-300',
         cardBorder: 'border-amber-300/80',
-        accentText: 'text-amber-900',
       }
     : isRank2
     ? {
-        border: 'border-slate-300',
-        bg: 'from-slate-500/10 via-white to-slate-50/40',
-        badgeBg: 'bg-slate-300 text-slate-900',
+        border: 'sm:border-slate-300',
         cardBorder: 'border-slate-300/80',
-        accentText: 'text-slate-900',
       }
     : {
-        border: 'border-amber-200',
-        bg: 'from-amber-600/10 via-white to-amber-50/30',
-        badgeBg: 'bg-amber-600/20 text-amber-900',
+        border: 'sm:border-amber-200',
         cardBorder: 'border-amber-300/60',
-        accentText: 'text-amber-900',
       };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/70"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Apresiasi Kedisiplinan Guru"
+    >
       {/* Backdrop */}
       <div
         className="fixed inset-0"
@@ -90,150 +93,163 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
         aria-hidden="true"
       />
 
-      {/* Modal Container */}
+      {/* Fullscreen Infinix Note 8 / Centered Desktop Container */}
       <div
-        className={`relative w-full max-w-md bg-white rounded-3xl shadow-2xl border-2 ${rankTheme.border} p-5 sm:p-6 text-center space-y-4 z-10 overflow-hidden animate-scale-up`}
+        className={`relative w-full h-dvh sm:h-auto sm:max-h-[92dvh] sm:max-w-md bg-white rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border-2 ${rankTheme.border} flex flex-col overflow-hidden z-10`}
       >
-        {/* Decorative Top Accent Glow */}
-        <div
-          className={`absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-48 rounded-full bg-linear-to-b ${rankTheme.bg} blur-2xl pointer-events-none opacity-60`}
-        />
-
-        {/* Close Button */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer z-20"
-          aria-label="Tutup"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        {/* Trophy & Sparkles Hero Header */}
-        <div className="relative pt-2">
-          <div className="relative inline-block">
-            {/* Pulsing ring */}
-            <div className="absolute inset-0 rounded-3xl bg-amber-400/20 animate-ping" />
-
-            <div className="relative w-20 h-20 sm:w-22 sm:h-22 rounded-3xl bg-linear-to-br from-[#18536B] to-[#023246] text-amber-300 flex items-center justify-center shadow-lg border-2 border-amber-300/80 mx-auto">
-              <Trophy className="w-10 h-10 sm:w-11 sm:h-11 text-amber-300" />
+        {/* 1. Sticky Top Header */}
+        <header className="shrink-0 bg-white border-b border-slate-100 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-2.5 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-[#F8FAFC] border border-slate-200 flex items-center justify-center shrink-0">
+              <SagaMedalRankIcon rank={rank} className="w-6 h-6" />
             </div>
-
-            {/* Medal Badge Pill */}
-            <span className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-white text-slate-900 flex items-center justify-center text-lg font-black shadow-md border-2 border-amber-400">
-              {rankBadgeEmoji}
-            </span>
-          </div>
-        </div>
-
-        {/* Celebratory Title & Badges */}
-        <div className="space-y-1.5 relative z-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black uppercase tracking-wider">
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>Apresiasi Resmi Kepala Sekolah</span>
-          </div>
-
-          <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
-            Selamat, {user?.full_name || 'Bapak/Ibu Guru'}!
-          </h3>
-
-          <p className="text-xs sm:text-sm font-bold text-slate-600">
-            Anda berhasil meraih{' '}
-            <span className="text-amber-800 font-extrabold underline decoration-amber-400">
-              {rankTitle}
-            </span>{' '}
-            Bulan Ini
-          </p>
-        </div>
-
-        {/* Score & Recognition Card */}
-        <div
-          className={`rounded-2xl border ${rankTheme.cardBorder} bg-linear-to-br from-slate-50 via-white to-amber-50/30 p-3.5 sm:p-4 text-left space-y-2.5 shadow-2xs relative z-10`}
-        >
-          <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
-            <div className="flex items-center gap-2">
-              <Award className="w-4 h-4 text-amber-700" />
-              <span className="text-xs font-bold text-slate-700">Akumulasi Kedisiplinan</span>
-            </div>
-            <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
-              {totalPoints} Poin
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-white p-2.5 rounded-xl border border-slate-100">
-              <span className="text-[10px] font-bold text-slate-400 block uppercase">
-                Posisi Sekolah
-              </span>
-              <span className="text-sm font-black text-slate-900">
-                Peringkat #{rank}
-              </span>
-            </div>
-
-            <div className="bg-white p-2.5 rounded-xl border border-slate-100">
-              <span className="text-[10px] font-bold text-slate-400 block uppercase">
-                Ketepatan Waktu
-              </span>
-              <span className="text-sm font-black text-emerald-700">
-                {teacherData?.hadirTepatWaktuCount || '100%'} On-Time
-              </span>
+            <div className="min-w-0 text-left">
+              <h2 className="text-sm font-bold text-slate-900 truncate leading-tight">
+                Apresiasi Pendidik Terdisiplin
+              </h2>
+              <p className="text-xs text-slate-500 font-medium truncate">
+                Periode {effectivePeriod}
+              </p>
             </div>
           </div>
 
-          {/* Klasemen Transparan 3 Besar Sekolah */}
-          {topTeachers && topTeachers.length > 0 && (
-            <div className="pt-2 border-t border-slate-100/90 space-y-1.5 text-left">
-              <div className="flex items-center justify-between text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                <span>Klasemen 3 Besar Bulan Ini</span>
-                <span className="text-emerald-700 font-bold">Terverifikasi Realtime</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            aria-label="Tutup"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </header>
+
+        {/* 2. Scrollable Body */}
+        <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4 text-center">
+          {/* Trophy Emblem */}
+          <div className="relative flex justify-center">
+            <div className="relative inline-block">
+              <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-3xl bg-[#0D5C46] text-white flex items-center justify-center shadow-md border-2 border-amber-300 mx-auto">
+                <SagaChallengeTrophyIcon tone="dark" className="w-11 h-11" />
               </div>
-              <div className="space-y-1">
-                {topTeachers.slice(0, 3).map((item, idx) => {
-                  const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉';
-                  const isCurrentItem = item.isCurrentUser || (user?.id && item.id === user.id);
-                  return (
-                    <div
-                      key={item.id || idx}
-                      className={`px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between gap-2 border transition-all ${
-                        isCurrentItem
-                          ? 'bg-amber-50/90 border-amber-300 font-black text-slate-900 shadow-2xs'
-                          : 'bg-white border-slate-100 text-slate-700 font-medium'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <span className="text-sm shrink-0">{medal}</span>
-                        <span className="truncate text-[11px] font-bold">
-                          {item.name} {isCurrentItem ? '(Anda)' : ''}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0 text-right">
-                        <span className="text-[10px] text-slate-400 font-bold hidden sm:inline">
-                          {item.hadirTepatWaktuCount} On-Time
-                        </span>
-                        <span className={`text-[11px] font-black ${isCurrentItem ? 'text-amber-900' : 'text-slate-800'}`}>
-                          {item.totalPoints} Poin
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+
+              <span className="absolute -bottom-2 -right-2 w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-sm border-2 border-amber-400">
+                <SagaMedalRankIcon rank={rank} className="w-6 h-6" />
+              </span>
+            </div>
+          </div>
+
+          {/* Celebratory Title */}
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold uppercase tracking-wide">
+              <SagaSparkAiIcon className="w-3.5 h-3.5" />
+              <span>Apresiasi Resmi Kepala Sekolah</span>
+            </div>
+
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">
+              Selamat, {user?.full_name || 'Bapak/Ibu Guru'}!
+            </h3>
+
+            <p className="text-sm font-medium text-slate-600">
+              Anda berhasil meraih{' '}
+              <span className="text-[#0D5C46] font-bold underline decoration-amber-400">
+                {rankTitle}
+              </span>{' '}
+              Bulan Ini
+            </p>
+          </div>
+
+          {/* Score & Recognition Card */}
+          <div
+            className={`rounded-2xl border ${rankTheme.cardBorder} bg-[#F8FAFC] p-3.5 sm:p-4 text-left space-y-3`}
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2">
+              <div className="flex items-center gap-2">
+                <SagaMedalRankIcon rank={rank} className="w-5 h-5" />
+                <span className="text-xs font-bold text-slate-700">Akumulasi Kedisiplinan</span>
+              </div>
+              <span className="text-xs font-bold text-[#0D5C46] bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                {totalPoints} Poin
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200">
+                <span className="text-[11px] font-semibold text-slate-500 block uppercase">
+                  Posisi Sekolah
+                </span>
+                <span className="text-sm font-bold text-slate-900">
+                  Peringkat #{rank}
+                </span>
+              </div>
+
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200">
+                <span className="text-[11px] font-semibold text-slate-500 block uppercase">
+                  Ketepatan Waktu
+                </span>
+                <span className="text-sm font-bold text-[#0D5C46]">
+                  {teacherData?.hadirTepatWaktuCount || '100%'} On-Time
+                </span>
               </div>
             </div>
-          )}
 
-          {/* Pesan Inspiratif */}
-          <div className="pt-1 text-[11px] text-slate-600 leading-relaxed italic border-t border-slate-100/80">
-            &ldquo;Keteladanan waktu dan dedikasi bapak/ibu adalah cermin kebaikan bagi seluruh murid di
-            sekolah. Pertahankan prestasi dan integritas mulia ini.&rdquo;
-            <span className="block not-italic font-bold text-slate-700 mt-1">
-              — Farhan Sopian Sahid, S.Pd.I (Kepala Sekolah)
-            </span>
+            {/* Klasemen Transparan 3 Besar Sekolah */}
+            {topTeachers && topTeachers.length > 0 && (
+              <div className="pt-2 border-t border-slate-200 space-y-1.5 text-left">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                  <span>Klasemen 3 Besar Bulan Ini</span>
+                  <span className="text-[#0D5C46]">Terverifikasi Realtime</span>
+                </div>
+                <div className="space-y-1.5">
+                  {topTeachers.slice(0, 3).map((item, idx) => {
+                    const isCurrentItem = item.isCurrentUser || (user?.id && item.id === user.id);
+                    return (
+                      <div
+                        key={item.id || idx}
+                        className={`px-3 py-2 rounded-xl text-xs flex items-center justify-between gap-2 border ${
+                          isCurrentItem
+                            ? 'bg-amber-50 border-amber-300 font-bold text-slate-900'
+                            : 'bg-white border-slate-200 text-slate-700 font-medium'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <SagaMedalRankIcon rank={idx + 1} className="w-5 h-5 shrink-0" />
+                          <span className="truncate text-xs font-bold">
+                            {item.name} {isCurrentItem ? '(Anda)' : ''}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 text-right">
+                          <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline">
+                            {item.hadirTepatWaktuCount} On-Time
+                          </span>
+                          <span className={`text-xs font-bold ${isCurrentItem ? 'text-amber-900' : 'text-slate-900'}`}>
+                            {item.totalPoints} Poin
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Pesan Inspiratif */}
+            <div className="pt-2 text-xs text-slate-600 leading-relaxed italic border-t border-slate-200">
+              &ldquo;Keteladanan waktu dan dedikasi bapak/ibu adalah cermin kebaikan bagi seluruh murid di
+              sekolah. Pertahankan prestasi dan integritas mulia ini.&rdquo;
+              <span className="block not-italic font-bold text-slate-800 mt-1">
+                — Farhan Sopian Sahid, S.Pd.I (Kepala Sekolah)
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 font-medium">
+            <SagaDeviceShieldIcon className="w-4 h-4 shrink-0" />
+            <span>Terverifikasi Otomatis oleh Sistem Keamanan Absensi</span>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="space-y-2 pt-1 relative z-10">
-          {/* Tombol Piagam Penghargaan Resmi Juara 1, 2, dan 3 */}
+        {/* 3. Sticky Bottom Action Bar */}
+        <div className="shrink-0 bg-white border-t border-slate-100 p-4 pb-[max(14px,env(safe-area-inset-bottom))] space-y-2 z-10">
           {rank <= 3 && (
             <button
               type="button"
@@ -244,18 +260,16 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
                   setIsCertificateOpen(true);
                 }
               }}
-              className={`w-full h-11 rounded-2xl active:scale-[0.98] text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
+              className={`w-full min-h-12 px-4 rounded-2xl active:scale-[0.99] text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
                 isRank1
-                  ? 'bg-amber-400 hover:bg-amber-500 text-slate-950'
+                  ? 'bg-amber-400 hover:bg-amber-300 text-slate-950'
                   : isRank2
                   ? 'bg-slate-200 hover:bg-slate-300 text-slate-900 border border-slate-300'
-                  : 'bg-amber-600 hover:bg-amber-700 text-white'
+                  : 'bg-amber-700 hover:bg-amber-800 text-white'
               }`}
             >
-              <Printer className="w-4 h-4" />
-              <span>
-                {rankBadgeEmoji} Lihat &amp; Cetak Piagam Juara {rank} (PDF)
-              </span>
+              <SagaPrinterIcon tone={isRank3 ? 'dark' : 'light'} className="w-5 h-5 shrink-0" />
+              <span>Lihat &amp; Cetak Piagam Juara {rank} (PDF)</span>
             </button>
           )}
 
@@ -265,25 +279,19 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
               onClose();
               onOpenLeaderboard();
             }}
-            className="w-full h-11 rounded-2xl bg-[#023246] hover:bg-[#034560] active:scale-[0.98] text-white text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+            className="w-full min-h-12 px-4 rounded-2xl bg-[#0D5C46] hover:bg-[#094736] active:scale-[0.99] text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
             <span>Buka Layer Penjelasan &amp; Peringkat</span>
-            <ArrowRight className="w-4 h-4 text-cyan-300" />
+            <ArrowRight className="w-4 h-4 text-emerald-200" />
           </button>
 
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+            className="w-full min-h-11 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
           >
             Terima Kasih, Lanjut ke Beranda
           </button>
-        </div>
-
-        {/* Footer Verification Badge */}
-        <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400 font-semibold pt-1 border-t border-slate-100">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Terverifikasi Otomatis oleh Sistem Keamanan Absensi</span>
         </div>
       </div>
 

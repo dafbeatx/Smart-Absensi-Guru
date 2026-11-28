@@ -62,7 +62,7 @@ export class AttendanceEngine {
       const geofenceSettings = GPSService.getGeofenceSettings();
       let gpsCoords: GPSCoordinates;
       try {
-        gpsCoords = await GPSService.getCurrentPosition(geofenceSettings.lat, geofenceSettings.lng);
+        gpsCoords = await GPSService.getCurrentPosition(geofenceSettings.lat, geofenceSettings.lng, { mode: 'QR_SCAN' });
         // Fallback for dev/test mode if actual browser GPS is outside school geofence
         if (
           (qrRawData.includes('TEST') || qrRawData.includes('DEV') || token.includes('DEV_')) &&
@@ -75,7 +75,7 @@ export class AttendanceEngine {
         gpsCoords = { latitude: geofenceSettings.lat, longitude: geofenceSettings.lng, accuracy: 5, distanceMeters: 12 };
       }
 
-      const gpsResult = GPSService.validateGeofenceRadius(gpsCoords, geofenceSettings.radius);
+      const gpsResult = GPSService.validateGeofenceRadius(gpsCoords, geofenceSettings.radius, { mode: 'QR_SCAN' });
       if (!gpsResult.isValid) {
         return {
           success: false,
@@ -192,7 +192,7 @@ export class AttendanceEngine {
       const geofenceSettings = GPSService.getGeofenceSettings();
       let gpsCoords: GPSCoordinates;
       try {
-        gpsCoords = await GPSService.getCurrentPosition(geofenceSettings.lat, geofenceSettings.lng);
+        gpsCoords = await GPSService.getCurrentPosition(geofenceSettings.lat, geofenceSettings.lng, { mode: 'BIOMETRIC' });
         if (token.includes('DEV_') && gpsCoords.distanceMeters > geofenceSettings.radius) {
           gpsCoords = { latitude: geofenceSettings.lat, longitude: geofenceSettings.lng, accuracy: 5, distanceMeters: 12 };
         }
@@ -209,7 +209,11 @@ export class AttendanceEngine {
         }
       }
 
-      const gpsResult = GPSService.validateGeofenceRadius(gpsCoords, geofenceSettings.radius, { maxAllowedAccuracy: 100 });
+      const gpsResult = GPSService.validateGeofenceRadius(gpsCoords, geofenceSettings.radius, {
+        mode: 'BIOMETRIC',
+        maxAllowedAccuracy: 100,
+        maxCompensationMeters: 25,
+      });
       if (!gpsResult.isValid) {
         notify('ERROR');
         return {

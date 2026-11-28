@@ -1,5 +1,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Sparkles, Trophy, ShieldCheck, Clock, Award, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import {
+  SagaChallengeTrophyIcon,
+  SagaCheckBadgeIcon,
+  SagaClockStatusIcon,
+  SagaDeviceShieldIcon,
+  SagaSparkAiIcon,
+} from './SagaServiceIcons';
 import { SoundService } from '../../services/audio.service';
 import { SpeechService } from '../../services/speech.service';
 
@@ -30,9 +37,7 @@ interface Particle {
   top: number;
   size: number;
   color: string;
-  delay: number;
-  duration: number;
-  symbol: string;
+  shape: 'star' | 'diamond' | 'dot';
 }
 
 export const PointRewardCelebrationOverlay: React.FC<PointRewardCelebrationOverlayProps> = ({
@@ -42,26 +47,18 @@ export const PointRewardCelebrationOverlay: React.FC<PointRewardCelebrationOverl
 }) => {
   const [secondsLeft, setSecondsLeft] = useState(5);
 
-  // Generate festive floating confetti particles
+  // Confetti SVG geometris statis yang tenang & ringan (nol emoji)
   const particles: Particle[] = useMemo(() => {
-    const symbols = ['⭐', '✨', '✦', '🎖️', '💫', '⚡'];
-    const colors = [
-      'text-amber-300',
-      'text-yellow-400',
-      'text-emerald-300',
-      'text-cyan-300',
-      'text-amber-200',
-    ];
+    const shapes: Array<'star' | 'diamond' | 'dot'> = ['star', 'diamond', 'dot'];
+    const colors = ['#FDE047', '#4ADE80', '#60A5FA', '#FB923C', '#FDA4AF'];
 
-    return Array.from({ length: 22 }).map((_, idx) => ({
+    return Array.from({ length: 18 }).map((_, idx) => ({
       id: idx,
-      left: Math.floor(Math.random() * 92) + 4,
-      top: Math.floor(Math.random() * 85) + 5,
-      size: Math.floor(Math.random() * 12) + 14,
+      left: ((idx * 19 + 7) % 88) + 6,
+      top: ((idx * 23 + 9) % 82) + 6,
+      size: 10 + (idx % 3) * 3,
       color: colors[idx % colors.length],
-      delay: (idx * 0.18) % 2.5,
-      duration: 2.5 + (idx % 3) * 0.8,
-      symbol: symbols[idx % symbols.length],
+      shape: shapes[idx % shapes.length],
     }));
   }, []);
 
@@ -108,117 +105,106 @@ export const PointRewardCelebrationOverlay: React.FC<PointRewardCelebrationOverl
       aria-modal="true"
       aria-label="Apresiasi Poin Kedisiplinan"
     >
-      {/* 🌟 Floating Background Glowing Sunburst Halo */}
-      <div className="absolute w-80 h-80 sm:w-96 sm:h-96 rounded-full bg-linear-to-tr from-amber-500/25 via-yellow-400/20 to-transparent blur-3xl pointer-events-none animate-pulse-glow" />
-      <div className="absolute w-64 h-64 sm:w-72 sm:h-72 rounded-full bg-linear-to-bl from-emerald-500/15 via-amber-400/10 to-transparent blur-2xl pointer-events-none" />
-
-      {/* 🌟 Sparkling Floating Particles (Confetti Stars) */}
+      {/* Confetti SVG geometris bersih (nol emoji, nol halo blur) */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {particles.map((p) => (
-          <div
+          <svg
             key={p.id}
-            className={`absolute ${p.color} transition-all drop-shadow-md`}
-            style={{
-              left: `${p.left}%`,
-              top: `${p.top}%`,
-              fontSize: `${p.size}px`,
-              animation: `float-gentle ${p.duration}s ease-in-out infinite`,
-              animationDelay: `${p.delay}s`,
-            }}
+            viewBox="0 0 12 12"
+            width={p.size}
+            height={p.size}
+            className="absolute opacity-80"
+            style={{ left: `${p.left}%`, top: `${p.top}%` }}
+            aria-hidden="true"
           >
-            {p.symbol}
-          </div>
+            {p.shape === 'star' && (
+              <path
+                d="M6 0.8 7.3 4.7 11.2 6 7.3 7.3 6 11.2 4.7 7.3 0.8 6 4.7 4.7Z"
+                fill={p.color}
+              />
+            )}
+            {p.shape === 'diamond' && (
+              <polygon points="6,1 11,6 6,11 1,6" fill={p.color} />
+            )}
+            {p.shape === 'dot' && <circle cx="6" cy="6" r="3.5" fill={p.color} />}
+          </svg>
         ))}
       </div>
 
-      {/* 🌟 CARDLESS FLOATING AWARD CELEBRATION (TANPA KOTAK CARD) */}
+      {/* Reward Celebration Panel */}
       <div
-        className="relative z-10 flex flex-col items-center justify-center text-center max-w-sm sm:max-w-md w-full px-2"
+        className="relative z-10 flex flex-col items-center justify-center text-center max-w-sm sm:max-w-md w-full px-4"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 1. Floating Animated 3D Trophy & Rotating Halo */}
-        <div className="relative animate-float-gentle flex items-center justify-center mb-2">
-          {/* Subtle rotating sunbeam aura */}
-          <div className="absolute w-36 h-36 sm:w-44 sm:h-44 rounded-full border border-amber-300/30 bg-radial from-amber-400/20 via-transparent to-transparent animate-spin-slow pointer-events-none" />
-
-          {/* Floating Trophy Emblem */}
-          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-linear-to-br from-amber-300 via-yellow-500 to-amber-600 flex items-center justify-center shadow-[0_0_60px_rgba(251,191,36,0.65)] border-2 border-amber-100 ring-8 ring-amber-400/25">
-            <Trophy className="w-12 h-12 sm:w-14 sm:h-14 text-slate-950 drop-shadow-md" />
-            <span className="absolute -top-3 -right-2 text-2xl sm:text-3xl animate-bounce">
-              ✨
-            </span>
-            <span className="absolute -bottom-2 -left-2 text-xl sm:text-2xl animate-pulse">
-              🌟
-            </span>
+        {/* 1. Emblem Piala Resmi */}
+        <div className="relative flex items-center justify-center mb-3">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-[#0D5C46] flex items-center justify-center border-2 border-amber-300 shadow-lg">
+            <SagaChallengeTrophyIcon tone="dark" className="w-14 h-14" />
           </div>
         </div>
 
-        {/* 2. Floating Tagline */}
-        <div className="flex items-center gap-1.5 text-amber-300 text-xs sm:text-sm font-black uppercase tracking-widest drop-shadow-[0_2px_10px_rgba(251,191,36,0.7)] mt-1">
-          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-          <span>APRESIASI KEDISIPLINAN SEKOLAH</span>
-          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+        {/* 2. Tagline */}
+        <div className="flex items-center gap-1.5 text-amber-300 text-xs sm:text-sm font-bold uppercase tracking-wider mt-1">
+          <SagaSparkAiIcon tone="dark" className="w-4 h-4 shrink-0" />
+          <span>Apresiasi Kedisiplinan Sekolah</span>
         </div>
 
-        {/* 3. Giant Glowing Points Badge */}
-        <div className="flex items-baseline justify-center gap-2 mt-1 drop-shadow-[0_0_35px_rgba(251,191,36,0.9)]">
-          <span className="text-6xl sm:text-7xl font-black text-transparent bg-clip-text bg-linear-to-b from-yellow-100 via-amber-300 to-amber-500 tracking-tight">
+        {/* 3. Points Badge */}
+        <div className="flex items-baseline justify-center gap-2 mt-1.5">
+          <span className="text-5xl sm:text-6xl font-bold text-amber-300 tracking-tight">
             +{data.points}
           </span>
-          <span className="text-2xl sm:text-3xl font-black text-amber-300 uppercase tracking-wider">
+          <span className="text-2xl sm:text-3xl font-bold text-white uppercase tracking-wider">
             POIN
           </span>
         </div>
 
-        {/* 4. Translucent Floating Pills (No Card Box) */}
-        <div className="mt-3 flex flex-col items-center gap-2 max-w-xs sm:max-w-sm">
-          {/* Main Reason Pill */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-amber-300/40 text-amber-100 text-xs sm:text-sm font-bold shadow-lg">
+        {/* 4. Pill Keterangan */}
+        <div className="mt-3 flex flex-col items-center gap-2 max-w-xs sm:max-w-sm w-full">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/25 text-amber-100 text-xs sm:text-sm font-bold">
             {isOnTime || isCheckout ? (
-              <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
+              <SagaClockStatusIcon tone="dark" className="w-4 h-4 shrink-0" />
             ) : (
-              <Award className="w-4 h-4 text-amber-400 shrink-0" />
+              <SagaCheckBadgeIcon tone="dark" className="w-4 h-4 shrink-0" />
             )}
             <span>{data.reason}</span>
           </div>
 
-          {/* Duty Bonus Pill if applicable */}
           {hasDutyBonus && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/60 backdrop-blur-md border border-emerald-400/40 text-emerald-200 text-xs font-bold shadow-md">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#0D5C46] border border-emerald-300/40 text-emerald-100 text-xs font-semibold">
+              <SagaDeviceShieldIcon tone="dark" className="w-4 h-4 shrink-0" />
               <span>Termasuk Bonus Tugas Piket (+{data.breakdown?.piket} Poin)</span>
             </div>
           )}
 
-          {/* Checkout Pill if applicable */}
           {hasCheckoutBonus && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/60 backdrop-blur-md border border-cyan-400/40 text-cyan-200 text-xs font-bold shadow-md">
-              <ShieldCheck className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-800 border border-white/25 text-slate-100 text-xs font-semibold">
+              <SagaDeviceShieldIcon tone="dark" className="w-4 h-4 shrink-0" />
               <span>Tuntas Jam Dinas Sekolah (+{data.breakdown?.checkout} Poin)</span>
             </div>
           )}
         </div>
 
-        {/* 5. Personal Congratulatory Message */}
-        <div className="mt-4 text-center max-w-sm px-4 space-y-1">
-          <h4 className="text-white font-extrabold text-base sm:text-lg drop-shadow-md">
+        {/* 5. Pesan Ucapan */}
+        <div className="mt-4 text-center max-w-sm px-2 space-y-1">
+          <h4 className="text-white font-bold text-base sm:text-lg">
             Selamat, {cleanName}!
           </h4>
-          <p className="text-slate-200 text-xs sm:text-sm leading-relaxed drop-shadow-sm font-medium">
+          <p className="text-slate-200 text-sm leading-relaxed font-normal">
             {isCheckout
-              ? 'Terima kasih atas dedikasi dan pengabdian Anda bertugas di sekolah hari ini. Selamat beristirahat!'
+              ? 'Terima kasih atas dedikasi dan pengabdian Anda bertugas di sekolah hari ini. Selamat beristirahat.'
               : isOnTime
               ? 'Kehadiran tepat waktu Anda menjadi inspirasi dan keteladanan hidup bagi seluruh murid.'
               : 'Terima kasih atas dedikasi dan komitmen Anda bertugas di sekolah hari ini.'}
           </p>
         </div>
 
-        {/* 6. Floating Action Button (Glowing Pill) */}
+        {/* 6. Tombol Lanjutkan */}
         <div className="mt-6 flex flex-col items-center gap-2.5 w-full">
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-linear-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-400 active:scale-95 text-slate-950 font-black text-xs sm:text-sm tracking-wider uppercase transition-all shadow-[0_0_30px_rgba(251,191,36,0.6)] cursor-pointer flex items-center justify-center gap-2 min-h-12"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-slate-950 font-bold text-sm tracking-wide transition-colors cursor-pointer flex items-center justify-center gap-2 min-h-12"
           >
             <span>Lanjutkan ke Beranda</span>
             <ArrowRight className="w-4 h-4" />

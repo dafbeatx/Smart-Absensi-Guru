@@ -1,7 +1,8 @@
 import React from 'react';
+import { SagaEmptyListIllustration } from './SagaServiceIcons';
 
 export interface EmptyStateProps {
-  icon?: string;
+  icon?: React.ReactNode;
   title: string;
   description: string;
   actionLabel?: string;
@@ -10,7 +11,7 @@ export interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  icon = '📂',
+  icon,
   title,
   description,
   actionLabel,
@@ -18,9 +19,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`bg-white rounded-2xl p-8 border border-slate-200/80 text-center space-y-3 shadow-xs ${className}`}>
-      <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-500 text-2xl flex items-center justify-center mx-auto shadow-inner">
-        {icon}
+    <div className={`bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 text-center space-y-3 ${className}`}>
+      <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-600 text-2xl flex items-center justify-center mx-auto">
+        {icon ?? <SagaEmptyListIllustration className="w-12 h-12" />}
       </div>
       <div className="space-y-1 max-w-sm mx-auto">
         <h3 className="font-extrabold text-slate-900 text-sm tracking-tight">{title}</h3>

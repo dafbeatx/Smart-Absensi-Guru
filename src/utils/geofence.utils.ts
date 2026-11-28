@@ -96,3 +96,259 @@ export const sanitizeSchoolCoordinates = (
 
   return { lat, lng };
 };
+
+export interface CompensatedDistanceResult {
+  rawDistanceMeters: number;
+  compensationMeters: number;
+  effectiveDistanceMeters: number;
+}
+
+/**
+ * Computes bounded effective distance from raw geofence distance and GPS accuracy:
+ *   effectiveDistance = Math.max(0, rawDistance - Math.min(safeAccuracy, B_max))
+ * Invalid/negative/NaN accuracy values yield 0 compensation.
+ */
+export const calculateCompensatedDistance = (
+  rawDistanceMeters: number,
+  accuracyMeters: unknown,
+  maxCompensationMeters: number = 35
+): CompensatedDistanceResult => {
+  const safeRaw =
+    typeof rawDistanceMeters === 'number' && Number.isFinite(rawDistanceMeters)
+      ? Math.max(0, Math.round(rawDistanceMeters))
+      : 0;
+  const safeAccuracy =
+    typeof accuracyMeters === 'number' && Number.isFinite(accuracyMeters) && accuracyMeters > 0
+      ? accuracyMeters
+      : 0;
+  const safeMaxComp =
+    typeof maxCompensationMeters === 'number' && Number.isFinite(maxCompensationMeters)
+      ? Math.max(0, Math.round(maxCompensationMeters))
+      : 0;
+
+  const compensationMeters = Math.min(Math.round(safeAccuracy), safeMaxComp);
+  const effectiveDistanceMeters = Math.max(0, safeRaw - compensationMeters);
+
+  return {
+    rawDistanceMeters: safeRaw,
+    compensationMeters,
+    effectiveDistanceMeters,
+  };
+};
+
+export interface ServerGeofenceGateParams {
+  rawDistanceMeters: number;
+  gpsAccuracy: unknown;
+  allowedRadiusMeters: number;
+  isBiometric: boolean;
+  isOfflineSync?: boolean;
+  maxAllowedAccuracyMeters?: number;
+  maxCompensationMeters?: number;
+}
+
+/**
+ * Backend geofence validator synchronized with client B_max compensation bounds.
+ * Biometric defaults to strict B_max = 25m; Door QR defaults to B_max = 35m.
+ * If accuracy is missing/NaN/negative or exceeds maxAllowedAccuracyMeters, compensation is 0.
+ */
+export const evaluateServerGeofenceGate = (
+  params: ServerGeofenceGateParams
+): CompensatedDistanceResult & { isAllowed: boolean } => {
+  const maxAccuracy =
+    params.maxAllowedAccuracyMeters ?? (params.isBiometric ? 100 : 90);
+  const bMax =
+    params.maxCompensationMeters ?? (params.isBiometric ? 25 : 35);
+
+  const validAccuracy =
+    typeof params.gpsAccuracy === 'number' &&
+    Number.isFinite(params.gpsAccuracy) &&
+    params.gpsAccuracy > 0 &&
+    params.gpsAccuracy <= maxAccuracy
+      ? params.gpsAccuracy
+      : 0;
+
+  const compResult = calculateCompensatedDistance(
+    params.rawDistanceMeters,
+    validAccuracy,
+    validAccuracy > 0 ? bMax : 0
+  );
+
+  const isAllowed = params.isOfflineSync
+    ? true
+    : compResult.effectiveDistanceMeters <= params.allowedRadiusMeters;
+
+  return {
+    ...compResult,
+    isAllowed,
+  };
+};
+
+export interface PositionFreshnessResult {
+  isStale: boolean;
+  ageMs: number;
+  anomaly: 'NONE' | 'DEVICE_CLOCK_BEHIND' | 'STALE_TIMESTAMP';
+  suggestedClockSkewMs?: number;
+}
+
+/**
+ * Evaluates geolocation position.timestamp against local wall clock with clock-skew guard.
+ * - Rejects cached fixes older than maxAgeMs (default 10s).
+ * - Prevents false rejection when device clock lags GPS time (rawDelta < -2000ms) or
+ *   when a calibrated device-vs-satellite clockSkewOffsetMs is supplied.
+ */
+export const evaluatePositionFreshness = (
+  positionTimestamp: unknown,
+  receivedAtMs: number,
+  maxAgeMs: number = 10000,
+  clockSkewOffsetMs: number = 0
+): PositionFreshnessResult => {
+  if (
+    typeof positionTimestamp !== 'number' ||
+    !Number.isFinite(positionTimestamp) ||
+    positionTimestamp <= 0
+  ) {
+    return { isStale: false, ageMs: 0, anomaly: 'NONE' };
+  }
+
+  const safeSkew =
+    typeof clockSkewOffsetMs === 'number' && Number.isFinite(clockSkewOffsetMs)
+      ? clockSkewOffsetMs
+      : 0;
+  const rawDelta = receivedAtMs - positionTimestamp;
+
+  // Device clock lags GPS satellite clock (> 2s ahead of local Date.now())
+  if (rawDelta < -2000 && safeSkew === 0) {
+    return {
+      isStale: false,
+      ageMs: 0,
+      anomaly: 'DEVICE_CLOCK_BEHIND',
+      suggestedClockSkewMs: positionTimestamp - receivedAtMs,
+    };
+  }
+
+  const adjustedDelta = receivedAtMs + safeSkew - positionTimestamp;
+  if (adjustedDelta >= -2000 && adjustedDelta <= maxAgeMs) {
+    return {
+      isStale: false,
+      ageMs: Math.max(0, Math.round(adjustedDelta)),
+      anomaly: 'NONE',
+    };
+  }
+
+  return {
+    isStale: true,
+    ageMs: Math.max(0, Math.round(Math.abs(adjustedDelta))),
+    anomaly: 'STALE_TIMESTAMP',
+  };
+};
+
+export interface GpsJumpEvaluation {
+  isJump: boolean;
+  jumpMeters: number;
+  speedMps: number;
+  dtMs: number;
+  isCoarseJump: boolean;
+  withinSpikeWindow: boolean;
+}
+
+/**
+ * Detects physically impossible coordinate jumps (e.g. > 50 m/s in < 2s caused by BTS bounce).
+ */
+export const evaluateCoordinateJump = (
+  candidate: { latitude: number; longitude: number; accuracy: number; timestamp: number },
+  baseline: { latitude: number; longitude: number; accuracy: number; timestamp: number },
+  options?: { maxOutlierSpeedMps?: number; windowMs?: number; coarseAccuracyThreshold?: number }
+): GpsJumpEvaluation => {
+  const maxSpeedMps = options?.maxOutlierSpeedMps ?? 50;
+  const windowMs = options?.windowMs ?? 2000;
+  const coarseThreshold = options?.coarseAccuracyThreshold ?? 50;
+
+  const dtMs = Math.max(50, candidate.timestamp - baseline.timestamp);
+  const dtSec = dtMs / 1000;
+  const jumpMeters = calculateDistanceMeters(
+    candidate.latitude,
+    candidate.longitude,
+    baseline.latitude,
+    baseline.longitude
+  );
+  const speedMps = jumpMeters / dtSec;
+  const isJump = jumpMeters > 80 && speedMps > maxSpeedMps;
+  const withinSpikeWindow = dtMs <= windowMs;
+
+  return {
+    isJump,
+    jumpMeters,
+    speedMps,
+    dtMs,
+    isCoarseJump: isJump && candidate.accuracy > coarseThreshold,
+    withinSpikeWindow,
+  };
+};
+
+/**
+ * Picks spatial median from tightest accuracy cluster (>= 3 samples) or best accuracy fix.
+ */
+export const selectBestGpsSample = <
+  T extends { latitude: number; longitude: number; accuracy: number; timestamp: number }
+>(
+  samples: T[]
+): (T & { selectionMethod: 'MEDIAN_CLUSTER' | 'BEST_ACCURACY' }) | null => {
+  if (!samples || samples.length === 0) return null;
+
+  const normalized = [...samples].sort((a, b) => {
+    const accA = Number.isFinite(a.accuracy) && a.accuracy > 0 ? a.accuracy : Number.MAX_SAFE_INTEGER;
+    const accB = Number.isFinite(b.accuracy) && b.accuracy > 0 ? b.accuracy : Number.MAX_SAFE_INTEGER;
+    if (accA !== accB) return accA - accB;
+    return b.timestamp - a.timestamp;
+  });
+
+  const best = normalized[0];
+  const minAcc = Number.isFinite(best.accuracy) && best.accuracy > 0 ? best.accuracy : 50;
+  const clusterLimit = Math.max(minAcc * 1.5, minAcc + 15);
+  const cluster = normalized.filter((s) => s.accuracy <= clusterLimit);
+
+  if (cluster.length >= 3) {
+    const lats = cluster.map((c) => c.latitude).sort((a, b) => a - b);
+    const lngs = cluster.map((c) => c.longitude).sort((a, b) => a - b);
+    const accs = cluster.map((c) => c.accuracy).sort((a, b) => a - b);
+    const mid = Math.floor(cluster.length / 2);
+
+    return {
+      ...best,
+      latitude: lats[mid],
+      longitude: lngs[mid],
+      accuracy: Math.round(accs[mid] * 10) / 10,
+      selectionMethod: 'MEDIAN_CLUSTER',
+    };
+  }
+
+  return {
+    ...best,
+    selectionMethod: 'BEST_ACCURACY',
+  };
+};
+
+/**
+ * Prevents overwriting an active accurate GPS fix with a coarser candidate fix.
+ */
+export const shouldReplaceWithBetterFix = (
+  current: { accuracy: number; timestamp?: number } | null | undefined,
+  candidate: { accuracy: number },
+  maxAgeMs: number = 10000,
+  nowMs: number = Date.now()
+): boolean => {
+  if (!current) return true;
+  if (typeof current.timestamp === 'number' && nowMs - current.timestamp > maxAgeMs) {
+    return true;
+  }
+  const candAcc =
+    typeof candidate.accuracy === 'number' && Number.isFinite(candidate.accuracy) && candidate.accuracy > 0
+      ? candidate.accuracy
+      : Number.MAX_SAFE_INTEGER;
+  const currAcc =
+    typeof current.accuracy === 'number' && Number.isFinite(current.accuracy) && current.accuracy > 0
+      ? current.accuracy
+      : Number.MAX_SAFE_INTEGER;
+
+  return candAcc <= currAcc;
+};

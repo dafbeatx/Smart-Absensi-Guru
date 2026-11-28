@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
+import { SagaBellIcon } from '../ui/SagaServiceIcons';
 import { NotificationService, type DetailedPermissionStatus } from '../../services/notification-permission.service';
 import { useToastStore } from '../../store/useToastStore';
 import type { UserProfile } from '../../types/database.types';
@@ -15,6 +17,7 @@ export const NotificationPermissionBanner: React.FC<NotificationPermissionBanner
   const [detailedStatus, setDetailedStatus] = useState<DetailedPermissionStatus>('default');
   const [isDismissed, setIsDismissed] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const { showToast } = useToastStore();
 
   const effectiveUserId = user?.id || 'guest';
@@ -125,38 +128,36 @@ export const NotificationPermissionBanner: React.FC<NotificationPermissionBanner
   return (
     <aside
       aria-label="Pemberitahuan Izin Notifikasi"
-      className="bg-[#023246] text-white p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl shadow-md border border-[#287094]/40 flex flex-col md:flex-row items-center justify-between gap-3 animate-fade-in"
+      className="bg-[#0D5C46] text-white p-3.5 sm:p-4 rounded-2xl shadow-sm border border-[#094736] flex flex-col md:flex-row items-center justify-between gap-3"
     >
       <div className="flex items-center gap-3 w-full md:w-auto min-w-0">
         <div
           aria-hidden="true"
-          className="w-10 h-10 rounded-2xl bg-white/10 p-1.5 flex items-center justify-center shrink-0 border border-white/15 overflow-hidden shadow-xs"
+          className="w-10 h-10 rounded-xl bg-white/10 p-1.5 flex items-center justify-center shrink-0 border border-white/20 overflow-hidden"
         >
-          <img
-            src="/school-logo.png"
-            alt="Logo Sekolah"
-            className="w-full h-full object-contain"
-            onError={(e) => {
-              const target = e.currentTarget;
-              target.style.display = 'none';
-              if (target.parentElement) {
-                target.parentElement.innerHTML = '<span class="text-xl">🔔</span>';
-              }
-            }}
-          />
+          {logoError ? (
+            <SagaBellIcon tone="dark" className="w-6 h-6" />
+          ) : (
+            <img
+              src="/school-logo.png"
+              alt="Logo Sekolah"
+              className="w-full h-full object-contain"
+              onError={() => setLogoError(true)}
+            />
+          )}
         </div>
         <div className="space-y-0.5 min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="font-extrabold text-xs sm:text-sm text-white tracking-tight leading-tight">
+            <h4 className="font-bold text-xs sm:text-sm text-white tracking-tight leading-tight">
               {bannerTitle}
             </h4>
             {detailedStatus === 'denied' && (
-              <span className="px-2 py-0.5 text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-400/30 rounded-md">
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-rose-500/20 text-rose-100 border border-rose-300/30 rounded-md">
                 Diblokir di Browser
               </span>
             )}
           </div>
-          <p className="text-[11px] sm:text-xs text-slate-300 leading-relaxed">
+          <p className="text-xs text-emerald-100 leading-relaxed font-normal">
             {detailedStatus === 'denied'
               ? 'Izin notifikasi saat ini diblokir. Ketuk ikon gembok pada address bar browser Anda, lalu pilih "Izinkan Notifikasi".'
               : bannerDesc}
@@ -170,15 +171,16 @@ export const NotificationPermissionBanner: React.FC<NotificationPermissionBanner
             type="button"
             onClick={handleRequestPermission}
             disabled={isSubscribing}
-            className="flex-1 md:flex-none min-h-11 px-4 py-2.5 bg-[#0D7A5F] hover:bg-[#0b654f] text-white font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer border border-emerald-400/30 active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50"
+            className="flex-1 md:flex-none min-h-11 px-4 py-2 bg-[#094736] hover:bg-[#07382B] text-white font-bold text-xs rounded-xl transition-colors cursor-pointer border border-white/20 active:scale-[0.98] flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
-            <span>{isSubscribing ? 'Mengaktifkan...' : '🔔 Aktifkan Sekarang'}</span>
+            <SagaBellIcon tone="dark" className="w-4 h-4 shrink-0" />
+            <span>{isSubscribing ? 'Mengaktifkan...' : 'Aktifkan Sekarang'}</span>
           </button>
         ) : (
           <button
             type="button"
             onClick={handleRequestPermission}
-            className="flex-1 md:flex-none min-h-11 px-3.5 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-xs rounded-xl transition-all cursor-pointer border border-slate-600"
+            className="flex-1 md:flex-none min-h-11 px-3.5 py-2 bg-white/15 hover:bg-white/25 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer border border-white/20"
           >
             Coba Cek Ulang
           </button>
@@ -188,21 +190,21 @@ export const NotificationPermissionBanner: React.FC<NotificationPermissionBanner
           <button
             type="button"
             onClick={onOpenPreferences}
-            className="min-h-11 px-3 py-2 text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer border border-white/10"
+            className="min-h-11 px-3 py-2 text-xs font-bold text-emerald-100 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer border border-white/15"
             title="Pengaturan Notifikasi"
           >
-            ⚙️ Atur
+            Atur
           </button>
         )}
 
         <button
           type="button"
           onClick={handleDismiss}
-          className="min-h-11 min-w-11 p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer text-xs flex items-center justify-center shrink-0"
+          className="min-h-11 min-w-11 p-2 text-emerald-100 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer flex items-center justify-center shrink-0"
           aria-label="Tutup banner notifikasi"
           title="Tutup banner"
         >
-          ✕
+          <X className="w-4 h-4" />
         </button>
       </div>
     </aside>
