@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Award, RefreshCw } from 'lucide-react';
+import { Award, Eye, EyeOff, KeyRound, RefreshCw } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
 import { AuditLogger } from '../../../services/audit-logger.service';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { AuthRepository } from '../../../repositories/AuthRepository';
 import { useToastStore } from '../../../store/useToastStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import type { UserProfile, RoleCode, TeacherPointLog } from '../../../types/database.types';
@@ -192,7 +193,11 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const [position, setPosition] = useState('');
   const [teachingAssignment, setTeachingAssignment] = useState('');
   const [role, setRole] = useState<RoleCode>('GURU');
-  const [newPin, setNewPin] = useState('');
+  const [newPin, setNewPin] = useState('123456');
+  const [showResetPin, setShowResetPin] = useState(false);
+  const [isGlobalResetPinOpen, setIsGlobalResetPinOpen] = useState(false);
+  const [isResettingGlobalPins, setIsResettingGlobalPins] = useState(false);
+  const [excludeSelfOnGlobalReset, setExcludeSelfOnGlobalReset] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSubmittingAdd, setIsSubmittingAdd] = useState(false);
@@ -520,14 +525,64 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
         reason: `Reset PIN 6-digit oleh Admin Website untuk ${selectedTeacher.full_name}`,
       });
 
-      showToast('success', 'Reset PIN Berhasil!', `PIN sementara untuk ${selectedTeacher.full_name} adalah ${newPin} (Wajib reset di login berikutnya).`);
+      showToast('success', 'Reset PIN Berhasil!', `PIN sementara untuk ${selectedTeacher.full_name} adalah ${newPin} (Wajib buat PIN baru saat login berikutnya).`);
       setIsResetPinOpen(false);
       setSelectedTeacher(null);
-      setNewPin('');
+      setNewPin('123456');
+      setShowResetPin(false);
     } catch (err: unknown) {
       handleAppError(err, 'TeacherManagementTable.handleResetPin', 'Gagal Melakukan Reset PIN');
     } finally {
       setIsResettingPin(false);
+    }
+  };
+
+  const handleGlobalResetPinsToDefault = async () => {
+    if (effectiveReadOnly) return;
+
+    setIsResettingGlobalPins(true);
+    try {
+      const token = useAuthStore.getState().token || '';
+      const result = await AuthRepository.resetAllPinsToDefault(token, {
+        excludeSelf: excludeSelfOnGlobalReset,
+      });
+
+      const updated = teachers.map((t) => {
+        const isExcludedSelf = excludeSelfOnGlobalReset && user?.id && t.id === user.id;
+        const isActive = t.is_active !== false;
+        if (!isActive || isExcludedSelf) return t;
+        return { ...t, must_change_pin: true };
+      });
+      onTeachersChange(updated);
+      try {
+        localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to cache teachers to localStorage:', e);
+      }
+      window.dispatchEvent(new CustomEvent('smart_absensi_teachers_updated'));
+
+      await AuditLogger.log({
+        actorId: user?.id || 'op_1',
+        actorRole: user?.role || 'ADMIN',
+        actionType: 'RESET_PIN',
+        targetEntity: 'Users',
+        newValue: JSON.stringify({
+          global_pin_reset: true,
+          default_pin: '123456',
+          must_change_pin: true,
+          exclude_self: excludeSelfOnGlobalReset,
+          reset_count: result.resetCount,
+        }),
+        reason: `Reset PIN global ke default 123456 oleh Admin (${result.resetCount} akun aktif, wajib buat PIN baru saat masuk)`,
+      });
+
+      showToast('success', 'Reset PIN Global Berhasil!', result.message);
+      setIsGlobalResetPinOpen(false);
+      setExcludeSelfOnGlobalReset(false);
+    } catch (err: unknown) {
+      handleAppError(err, 'TeacherManagementTable.handleGlobalResetPinsToDefault', 'Gagal Melakukan Reset PIN Global');
+    } finally {
+      setIsResettingGlobalPins(false);
     }
   };
 
@@ -690,9 +745,23 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           </button>
 
           {!effectiveReadOnly && (
-            <Button variant="primary" onClick={handleOpenAddModal}>
-              + Tambah Pengguna Baru
-            </Button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setExcludeSelfOnGlobalReset(false);
+                  setIsGlobalResetPinOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-11 sm:min-h-0 rounded-xl bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-800 border border-amber-300 font-extrabold text-xs shadow-xs transition-all"
+                title="Reset PIN semua pengguna aktif menjadi 123456 dan wajibkan membuat PIN baru saat masuk"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>Reset Global → 123456</span>
+              </button>
+              <Button variant="primary" onClick={handleOpenAddModal}>
+                + Tambah Pengguna Baru
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -824,6 +893,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                   <button
                     onClick={() => {
                       setSelectedTeacher(t);
+                      setNewPin('123456');
+                      setShowResetPin(false);
                       setIsResetPinOpen(true);
                     }}
                     className="py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-700 font-extrabold text-[10px] rounded-xl border border-amber-200 transition-colors text-center active:scale-95"
@@ -985,6 +1056,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                       <button
                         onClick={() => {
                           setSelectedTeacher(t);
+                          setNewPin('123456');
+                          setShowResetPin(false);
                           setIsResetPinOpen(true);
                         }}
                         className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold rounded-lg transition-colors"
@@ -1469,15 +1542,122 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       </Modal>
 
       {/* Reset PIN Modal */}
-      <Modal isOpen={isResetPinOpen} onClose={() => setIsResetPinOpen(false)} title="🔑 Reset PIN 6-Digit">
+      <Modal
+        isOpen={isResetPinOpen}
+        onClose={() => {
+          setIsResetPinOpen(false);
+          setNewPin('123456');
+          setShowResetPin(false);
+        }}
+        title="🔑 Reset PIN 6-Digit"
+      >
         <div className="space-y-4">
-          <p className="text-xs text-slate-600">
-            Masukkan PIN 6-digit baru untuk <span className="font-bold text-slate-900">{selectedTeacher?.full_name}</span>.
-          </p>
-          <Input label="PIN 6-Digit Baru" type="password" maxLength={6} value={newPin} onChange={(e) => setNewPin(e.target.value)} placeholder="Contoh: 654321" />
+          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+            <p>
+              Atur PIN sementara 6-digit untuk <span className="font-bold text-slate-900">{selectedTeacher?.full_name}</span>.
+            </p>
+            <p className="text-[11px] text-amber-800">
+              Setelah berhasil masuk memakai PIN ini (default <code className="font-mono font-bold bg-amber-100 px-1 rounded">123456</code>), pengguna langsung diarahkan membuat PIN baru.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Input
+              label="PIN 6-Digit Sementara"
+              type={showResetPin ? 'text' : 'password'}
+              inputMode="numeric"
+              maxLength={6}
+              value={newPin}
+              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="Default: 123456"
+              rightIcon={
+                <button
+                  type="button"
+                  onClick={() => setShowResetPin((prev) => !prev)}
+                  className="text-slate-500 hover:text-slate-700 p-1 rounded-md transition-colors"
+                  aria-label={showResetPin ? 'Sembunyikan PIN' : 'Tampilkan PIN'}
+                >
+                  {showResetPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              }
+            />
+            <div className="flex items-center justify-between text-[11px] text-slate-500">
+              <span>PIN default standar: 123456</span>
+              <button
+                type="button"
+                onClick={() => setNewPin('123456')}
+                className="font-bold text-amber-700 hover:text-amber-800 underline underline-offset-2"
+              >
+                Gunakan 123456
+              </button>
+            </div>
+          </div>
           <div className="flex gap-2">
-            <Button variant="secondary" className="w-1/2" onClick={() => setIsResetPinOpen(false)} disabled={isResettingPin}>Batal</Button>
-            <Button variant="primary" className="w-1/2" onClick={handleResetPin} isLoading={isResettingPin} disabled={isResettingPin || newPin.length !== 6}>Simpan PIN Baru</Button>
+            <Button
+              variant="secondary"
+              className="w-1/2"
+              onClick={() => {
+                setIsResetPinOpen(false);
+                setNewPin('123456');
+                setShowResetPin(false);
+              }}
+              disabled={isResettingPin}
+            >
+              Batal
+            </Button>
+            <Button variant="primary" className="w-1/2" onClick={handleResetPin} isLoading={isResettingPin} disabled={isResettingPin || newPin.length !== 6}>
+              Simpan PIN Baru
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Global Reset PIN to 123456 Modal */}
+      <Modal
+        isOpen={isGlobalResetPinOpen}
+        onClose={() => !isResettingGlobalPins && setIsGlobalResetPinOpen(false)}
+        title="🔑 Reset PIN Global → 123456"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-950 space-y-2">
+            <p className="font-bold text-sm">Samakan PIN awal semua pengguna ke <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono font-extrabold">123456</code>?</p>
+            <ul className="text-xs space-y-1.5 text-amber-900 list-disc pl-4">
+              <li>Seluruh akun aktif akan menggunakan PIN sementara <code className="font-mono font-bold">123456</code>.</li>
+              <li>Akun guru/staf yang sempat terkunci karena salah ketik PIN akan langsung dibuka kembali.</li>
+              <li>Begitu berhasil masuk dengan <code className="font-mono font-bold">123456</code>, aplikasi langsung mengarahkan pengguna untuk membuat PIN rahasia pribadi mereka sendiri.</li>
+            </ul>
+          </div>
+
+          <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer text-xs text-slate-700">
+            <input
+              type="checkbox"
+              checked={excludeSelfOnGlobalReset}
+              onChange={(e) => setExcludeSelfOnGlobalReset(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-emerald-600 rounded"
+            />
+            <span>
+              <strong className="text-slate-900 block">Pertahankan PIN akun saya sendiri</strong>
+              Centang jika Anda ingin PIN Admin Anda saat ini tidak ikut diubah menjadi 123456.
+            </span>
+          </label>
+
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              className="w-1/2"
+              onClick={() => setIsGlobalResetPinOpen(false)}
+              disabled={isResettingGlobalPins}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="danger"
+              className="w-1/2"
+              onClick={handleGlobalResetPinsToDefault}
+              isLoading={isResettingGlobalPins}
+              disabled={isResettingGlobalPins}
+            >
+              Reset Semua ke 123456
+            </Button>
           </div>
         </div>
       </Modal>

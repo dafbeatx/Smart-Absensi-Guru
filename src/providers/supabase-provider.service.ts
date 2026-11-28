@@ -476,10 +476,19 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     const hashedInputPin = await hashPin(dto.pin);
-    const isPinMatch = user.pin_hash === hashedInputPin || user.pin_hash === dto.pin;
+    const isEmptyPinDefault = !user.pin_hash && dto.pin === '123456';
+    const isPinMatch = isEmptyPinDefault || user.pin_hash === hashedInputPin || user.pin_hash === dto.pin;
 
-    if (!user.pin_hash || !isPinMatch) {
+    if (!isPinMatch) {
       throw new Error('No HP / NPP atau PIN 6-digit yang Anda masukkan tidak valid.');
+    }
+
+    if (isEmptyPinDefault) {
+      try {
+        await this.client.from('users').update({ pin_hash: hashedInputPin }).eq('id', user.id);
+      } catch {
+        // Non-blocking fallback auto-upgrade
+      }
     }
 
     const userProfile: UserProfile = {
@@ -491,7 +500,7 @@ export class SupabaseProvider implements IDataProvider {
       position: user.position,
       avatar_url: user.avatar_url || null,
       is_active: user.account_status === 'ACTIVE',
-      must_change_pin: dto.pin === '123456',
+      must_change_pin: dto.pin === '123456' || isEmptyPinDefault || Boolean((user as { must_change_pin?: boolean }).must_change_pin),
       created_at: user.created_at,
     };
 
@@ -775,6 +784,82 @@ export class SupabaseProvider implements IDataProvider {
 
     if (error) throw new Error('Gagal mereset PIN: ' + error.message);
     return true;
+  }
+
+  public async resetAllPinsToDefault(
+    token: string,
+    options?: { excludeSelf?: boolean }
+  ): Promise<{ resetCount: number; message: string }> {
+    const isDevMode = Boolean(typeof import.meta !== 'undefined' && import.meta.env?.DEV);
+
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      let resp: Response | null = null;
+      try {
+        resp = await fetch('/api/auth/login?action=reset-global-pin', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ exclude_self: Boolean(options?.excludeSelf) }),
+        });
+      } catch {
+        if (!isDevMode) {
+          throw new Error('Gagal terhubung ke server untuk mereset PIN secara global.');
+        }
+      }
+
+      if (resp) {
+        const json = await resp.json().catch(() => null);
+        if (resp.ok && json?.success) {
+          this.cachedUsers = null;
+          this.cachedUsersTimestamp = 0;
+          return {
+            resetCount: Number(json.resetCount) || 0,
+            message:
+              json.message ||
+              'PIN seluruh pengguna berhasil direset ke default 123456. Saat login, mereka akan diarahkan membuat PIN baru.',
+          };
+        }
+        if (!(isDevMode && resp.status === 404)) {
+          throw new Error(json?.errorMessage || 'Gagal mereset PIN global di server.');
+        }
+      }
+    }
+
+    // Fallback khusus lokal dev tanpa serverless Vercel
+    const defaultPinHash = await hashPin('123456');
+    const updatePayload: Record<string, unknown> = {
+      pin_hash: defaultPinHash,
+      must_change_pin: true,
+      failed_login_count: 0,
+      locked_until: null,
+    };
+    let { error } = await this.client
+      .from('users')
+      .update(updatePayload)
+      .eq('account_status', 'ACTIVE');
+
+    if (error && this.isMustChangePinSchemaError(error)) {
+      delete updatePayload.must_change_pin;
+      const retry = await this.client
+        .from('users')
+        .update(updatePayload)
+        .eq('account_status', 'ACTIVE');
+      error = retry.error;
+    }
+
+    if (error) {
+      throw new Error('Gagal mereset PIN global: ' + error.message);
+    }
+
+    this.cachedUsers = null;
+    this.cachedUsersTimestamp = 0;
+    return {
+      resetCount: 0,
+      message: 'PIN seluruh pengguna aktif berhasil direset ke default 123456.',
+    };
   }
 
   // ─── ATTENDANCE API ───────────────────────────────────────────────────────
@@ -2782,7 +2867,7 @@ export class SupabaseProvider implements IDataProvider {
     this.cachedUsersTimestamp = 0;
 
     const newId = user.id || `usr_${Date.now()}`;
-    const defaultPin = (user as Partial<UserProfile> & { pin?: string }).pin || '123456';
+    const defaultPin = (user as Partial<UserProfile> & { pin?: string }).pin?.trim() || '123456';
     const hashedPin = await hashPin(defaultPin);
 
     const formattedAssignment = user.teaching_assignment
@@ -2842,6 +2927,7 @@ export class SupabaseProvider implements IDataProvider {
       position: newUser.position as string,
       avatar_url: null,
       is_active: true,
+      must_change_pin: defaultPin === '123456',
       teaching_assignment: user.teaching_assignment || undefined,
       created_at: new Date().toISOString(),
     };

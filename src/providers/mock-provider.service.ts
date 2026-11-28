@@ -301,6 +301,17 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
+  public async resetAllPinsToDefault(
+    _token: string,
+    _options?: { excludeSelf?: boolean }
+  ): Promise<{ resetCount: number; message: string }> {
+    await new Promise((r) => setTimeout(r, 300));
+    return {
+      resetCount: 11,
+      message: 'PIN seluruh pengguna aktif berhasil direset ke 123456 (simulasi).',
+    };
+  }
+
   public async checkDeviceBinding(userId: string, currentDeviceUUID: string, _token: string): Promise<DeviceBindingCheckResult> {
     const sessionUser = useAuthStore.getState().user;
     const isExempted = sessionUser && sessionUser.full_name.toLowerCase().includes('dafa maulana');

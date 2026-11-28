@@ -35,4 +35,15 @@ export class AuthRepository {
   public static async resetPin(userId: string, newPin: string, token: string): Promise<boolean> {
     return ProviderFactory.getProvider().resetPin(userId, newPin, token);
   }
+
+  public static async resetAllPinsToDefault(
+    token: string,
+    options?: { excludeSelf?: boolean }
+  ): Promise<{ resetCount: number; message: string }> {
+    const provider = ProviderFactory.getProvider();
+    if (!provider.resetAllPinsToDefault) {
+      throw new Error('Provider aktif belum mendukung reset PIN global.');
+    }
+    return provider.resetAllPinsToDefault(token, options);
+  }
 }

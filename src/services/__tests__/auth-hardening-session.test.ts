@@ -209,58 +209,67 @@ class MockAuthDatabase {
             return { data: record, error: null };
           },
           update: (updates: any) => {
-            return {
-              eq: (col: string, val: any) => {
-                const updateChain: any = {
-                  is: (isCol: string, isVal: any) => {
-                    const applyRevoke = (excludeId?: string) => {
-                      if (table === 'user_sessions' && col === 'token_hash') {
-                        const session = db.sessions[val];
-                        if (session && (isVal === null ? session[isCol] === null : session[isCol] === isVal)) {
-                          Object.assign(session, updates);
-                        }
-                      } else if (table === 'user_sessions' && col === 'user_id') {
-                        for (const session of Object.values(db.sessions)) {
-                          if (
-                            session.user_id === val &&
-                            (!excludeId || session.id !== excludeId) &&
-                            (isVal === null ? session[isCol] === null : session[isCol] === isVal)
-                          ) {
-                            Object.assign(session, updates);
-                          }
-                        }
-                      }
-                    };
+            const filters: Array<(row: any) => boolean> = [];
+            let returnUpdated = false;
+            let execPromise: Promise<any> | null = null;
 
-                    const isPromise = Promise.resolve({ error: null });
-                    const chainWithNeq: any = {
-                      neq: (neqCol: string, neqVal: any) => {
-                        if (neqCol === 'id') applyRevoke(neqVal);
-                        return Promise.resolve({ error: null });
-                      },
-                      then: (resolve: any, reject?: any) => {
-                        applyRevoke();
-                        return isPromise.then(resolve, reject);
-                      },
-                      catch: (reject: any) => isPromise.catch(reject),
-                    };
-                    return chainWithNeq;
-                  },
-                  then: (resolve: any) => {
-                    if (table === 'users' && col === 'id') {
-                      const user = db.users[val];
-                      if (user) Object.assign(user, updates);
-                    } else if (table === 'user_sessions' && col === 'id') {
-                      const session = Object.values(db.sessions).find((s) => s.id === val);
-                      if (session) Object.assign(session, updates);
-                    }
-                    return Promise.resolve({ error: null }).then(resolve);
-                  },
-                  catch: (reject: any) => Promise.resolve({ error: null }).catch(reject),
-                };
-                return updateChain;
-              },
+            const execUpdate = () => {
+              if (execPromise) return execPromise;
+              if (table === 'users') {
+                const updatedRows: any[] = [];
+                for (const user of Object.values(db.users)) {
+                  if (filters.every((fn) => fn(user))) {
+                    Object.assign(user, updates);
+                    updatedRows.push({ id: user.id });
+                  }
+                }
+                execPromise = Promise.resolve({
+                  data: returnUpdated ? updatedRows : null,
+                  error: null,
+                });
+                return execPromise;
+              }
+
+              if (table === 'user_sessions') {
+                const updatedRows: any[] = [];
+                for (const session of Object.values(db.sessions)) {
+                  if (filters.every((fn) => fn(session))) {
+                    Object.assign(session, updates);
+                    updatedRows.push({ id: session.id });
+                  }
+                }
+                execPromise = Promise.resolve({
+                  data: returnUpdated ? updatedRows : null,
+                  error: null,
+                });
+                return execPromise;
+              }
+
+              execPromise = Promise.resolve({ data: null, error: null });
+              return execPromise;
             };
+
+            const chain: any = {
+              eq: (col: string, val: any) => {
+                filters.push((row) => row[col] === val);
+                return chain;
+              },
+              neq: (col: string, val: any) => {
+                filters.push((row) => row[col] !== val);
+                return chain;
+              },
+              is: (col: string, val: any) => {
+                filters.push((row) => (val === null ? row[col] === null : row[col] === val));
+                return chain;
+              },
+              select: () => {
+                returnUpdated = true;
+                return chain;
+              },
+              then: (resolve: any, reject?: any) => execUpdate().then(resolve, reject),
+              catch: (reject: any) => execUpdate().catch(reject),
+            };
+            return chain;
           },
         };
 
@@ -967,6 +976,136 @@ export async function runAuthHardeningSessionTestSuite(): Promise<TestSuiteResul
         resSameTargetBlocked.getData()?.errorCode === 'RATE_LIMIT_EXCEEDED' &&
         resOtherColleagueOk.getStatusCode() === 200,
       `TargetStatus: ${resSameTargetBlocked.getStatusCode()}, ColleagueStatus: ${resOtherColleagueOk.getStatusCode()}`
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 28. Global Default PIN 123456: Akun dengan pin_hash kosong tetap bisa masuk memakai 123456 & wajib ganti PIN
+    // ─────────────────────────────────────────────────────────────────────────
+    const defaultPinHash = crypto.createHash('sha256').update('123456').digest('hex');
+    mockDb.users.usr_empty_pin_001 = {
+      id: 'usr_empty_pin_001',
+      nip: '199001012020011009',
+      full_name: 'Siti Aminah, S.Pd.',
+      phone_number: '08111222333',
+      role: 'GURU',
+      position: 'Guru IPA',
+      account_status: 'ACTIVE',
+      avatar_url: null,
+      pin_hash: '',
+      failed_login_count: 0,
+      locked_until: null,
+      must_change_pin: false,
+      created_at: new Date().toISOString(),
+    };
+
+    const { req: reqEmptyWrong, res: resEmptyWrong } = createMockReqRes({
+      method: 'POST',
+      headers: { 'x-forwarded-for': '10.28.0.1' },
+      body: { identity: '08111222333', pin: '654321' },
+    });
+    await loginHandler(reqEmptyWrong, resEmptyWrong);
+
+    const { req: reqEmptyDefault, res: resEmptyDefault } = createMockReqRes({
+      method: 'POST',
+      headers: { 'x-forwarded-for': '10.28.0.1' },
+      body: { identity: '08111222333', pin: '123456' },
+    });
+    await loginHandler(reqEmptyDefault, resEmptyDefault);
+
+    assert(
+      'Auth Hardening 28: Empty/null pin_hash allows login with default 123456 (200), auto-upgrades hash, and sets must_change_pin=true',
+      resEmptyWrong.getStatusCode() === 401 &&
+        resEmptyDefault.getStatusCode() === 200 &&
+        resEmptyDefault.getData()?.user?.must_change_pin === true &&
+        mockDb.users.usr_empty_pin_001.pin_hash === defaultPinHash &&
+        mockDb.users.usr_empty_pin_001.must_change_pin === true,
+      `WrongStatus: ${resEmptyWrong.getStatusCode()}, DefaultStatus: ${resEmptyDefault.getStatusCode()}, MustChange: ${resEmptyDefault.getData()?.user?.must_change_pin}`
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 29. Global Reset PIN -> 123456: RBAC Admin-Only, Unlock Akun, & Wajib Buat PIN Baru Saat Login
+    // ─────────────────────────────────────────────────────────────────────────
+    const adminCustomPinHash = crypto.createHash('sha256').update('789012').digest('hex');
+    mockDb.users.usr_admin_001 = {
+      id: 'usr_admin_001',
+      nip: '198001012005011001',
+      full_name: 'Operator Admin Sekolah',
+      phone_number: '08111999888',
+      role: 'ADMIN',
+      position: 'Admin / Operator Sekolah',
+      account_status: 'ACTIVE',
+      avatar_url: null,
+      pin_hash: adminCustomPinHash,
+      failed_login_count: 0,
+      locked_until: null,
+      must_change_pin: false,
+      created_at: new Date().toISOString(),
+    };
+
+    const { req: reqGuruLoginForRbac, res: resGuruLoginForRbac } = createMockReqRes({
+      method: 'POST',
+      headers: { 'x-forwarded-for': '10.29.0.1' },
+      body: { identity: '081234567890', pin: '654321' },
+    });
+    await loginHandler(reqGuruLoginForRbac, resGuruLoginForRbac);
+    const guruToken = resGuruLoginForRbac.getData()?.token;
+
+    const { req: reqGuruGlobalReset, res: resGuruGlobalReset } = createMockReqRes({
+      method: 'POST',
+      headers: { authorization: `Bearer ${guruToken}` },
+      body: { exclude_self: false },
+    });
+    (reqGuruGlobalReset as any).query = { action: 'reset-global-pin' };
+    await loginHandler(reqGuruGlobalReset, resGuruGlobalReset);
+
+    const { req: reqAdminLogin, res: resAdminLogin } = createMockReqRes({
+      method: 'POST',
+      headers: { 'x-forwarded-for': '10.29.0.2' },
+      body: { identity: '08111999888', pin: '789012' },
+    });
+    await loginHandler(reqAdminLogin, resAdminLogin);
+    const adminToken = resAdminLogin.getData()?.token;
+
+    const { req: reqAdminGlobalReset, res: resAdminGlobalReset } = createMockReqRes({
+      method: 'POST',
+      headers: { authorization: `Bearer ${adminToken}` },
+      body: { exclude_self: true },
+    });
+    (reqAdminGlobalReset as any).query = { action: 'reset-global-pin' };
+    await loginHandler(reqAdminGlobalReset, resAdminGlobalReset);
+
+    // Check old guru session got revoked while admin session stays active
+    const guruAuthAfterGlobal = await authenticateUser({
+      headers: { authorization: `Bearer ${guruToken}` },
+    });
+    const adminAuthAfterGlobal = await authenticateUser({
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    // Previously locked teacher (usr_locked_001) should immediately log in with 123456 & must_change_pin=true
+    const { req: reqUnlockedLogin, res: resUnlockedLogin } = createMockReqRes({
+      method: 'POST',
+      headers: { 'x-forwarded-for': '10.29.0.3' },
+      body: { identity: '081299990002', pin: '123456' },
+    });
+    await loginHandler(reqUnlockedLogin, resUnlockedLogin);
+
+    assert(
+      'Auth Hardening 29: reset-global-pin enforces ADMIN RBAC (403 for GURU), resets all active PINs to 123456, unlocks accounts, revokes other sessions, and forces new PIN on login',
+      resGuruGlobalReset.getStatusCode() === 403 &&
+        resAdminGlobalReset.getStatusCode() === 200 &&
+        resAdminGlobalReset.getData()?.resetCount === 3 &&
+        mockDb.users.usr_guru_001.pin_hash === defaultPinHash &&
+        mockDb.users.usr_guru_001.must_change_pin === true &&
+        mockDb.users.usr_locked_001.locked_until === null &&
+        mockDb.users.usr_locked_001.failed_login_count === 0 &&
+        mockDb.users.usr_admin_001.pin_hash === adminCustomPinHash &&
+        !guruAuthAfterGlobal.ok &&
+        guruAuthAfterGlobal.errorCode === 'AUTH_SESSION_REVOKED' &&
+        adminAuthAfterGlobal.ok &&
+        resUnlockedLogin.getStatusCode() === 200 &&
+        resUnlockedLogin.getData()?.user?.must_change_pin === true,
+      `Guru403: ${resGuruGlobalReset.getStatusCode()}, Admin200: ${resAdminGlobalReset.getStatusCode()}, Count: ${resAdminGlobalReset.getData()?.resetCount}, UnlockedLogin: ${resUnlockedLogin.getStatusCode()}, MustChange: ${resUnlockedLogin.getData()?.user?.must_change_pin}`
     );
   } finally {
     resetServerSupabaseClient();

@@ -428,6 +428,109 @@ async function handleChangePinAction(req: any, res: any) {
   });
 }
 
+async function handleResetGlobalPinAction(req: any, res: any) {
+  applyAuthCorsHeaders(req, res, 'POST, OPTIONS');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({
+      success: false,
+      errorCode: 'METHOD_NOT_ALLOWED',
+      errorMessage: 'Metode request tidak diizinkan. Gunakan POST.',
+    });
+  }
+
+  const auth = await authenticateUser(req);
+  if (!auth.ok) {
+    return res.status(auth.status).json({
+      success: false,
+      errorCode: auth.errorCode,
+      errorMessage: auth.errorMessage,
+    });
+  }
+
+  const normalizedRole = String(auth.role || '').toUpperCase();
+  if (normalizedRole !== 'ADMIN' && normalizedRole !== 'OPERATOR' && normalizedRole !== 'SUPERADMIN') {
+    return res.status(403).json({
+      success: false,
+      errorCode: 'AUTH_FORBIDDEN',
+      errorMessage: 'Hanya Admin / Operator yang berwenang melakukan reset global PIN ke default 123456.',
+    });
+  }
+
+  const excludeSelf = Boolean(req.body?.exclude_self);
+  const nowIso = new Date().toISOString();
+
+  const applyGlobalUpdate = async (withMustChangePin: boolean) => {
+    const updatePayload: Record<string, unknown> = {
+      pin_hash: DEFAULT_PIN_HASH,
+      failed_login_count: 0,
+      locked_until: null,
+      updated_at: nowIso,
+      ...(withMustChangePin ? { must_change_pin: true } : {}),
+    };
+
+    let query = serverSupabase
+      .from('users')
+      .update(updatePayload)
+      .eq('account_status', 'ACTIVE');
+
+    if (excludeSelf && typeof query.neq === 'function') {
+      query = query.neq('id', auth.userId);
+    }
+
+    return typeof query.select === 'function' ? query.select('id') : query;
+  };
+
+  let updateRes = await applyGlobalUpdate(true);
+  if (updateRes?.error && String(updateRes.error.message || '').includes('must_change_pin')) {
+    updateRes = await applyGlobalUpdate(false);
+  }
+
+  if (updateRes?.error) {
+    return res.status(500).json({
+      success: false,
+      errorCode: 'GLOBAL_PIN_RESET_FAILED',
+      errorMessage: 'Gagal mereset PIN global di database.',
+    });
+  }
+
+  // Revoke other active sessions so users log back in with 123456 and get directed to ForceChangePinModal
+  try {
+    const revokeQuery = serverSupabase
+      .from('user_sessions')
+      .update({
+        revoked_at: nowIso,
+        revocation_reason: 'GLOBAL_DEFAULT_PIN_RESET',
+      })
+      .is('revoked_at', null);
+
+    if (auth.sessionId && typeof revokeQuery.neq === 'function') {
+      await revokeQuery.neq('id', auth.sessionId);
+    } else {
+      await revokeQuery;
+    }
+  } catch {
+    // ignore background revocation errors
+  }
+
+  // Clear in-memory rate limits so everyone can immediately log in with 123456
+  ipRateLimitMap.clear();
+  ipIdentityRateMap.clear();
+
+  const updatedRows = Array.isArray(updateRes?.data) ? updateRes.data : [];
+  const resetCount = updatedRows.length;
+
+  return res.status(200).json({
+    success: true,
+    resetCount,
+    message: `PIN ${resetCount > 0 ? `${resetCount} pengguna` : 'seluruh pengguna aktif'} berhasil direset secara global ke default 123456. Saat login, mereka akan otomatis diarahkan membuat PIN baru.`,
+  });
+}
+
 export default async function handler(req: any, res: any) {
   const action = resolveAction(req);
   if (action === 'session') {
@@ -435,6 +538,9 @@ export default async function handler(req: any, res: any) {
   }
   if (action === 'change-pin') {
     return handleChangePinAction(req, res);
+  }
+  if (action === 'reset-global-pin') {
+    return handleResetGlobalPinAction(req, res);
   }
 
   applyAuthCorsHeaders(req, res, 'POST, OPTIONS');
@@ -637,11 +743,13 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // 4. Verifikasi PIN (Constant-Time Digest Comparison)
+    // 4. Verifikasi PIN (Constant-Time Digest Comparison; PIN kosong fallback ke default 123456)
     const hashedInputPin = crypto.createHash('sha256').update(cleanPin).digest('hex');
+    const hasEmptyStoredPin = !user.pin_hash || String(user.pin_hash).trim().length === 0;
+    const isEmptyPinDefaultLogin = hasEmptyStoredPin && timingSafeMatch(hashedInputPin, DEFAULT_PIN_HASH);
     const matchedHash = timingSafeMatch(user.pin_hash, hashedInputPin);
     const matchedPlainLegacy = !matchedHash && timingSafeMatch(user.pin_hash, cleanPin);
-    const isPinValid = matchedHash || matchedPlainLegacy;
+    const isPinValid = matchedHash || matchedPlainLegacy || isEmptyPinDefaultLogin;
 
     if (!isPinValid) {
       recordIpAuthFailure(clientIp, identityInfo.canonicalKey);
@@ -665,14 +773,17 @@ export default async function handler(req: any, res: any) {
 
     clearIpIdentityFailure(clientIp, identityInfo.canonicalKey);
 
-    // 5. Reset Counter Gagal & Auto-Upgrade Legacy Plaintext Hash jika PIN Benar
+    // 5. Reset Counter Gagal & Auto-Upgrade Legacy Plaintext / Null PIN Hash jika PIN Benar
     const successUpdates: Record<string, unknown> = {};
     if (user.failed_login_count > 0 || user.locked_until) {
       successUpdates.failed_login_count = 0;
       successUpdates.locked_until = null;
     }
-    if (matchedPlainLegacy) {
+    if (matchedPlainLegacy || isEmptyPinDefaultLogin) {
       successUpdates.pin_hash = hashedInputPin;
+    }
+    if (isEmptyPinDefaultLogin) {
+      successUpdates.must_change_pin = true;
     }
     if (Object.keys(successUpdates).length > 0) {
       await serverSupabase.from('users').update(successUpdates).eq('id', user.id);
@@ -691,6 +802,7 @@ export default async function handler(req: any, res: any) {
     // 7. Evaluasi Kewajiban Ganti PIN Sisi Server (Default PIN 123456 atau flag reset admin)
     const mustChangePin =
       Boolean(user.must_change_pin) ||
+      isEmptyPinDefaultLogin ||
       timingSafeMatch(user.pin_hash, DEFAULT_PIN_HASH) ||
       timingSafeMatch(hashedInputPin, DEFAULT_PIN_HASH);
 

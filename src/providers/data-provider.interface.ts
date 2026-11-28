@@ -115,6 +115,10 @@ export interface IDataProvider {
   resetDevice(userId: string, token: string): Promise<boolean>;
   changePin(userId: string, newPin: string, token: string): Promise<boolean>;
   resetPin(userId: string, newPin: string, token: string): Promise<boolean>;
+  resetAllPinsToDefault?(
+    token: string,
+    options?: { excludeSelf?: boolean }
+  ): Promise<{ resetCount: number; message: string }>;
   checkDeviceBinding(userId: string, currentDeviceUUID: string, token: string): Promise<DeviceBindingCheckResult>;
 
   // Attendance API

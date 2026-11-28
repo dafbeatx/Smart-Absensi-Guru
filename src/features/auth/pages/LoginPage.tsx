@@ -216,7 +216,7 @@ export const LoginPage: React.FC = () => {
                 }
               />
               <p className="text-[11px] text-slate-500">
-                Ketuk ikon mata di sebelah kanan untuk melihat angka PIN yang Anda ketik.
+                Masukkan 6 angka PIN Anda (gunakan PIN awal standar sekolah bila baru pertama masuk / setelah direset). Ketuk ikon mata untuk melihat angka.
               </p>
             </div>
 
