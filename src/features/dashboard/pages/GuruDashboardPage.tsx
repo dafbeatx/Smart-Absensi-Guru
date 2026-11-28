@@ -4660,7 +4660,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       }`}>
                         {guruOralAssignments.length > 0
                           ? `Siap pakai: ${guruOralAssignments[0].roomNumber} (${guruOralAssignments[0].className === 'SMA' ? 'SMA' : `Kls ${guruOralAssignments[0].className}`}) • ${guruOralAssignments[0].students.length} siswa`
-                          : 'Buka penilaian Bahasa & BTQ (penempatan diatur Admin)'}
+                          : 'Lihat hasil nilai seluruh penguji & ruang (Bahasa & BTQ)'}
                       </span>
                     </div>
                   </div>

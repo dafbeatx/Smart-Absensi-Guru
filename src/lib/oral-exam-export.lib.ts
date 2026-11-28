@@ -16,6 +16,7 @@ import {
   type OralExamCriteriaScores,
   type OralExamGrade,
   type OralExamSession,
+  type OralExamTrack,
 } from '../types/oral-exam.types';
 import {
   calculateCriteriaAverageAndPredicate,
@@ -348,6 +349,81 @@ export class OralExamExportService {
     XLSX.utils.book_append_sheet(wb, ws, 'Penilaian_Lisan');
 
     const cleanFilename = `Rekap_Ujian_Lisan_${session.className}_${session.templateType}_${scope}_${session.academicYear.replace('/', '-')}.xlsx`;
+    XLSX.writeFile(wb, cleanFilename);
+  }
+
+  /**
+   * Mengunduh rekap Excel gabungan lintas semua penguji & ruang untuk 1 jalur (BAHASA atau BTQ)
+   */
+  public static exportAllTrackSessionsToExcel(
+    sessions: OralExamSession[],
+    track: OralExamTrack,
+    academicYear?: string
+  ): void {
+    const filtered = sessions.filter((s) => getOralExamSessionTrack(s) === track);
+    const isBahasa = track === 'BAHASA';
+    const criteriaLabels = resolveCriteriaLabels(filtered[0]?.criteriaLabels, track);
+    const yearLabel = academicYear || filtered[0]?.academicYear || '2026/2027';
+
+    const wb = XLSX.utils.book_new();
+    const makeSubHeaders = (prefix: string) => [
+      `${prefix} - ${criteriaLabels[0]}`,
+      `${prefix} - ${criteriaLabels[1]}`,
+      `${prefix} - ${criteriaLabels[2]}`,
+      `${prefix} - Nilai Akhir`,
+      `${prefix} - Predikat`,
+    ];
+
+    const rows: any[] = [
+      ['REKAPITULASI GABUNGAN HASIL UJIAN LISAN - SEMUA RUANG & PENGUJI'],
+      [isBahasa ? 'Kategori: Ujian Bahasa (Bahasa Inggris & Arab)' : 'Kategori: Ujian Mengaji BTQ & Hafalan', `Tahun Ajaran: ${yearLabel}`, `Jumlah Sesi: ${filtered.length}`],
+      [`3 Kriteria Utama: 1) ${criteriaLabels[0]}, 2) ${criteriaLabels[1]}, 3) ${criteriaLabels[2]}`],
+      [],
+      [
+        'No',
+        'Ruang',
+        'Penguji',
+        'Kelas',
+        'Nama Siswa',
+        ...(isBahasa ? [...makeSubHeaders('B.Inggris'), ...makeSubHeaders('B.Arab')] : [...makeSubHeaders('BTQ'), ...makeSubHeaders('Hafalan')]),
+        'Keterangan',
+      ],
+    ];
+
+    let rowNum = 1;
+    const toSlice = (data: SubjectExportData) => [
+      data.c1,
+      data.c2,
+      data.c3,
+      data.finalScore,
+      data.predicate,
+    ];
+
+    filtered.forEach((sess) => {
+      sess.students.forEach((s) => {
+        const firstData = isBahasa
+          ? resolveSubjectExportData(s.englishCriteria, s.englishScore, s.englishPredicate, s.englishAssessed, false)
+          : resolveSubjectExportData(s.btqCriteria, s.btqScore, s.btqPredicate, undefined, true);
+        const secondData = isBahasa
+          ? resolveSubjectExportData(s.arabicCriteria, s.arabicScore, s.arabicPredicate, s.arabicAssessed, false)
+          : resolveSubjectExportData(s.hafalanCriteria, s.hafalanScore, s.hafalanPredicate, undefined, true);
+
+        rows.push([
+          rowNum++,
+          sess.roomNumber || '-',
+          sess.examinerName,
+          s.className || sess.className,
+          s.studentName,
+          ...toSlice(firstData),
+          ...toSlice(secondData),
+          s.notes || '',
+        ]);
+      });
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, isBahasa ? 'Rekap_Bahasa' : 'Rekap_BTQ');
+    const cleanFilename = `Rekap_Semua_Penguji_${track}_${yearLabel.replace('/', '-')}.xlsx`;
     XLSX.writeFile(wb, cleanFilename);
   }
 }

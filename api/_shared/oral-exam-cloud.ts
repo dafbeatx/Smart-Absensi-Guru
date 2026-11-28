@@ -8,7 +8,7 @@ import type { AuthSuccessContext } from './session-auth.js';
 import { serverSupabase } from './session-auth.js';
 
 const STAFF_ADMIN_ROLES = new Set(['ADMIN', 'OPERATOR', 'SUPERADMIN']);
-const READ_ALL_ROLES = new Set(['ADMIN', 'OPERATOR', 'KEPSEK', 'SUPERADMIN']);
+const READ_ALL_ROLES = new Set(['ADMIN', 'OPERATOR', 'KEPSEK', 'SUPERADMIN', 'GURU']);
 
 function sanitizeKeySegment(value: unknown, fallback = ''): string {
   const raw = typeof value === 'string' ? value.trim() : '';
@@ -262,17 +262,6 @@ export async function handleListOralExamSessions(academicYear: string | undefine
 
   if (READ_ALL_ROLES.has(roleUpper) || (await isActiveCommitteeMember(auth, targetYear || '2026/2027'))) {
     return { status: 200, body: { success: true, sessions } };
-  }
-
-  if (roleUpper === 'GURU') {
-    const assignedGroupIds = await getTeacherAssignedGroupIds(auth, targetYear || '2026/2027');
-    const teacherSessions = sessions.filter((s) => {
-      if (s.examinerUserId && s.examinerUserId === auth.userId) return true;
-      if (s.groupId && assignedGroupIds.has(String(s.groupId))) return true;
-      if (isMatchingExaminerPerson(s.examinerName, auth.user?.full_name)) return true;
-      return false;
-    });
-    return { status: 200, body: { success: true, sessions: teacherSessions } };
   }
 
   return {

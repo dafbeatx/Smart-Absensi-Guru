@@ -928,6 +928,7 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
     let guruDeleteForbidden = 0;
     let adiVisibleCount = 0;
     let otherVisibleCount = 0;
+    let kepsekVisibleCount = 0;
     let adminVisibleCount = 0;
     let adminDeleteStatus = 0;
 
@@ -957,9 +958,11 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
       kepsekForbidden = (await handleSaveOralExamSession({ session: cloudSessionPayload }, kepsekAuth)).status;
       guruDeleteForbidden = (await handleDeleteOralExamSession({ sessionId: cloudSessionPayload.id }, guruAdiAuth)).status;
 
-      // 13d: Listing isolasi per penguji untuk GURU & terbuka untuk ADMIN
+      // 13d: Transparansi Baca: Semua peran (Penguji, Guru lain, Kepsek, & Admin) dapat melihat hasil penilaian,
+      // sedangkan mutasi tetap dikunci strictly per penguji/admin
       adiVisibleCount = (await handleListOralExamSessions('2026/2027', guruAdiAuth)).body.sessions?.length || 0;
       otherVisibleCount = (await handleListOralExamSessions('2026/2027', guruOtherAuth)).body.sessions?.length || 0;
+      kepsekVisibleCount = (await handleListOralExamSessions('2026/2027', kepsekAuth)).body.sessions?.length || 0;
       adminVisibleCount = (await handleListOralExamSessions('2026/2027', adminAuth)).body.sessions?.length || 0;
 
       // 13e: Admin delete cleans relational & fallback
@@ -969,7 +972,7 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
     }
 
     assert(
-      'Supabase Cloud Sessions: Simpan/muat jalan saat pre-migrasi (system_settings) & tabel relasional (oral_exam_sessions) dengan RBAC ketat',
+      'Supabase Cloud Sessions: Semua Guru, Kepsek & Admin dapat memantau hasil (read-all), sedangkan mutasi RBAC tetap ketat per penguji',
       kvSaveStatus === 200 &&
         kvSavedBeforeMigration &&
         relSaveStatus === 200 &&
@@ -978,11 +981,12 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
         kepsekForbidden === 403 &&
         guruDeleteForbidden === 403 &&
         adiVisibleCount === 1 &&
-        otherVisibleCount === 0 &&
+        otherVisibleCount === 1 &&
+        kepsekVisibleCount === 1 &&
         adminVisibleCount === 1 &&
         adminDeleteStatus === 200 &&
         relationalRows.size === 0,
-      `kv=${kvSaveStatus}(${kvSavedBeforeMigration}), rel=${relSaveStatus}(clean=${relCleanedLegacyKv}), other403=${otherGuruForbidden}, ro403=${kepsekForbidden}, del403=${guruDeleteForbidden}, lists=${adiVisibleCount}/${otherVisibleCount}/${adminVisibleCount}`
+      `kv=${kvSaveStatus}(${kvSavedBeforeMigration}), rel=${relSaveStatus}(clean=${relCleanedLegacyKv}), other403=${otherGuruForbidden}, ro403=${kepsekForbidden}, del403=${guruDeleteForbidden}, lists=${adiVisibleCount}/${otherVisibleCount}/${kepsekVisibleCount}/${adminVisibleCount}`
     );
 
     await OralExamAssignmentRepository.resetToOfficialDefaults('2026/2027', 'MOCK_TOKEN');

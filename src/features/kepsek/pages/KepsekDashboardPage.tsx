@@ -49,6 +49,12 @@ import { SurveyAnalyticsView } from '../../survey/components/SurveyAnalyticsView
 import { BroadcastAnnouncementView } from '../../admin/components/BroadcastAnnouncementView';
 import { GamePidView } from '../../guru/components/GamePidView';
 
+const OralExamAssessmentModal = React.lazy(() =>
+  import('../../administration/components/OralExamAssessmentModal').then((m) => ({
+    default: m.OralExamAssessmentModal,
+  }))
+);
+
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
   onSwitchToGuruView?: () => void;
@@ -646,6 +652,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       label: 'Game PID (Staging)',
       icon: '🎮',
     },
+    {
+      id: 'ORAL_EXAM',
+      label: 'Hasil Ujian Lisan',
+      icon: '🗣️',
+    },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
   ];
 
@@ -1131,6 +1142,27 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
                 user={user}
               />
             </div>
+          )}
+
+          {/* TAB: MONITORING HASIL PENILAIAN UJIAN LISAN (READ-ONLY) */}
+          {activeTab === 'ORAL_EXAM' && (
+            <React.Suspense
+              fallback={
+                <div className="p-8 rounded-2xl bg-white border border-slate-200 text-center text-xs font-semibold text-slate-500">
+                  Memuat Rekap Hasil Ujian Lisan...
+                </div>
+              }
+            >
+              <OralExamAssessmentModal
+                isOpen={true}
+                displayMode="page"
+                onClose={() => {
+                  setActiveTab('DASHBOARD');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                roleMode="KEPSEK"
+              />
+            </React.Suspense>
           )}
         </main>
       </div>
