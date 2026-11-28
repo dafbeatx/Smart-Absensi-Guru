@@ -6,8 +6,10 @@
 
 import {
   getOralExamSessionTrack,
+  normalizeBtqScope,
   resolveCriteriaLabels,
   type OralExamAssignment,
+  type OralExamBtqScope,
   type OralExamCriteriaLabels,
   type OralExamSession,
   type OralExamTemplateType,
@@ -109,7 +111,13 @@ export class OralExamRepository {
       roomNumber?: string;
       className: string;
       date: string;
-      students: Array<{ studentId: string; studentName: string; nisn?: string; className?: string }>;
+      students: Array<{
+        studentId: string;
+        studentName: string;
+        nisn?: string;
+        className?: string;
+        btqScope?: OralExamBtqScope;
+      }>;
     },
     token?: string
   ): Promise<OralExamSession> {
@@ -135,11 +143,13 @@ export class OralExamRepository {
         };
       }
 
+      const studentBtqScope = normalizeBtqScope(st.btqScope);
       return {
         studentId: st.studentId,
         studentName: st.studentName,
         nisn: st.nisn,
         className: st.className || params.className,
+        ...(studentBtqScope ? { btqScope: studentBtqScope } : {}),
         btqCriteria: [null, null, null],
         btqScore: null,
         btqPredicate: null,
@@ -265,12 +275,17 @@ export class OralExamRepository {
         existingByName.get(as.studentName.trim().toLowerCase());
 
       if (matched) {
+        const syncedBtqScope =
+          templateType === 'BTQ_HAFALAN'
+            ? (normalizeBtqScope(as.btqScope) ?? normalizeBtqScope(matched.btqScope))
+            : undefined;
         return {
           ...matched,
           studentId: as.studentId,
           studentName: as.studentName,
           nisn: as.nisn ?? matched.nisn,
           className: as.className || assignment.className,
+          ...(syncedBtqScope ? { btqScope: syncedBtqScope } : {}),
         };
       }
 
@@ -291,11 +306,13 @@ export class OralExamRepository {
         };
       }
 
+      const assignedBtqScope = normalizeBtqScope(as.btqScope);
       return {
         studentId: as.studentId,
         studentName: as.studentName,
         nisn: as.nisn,
         className: as.className || assignment.className,
+        ...(assignedBtqScope ? { btqScope: assignedBtqScope } : {}),
         btqCriteria: [null, null, null],
         btqScore: null,
         btqPredicate: null,

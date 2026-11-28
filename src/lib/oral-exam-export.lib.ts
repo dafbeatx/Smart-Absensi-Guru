@@ -10,6 +10,8 @@ import { exportHtmlToPdf } from './pdf-export.lib';
 import { resolveSchoolLevel } from '../utils/class.utils';
 import { escapeHtml, formatNppHtmlLine, getLevelSchoolBranding } from '../utils/html.utils';
 import {
+  getBtqScopeShortLabel,
+  getEffectiveStudentBtqScope,
   getEffectiveSubjectScope,
   getOralExamSessionTrack,
   ORAL_EXAM_SCHEDULE_LABEL,
@@ -75,18 +77,41 @@ function resolveSubjectExportData(
   };
 }
 
+const NOT_PARTICIPATING_EXPORT_DATA: SubjectExportData = {
+  c1: '-',
+  c2: '-',
+  c3: '-',
+  finalScore: 'Tidak Ikut',
+  predicate: '-',
+};
+
+function resolveSessionExportVisibility(session: OralExamSession) {
+  const isBahasa = session.templateType === 'BAHASA_INGGRIS_ARAB';
+  const scope = getEffectiveSubjectScope(session);
+  const showEnglish = isBahasa && scope !== 'ARABIC_ONLY';
+  const showArabic = isBahasa && scope !== 'ENGLISH_ONLY';
+  const showBtq =
+    !isBahasa &&
+    (session.students.length > 0
+      ? session.students.some((st) => getEffectiveStudentBtqScope(st, scope) !== 'HAFALAN_ONLY')
+      : scope !== 'HAFALAN_ONLY');
+  const showHafalan =
+    !isBahasa &&
+    (session.students.length > 0
+      ? session.students.some((st) => getEffectiveStudentBtqScope(st, scope) !== 'BTQ_ONLY')
+      : scope !== 'BTQ_ONLY');
+
+  return { isBahasa, scope, showEnglish, showArabic, showBtq, showHafalan };
+}
+
 export class OralExamExportService {
   /**
    * Menghasilkan string HTML dokumen cetak A4 resmi untuk ujian lisan berbasis 3 kriteria
    */
   public static generatePrintHtml(session: OralExamSession): string {
-    const isBahasa = session.templateType === 'BAHASA_INGGRIS_ARAB';
-    const scope = getEffectiveSubjectScope(session);
+    const { isBahasa, scope, showEnglish, showArabic, showBtq, showHafalan } =
+      resolveSessionExportVisibility(session);
     const criteriaLabels = resolveCriteriaLabels(session.criteriaLabels, getOralExamSessionTrack(session));
-    const showEnglish = isBahasa && scope !== 'ARABIC_ONLY';
-    const showArabic = isBahasa && scope !== 'ENGLISH_ONLY';
-    const showBtq = !isBahasa && scope !== 'HAFALAN_ONLY';
-    const showHafalan = !isBahasa && scope !== 'BTQ_ONLY';
 
     const level = resolveSchoolLevel(session.className);
     const levelBranding = getLevelSchoolBranding(level);
@@ -146,10 +171,17 @@ export class OralExamExportService {
 
     let rowsHtml = '';
     session.students.forEach((s, idx) => {
+      const studentBtqScope = !isBahasa ? getEffectiveStudentBtqScope(s, scope) : 'BOTH';
+      const skipBtq = !isBahasa && studentBtqScope === 'HAFALAN_ONLY';
+      const skipHafalan = !isBahasa && studentBtqScope === 'BTQ_ONLY';
+
       const engData = resolveSubjectExportData(s.englishCriteria, s.englishScore, s.englishPredicate, s.englishAssessed, false);
       const araData = resolveSubjectExportData(s.arabicCriteria, s.arabicScore, s.arabicPredicate, s.arabicAssessed, false);
       const btqData = resolveSubjectExportData(s.btqCriteria, s.btqScore, s.btqPredicate, undefined, true);
       const hafData = resolveSubjectExportData(s.hafalanCriteria, s.hafalanScore, s.hafalanPredicate, undefined, true);
+
+      const skippedCell = (label: string) =>
+        `<td colspan="5" style="border: 1px solid #000; text-align: center; font-size: 9.5px; font-style: italic; color: #475569; background: #f8fafc;">${escapeHtml(label)}</td>`;
 
       rowsHtml += `
         <tr style="height: 24px;">
@@ -157,8 +189,8 @@ export class OralExamExportService {
           <td style="border: 1px solid #000; padding: 3px 6px; font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">${escapeHtml(s.studentName)}</td>
           ${showEnglish ? renderSubjectCells(engData) : ''}
           ${showArabic ? renderSubjectCells(araData) : ''}
-          ${showBtq ? renderSubjectCells(btqData) : ''}
-          ${showHafalan ? renderSubjectCells(hafData) : ''}
+          ${showBtq ? (skipBtq ? skippedCell('Tidak Ikut (Khusus Hafalan)') : renderSubjectCells(btqData)) : ''}
+          ${showHafalan ? (skipHafalan ? skippedCell('Tidak Ikut (Khusus BTQ)') : renderSubjectCells(hafData)) : ''}
           <td style="border: 1px solid #000; padding: 3px 6px; font-size: 9.5px; font-style: italic; color: #4b5563;">${escapeHtml(s.notes || '-')}</td>
         </tr>
       `;
@@ -260,13 +292,15 @@ export class OralExamExportService {
    * Mengunduh berkas PDF A4 siap cetak
    */
   public static async exportToPdf(session: OralExamSession): Promise<void> {
-    const scope = getEffectiveSubjectScope(session);
+    const { scope, showEnglish, showArabic, showBtq, showHafalan } =
+      resolveSessionExportVisibility(session);
+    const hasMultipleSubjects = (showEnglish && showArabic) || (showBtq && showHafalan);
     const html = this.generatePrintHtml(session);
     const filename = `Penilaian_Lisan_${session.className}_${session.templateType}_${scope}_${session.academicYear.replace('/', '-')}`;
 
     await exportHtmlToPdf(html, {
       filename,
-      orientation: scope === 'BOTH' ? 'landscape' : 'portrait',
+      orientation: hasMultipleSubjects ? 'landscape' : 'portrait',
       format: 'a4',
       scale: 2,
     });
@@ -276,13 +310,9 @@ export class OralExamExportService {
    * Mengunduh rekap Excel (.xlsx) rapi dengan rincian 3 kriteria per mata uji
    */
   public static exportToExcel(session: OralExamSession): void {
-    const isBahasa = session.templateType === 'BAHASA_INGGRIS_ARAB';
-    const scope = getEffectiveSubjectScope(session);
+    const { isBahasa, scope, showEnglish, showArabic, showBtq, showHafalan } =
+      resolveSessionExportVisibility(session);
     const criteriaLabels = resolveCriteriaLabels(session.criteriaLabels, getOralExamSessionTrack(session));
-    const showEnglish = isBahasa && scope !== 'ARABIC_ONLY';
-    const showArabic = isBahasa && scope !== 'ENGLISH_ONLY';
-    const showBtq = !isBahasa && scope !== 'HAFALAN_ONLY';
-    const showHafalan = !isBahasa && scope !== 'BTQ_ONLY';
 
     const level = resolveSchoolLevel(session.className);
     const levelBranding = getLevelSchoolBranding(level);
@@ -312,6 +342,7 @@ export class OralExamExportService {
       'Nama Siswa',
       'NISN',
       'Kelas',
+      ...(!isBahasa ? ['Jalur Mengaji'] : []),
       ...(showEnglish ? makeSubjectHeaders('B.Inggris') : []),
       ...(showArabic ? makeSubjectHeaders('B.Arab') : []),
       ...(showBtq ? makeSubjectHeaders('BTQ') : []),
@@ -328,16 +359,24 @@ export class OralExamExportService {
     ];
 
     session.students.forEach((s, idx) => {
+      const studentBtqScope = !isBahasa ? getEffectiveStudentBtqScope(s, scope) : 'BOTH';
       const engData = resolveSubjectExportData(s.englishCriteria, s.englishScore, s.englishPredicate, s.englishAssessed, false);
       const araData = resolveSubjectExportData(s.arabicCriteria, s.arabicScore, s.arabicPredicate, s.arabicAssessed, false);
-      const btqData = resolveSubjectExportData(s.btqCriteria, s.btqScore, s.btqPredicate, undefined, true);
-      const hafData = resolveSubjectExportData(s.hafalanCriteria, s.hafalanScore, s.hafalanPredicate, undefined, true);
+      const btqData =
+        studentBtqScope === 'HAFALAN_ONLY'
+          ? NOT_PARTICIPATING_EXPORT_DATA
+          : resolveSubjectExportData(s.btqCriteria, s.btqScore, s.btqPredicate, undefined, true);
+      const hafData =
+        studentBtqScope === 'BTQ_ONLY'
+          ? NOT_PARTICIPATING_EXPORT_DATA
+          : resolveSubjectExportData(s.hafalanCriteria, s.hafalanScore, s.hafalanPredicate, undefined, true);
 
       rows.push([
         idx + 1,
         s.studentName,
         s.nisn || '-',
         s.className || session.className,
+        ...(!isBahasa ? [getBtqScopeShortLabel(studentBtqScope)] : []),
         ...(showEnglish ? toSubjectRowSlice(engData) : []),
         ...(showArabic ? toSubjectRowSlice(araData) : []),
         ...(showBtq ? toSubjectRowSlice(btqData) : []),
@@ -386,6 +425,7 @@ export class OralExamExportService {
         'Penguji',
         'Kelas',
         'Nama Siswa',
+        ...(!isBahasa ? ['Jalur Mengaji'] : []),
         ...(isBahasa ? [...makeSubHeaders('B.Inggris'), ...makeSubHeaders('B.Arab')] : [...makeSubHeaders('BTQ'), ...makeSubHeaders('Hafalan')]),
         'Keterangan',
       ],
@@ -401,13 +441,19 @@ export class OralExamExportService {
     ];
 
     filtered.forEach((sess) => {
+      const sessScope = getEffectiveSubjectScope(sess);
       sess.students.forEach((s) => {
+        const studentBtqScope = !isBahasa ? getEffectiveStudentBtqScope(s, sessScope) : 'BOTH';
         const firstData = isBahasa
           ? resolveSubjectExportData(s.englishCriteria, s.englishScore, s.englishPredicate, s.englishAssessed, false)
-          : resolveSubjectExportData(s.btqCriteria, s.btqScore, s.btqPredicate, undefined, true);
+          : studentBtqScope === 'HAFALAN_ONLY'
+            ? NOT_PARTICIPATING_EXPORT_DATA
+            : resolveSubjectExportData(s.btqCriteria, s.btqScore, s.btqPredicate, undefined, true);
         const secondData = isBahasa
           ? resolveSubjectExportData(s.arabicCriteria, s.arabicScore, s.arabicPredicate, s.arabicAssessed, false)
-          : resolveSubjectExportData(s.hafalanCriteria, s.hafalanScore, s.hafalanPredicate, undefined, true);
+          : studentBtqScope === 'BTQ_ONLY'
+            ? NOT_PARTICIPATING_EXPORT_DATA
+            : resolveSubjectExportData(s.hafalanCriteria, s.hafalanScore, s.hafalanPredicate, undefined, true);
 
         rows.push([
           rowNum++,
@@ -415,6 +461,7 @@ export class OralExamExportService {
           sess.examinerName,
           s.className || sess.className,
           s.studentName,
+          ...(!isBahasa ? [getBtqScopeShortLabel(studentBtqScope)] : []),
           ...toSlice(firstData),
           ...toSlice(secondData),
           s.notes || '',

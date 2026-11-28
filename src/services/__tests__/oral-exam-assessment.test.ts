@@ -11,6 +11,7 @@ import {
   getOralExamPeriodStatus,
   isStudentOralExamCompleted,
   resolveDefaultOralExamDate,
+  summarizeStudentBtqScopes,
 } from '../../utils/oral-exam-scoring.utils';
 import { OralExamRepository } from '../../repositories/OralExamRepository';
 import { OralExamAssignmentRepository } from '../../repositories/OralExamAssignmentRepository';
@@ -33,6 +34,7 @@ import {
   handleDeleteOralExamSession,
 } from '../../../api/_shared/oral-exam-cloud';
 import {
+  getEffectiveStudentBtqScope,
   getEffectiveSubjectScope,
   getOralExamSessionTrack,
   ORAL_EXAM_SCHEDULE_DAYS,
@@ -1016,6 +1018,130 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
         ongoingDay3Status.activeDayNumber === 3 &&
         completedStatus.phase === 'COMPLETED',
       `days=${ORAL_EXAM_SCHEDULE_DAYS.length}, before=${resolveDefaultOralExamDate('2026-11-28')}, mid=${resolveDefaultOralExamDate('2026-12-02')}, after=${resolveDefaultOralExamDate('2026-12-10')}, phases=${upcomingStatus.phase}/${ongoingDay3Status.phase}(d${ongoingDay3Status.activeDayNumber})/${completedStatus.phase}`
+    );
+
+    // =========================================================================
+    // Test 15: Penanda Jalur Per Siswa di Ujian BTQ (BTQ Saja vs Hafalan Saja)
+    // =========================================================================
+    const mixedBtqAssignment: OralExamAssignment = {
+      id: 'assign_mixed_btq_test',
+      examinerUserId: 'usr_adi_mix',
+      examinerName: 'Adi Prastyo, S.Pd',
+      examinerNpp: '1991041201',
+      roomNumber: 'Ruang 01',
+      className: '7',
+      examTracks: ['BTQ'],
+      bahasaScope: 'ENGLISH_ONLY',
+      btqScope: 'BOTH',
+      students: [
+        { studentId: 'mix_1', studentName: 'Siswa Khusus BTQ', className: '7', btqScope: 'BTQ_ONLY' },
+        { studentId: 'mix_2', studentName: 'Siswa Khusus Hafalan', className: '7', btqScope: 'HAFALAN_ONLY' },
+        { studentId: 'mix_3', studentName: 'Siswa Ikut Keduanya', className: '7', btqScope: 'BOTH' },
+      ],
+      academicYear: '2026/2027',
+      isActive: true,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const syncedMixedSession = await OralExamRepository.openOrSyncAssignedSession(
+      {
+        assignment: mixedBtqAssignment,
+        track: 'BTQ',
+        academicYear: '2026/2027',
+        semester: 'GANJIL',
+      },
+      'MOCK_TOKEN'
+    );
+
+    // Siswa 1 (BTQ_ONLY) isi BTQ 90; biarpun ada nilai hafalan tersisa, harus diabaikan oleh scope BTQ_ONLY
+    syncedMixedSession.students[0].btqCriteria = [90, 90, 90];
+    syncedMixedSession.students[0].btqScore = 90;
+    syncedMixedSession.students[0].btqPredicate = 'B';
+    // Siswa 2 (HAFALAN_ONLY) hanya isi Hafalan 94; tidak punya nilai BTQ namun wajib terhitung selesai
+    syncedMixedSession.students[1].hafalanCriteria = [94, 94, 94];
+    syncedMixedSession.students[1].hafalanScore = 94;
+    syncedMixedSession.students[1].hafalanPredicate = 'A';
+    // Siswa 3 (BOTH) isi Hafalan saja -> terhitung selesai, dan scope default terjaga
+    syncedMixedSession.students[2].hafalanCriteria = [82, 82, 82];
+    syncedMixedSession.students[2].hafalanScore = 82;
+    syncedMixedSession.students[2].hafalanPredicate = 'B';
+    await OralExamRepository.saveSession(syncedMixedSession, 'MOCK_TOKEN');
+
+    const mixedStats = calculateOralExamSummaryStats(
+      syncedMixedSession.students,
+      false,
+      getEffectiveSubjectScope(syncedMixedSession)
+    );
+    const mixedMixSummary = summarizeStudentBtqScopes(syncedMixedSession.students, 'BOTH');
+    const mixedPrintHtml = OralExamExportService.generatePrintHtml(syncedMixedSession);
+    await OralExamRepository.deleteSession(syncedMixedSession.id, 'MOCK_TOKEN');
+
+    // Verify backend assignment sanitizer preserves per-student btqScope
+    const savedKvPayloads: Array<{ key: string; value: string }> = [];
+    const fakeMixedDb = {
+      from: (table: string) => {
+        const chain: any = {
+          select: () => chain,
+          eq: () => chain,
+          in: () => chain,
+          limit: () => Promise.resolve({ data: [], error: null }),
+          upsert: (row: { key: string; value: string }) => {
+            if (table === 'system_settings') savedKvPayloads.push(row);
+            return Promise.resolve({ error: null });
+          },
+          then: (resolve: any, reject?: any) => Promise.resolve({ data: [], error: null }).then(resolve, reject),
+        };
+        return chain;
+      },
+    };
+    let parsedSavedStudents: Array<{ studentId: string; btqScope?: string }> = [];
+    try {
+      setServerSupabaseClient(fakeMixedDb);
+      await handleSaveOralExamAssignments(
+        { academicYear: '2026/2027', assignments: [mixedBtqAssignment] },
+        {
+          ok: true,
+          userId: 'usr_admin_mix',
+          role: 'ADMIN',
+          sessionId: 'sess_mix_admin',
+          user: {
+            id: 'usr_admin_mix',
+            nip: null,
+            full_name: 'Admin Mix',
+            role: 'ADMIN',
+            position: 'Admin',
+            avatar_url: null,
+            phone_number: null,
+          },
+        }
+      );
+      const rawKv = savedKvPayloads.find((p) => p.key === 'exam_oral_assignments_2026_2027')?.value;
+      if (rawKv) {
+        const arr = JSON.parse(rawKv);
+        parsedSavedStudents = arr[0]?.students || [];
+      }
+    } finally {
+      resetServerSupabaseClient();
+    }
+
+    assert(
+      'Per-Student BTQ vs Hafalan Scope: jalur per siswa tersinkron, progress akurat, ekspor cetak "Tidak Ikut", dan server menjaga btqScope',
+      getEffectiveStudentBtqScope(syncedMixedSession.students[0], 'BOTH') === 'BTQ_ONLY' &&
+        getEffectiveStudentBtqScope(syncedMixedSession.students[1], 'BOTH') === 'HAFALAN_ONLY' &&
+        isStudentOralExamCompleted(syncedMixedSession.students[0], 'BTQ_HAFALAN', 'BOTH') === true &&
+        isStudentOralExamCompleted(syncedMixedSession.students[1], 'BTQ_HAFALAN', 'BOTH') === true &&
+        mixedStats.completedStudents === 3 &&
+        mixedStats.averageScore1 === 90 &&
+        mixedStats.averageScore2 === 88 && // (94 + 82) / 2 = 88
+        mixedMixSummary.isMixed &&
+        mixedMixSummary.btqOnly === 1 &&
+        mixedMixSummary.hafalanOnly === 1 &&
+        mixedMixSummary.both === 1 &&
+        mixedPrintHtml.includes('Tidak Ikut (Khusus BTQ)') &&
+        mixedPrintHtml.includes('Tidak Ikut (Khusus Hafalan)') &&
+        parsedSavedStudents[0]?.btqScope === 'BTQ_ONLY' &&
+        parsedSavedStudents[1]?.btqScope === 'HAFALAN_ONLY',
+      `completed=${mixedStats.completedStudents}, avg1=${mixedStats.averageScore1}, avg2=${mixedStats.averageScore2}, saved0=${parsedSavedStudents[0]?.btqScope}, saved1=${parsedSavedStudents[1]?.btqScope}`
     );
   } finally {
     ProviderFactory.setProvider(prevProvider);

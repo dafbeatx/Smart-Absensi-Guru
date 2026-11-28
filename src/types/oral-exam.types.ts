@@ -78,6 +78,8 @@ export interface OralExamAssignmentStudent {
   studentName: string;
   nisn?: string;
   className?: string;
+  /** Jalur mengaji khusus siswa pada ujian BTQ/Hafalan (opsional; fallback ke btqScope kelompok) */
+  btqScope?: OralExamBtqScope;
 }
 
 export interface OralExamAssignment {
@@ -115,6 +117,8 @@ export interface OralExamStudentRecord {
   className?: string;
 
   // --- Jalur BTQ & Hafalan (3 Kriteria Langsung 0-100 & Rata-rata Nilai Akhir) ---
+  /** Jalur mengaji khusus siswa (`BTQ_ONLY`, `HAFALAN_ONLY`, atau `BOTH`). */
+  btqScope?: OralExamBtqScope;
   btqCriteria?: OralExamCriteriaScores;
   btqScore?: number | null;
   btqPredicate?: OralExamGrade | null;
@@ -228,6 +232,57 @@ export function getEffectiveSubjectScope(
     return session.subjectScope;
   }
   return 'BOTH';
+}
+
+/**
+ * Menormalkan nilai `btqScope` khusus siswa; mengembalikan `undefined` bila tidak valid/kosong.
+ */
+export function normalizeBtqScope(value: unknown): OralExamBtqScope | undefined {
+  if (value === 'BTQ_ONLY' || value === 'HAFALAN_ONLY' || value === 'BOTH') {
+    return value;
+  }
+  return undefined;
+}
+
+/**
+ * Mengembalikan cakupan mengaji efektif untuk 1 siswa pada jalur BTQ & Hafalan.
+ * Memprioritaskan penanda `student.btqScope` khusus siswa bila diatur, lalu fallback ke cakupan sesi/kelompok.
+ */
+export function getEffectiveStudentBtqScope(
+  student:
+    | Pick<OralExamStudentRecord, 'btqScope'>
+    | Pick<OralExamAssignmentStudent, 'btqScope'>
+    | null
+    | undefined,
+  sessionOrScope?: Pick<OralExamSession, 'templateType' | 'subjectScope'> | OralExamSubjectScope | null
+): OralExamBtqScope {
+  const explicit = normalizeBtqScope(student?.btqScope);
+  if (explicit) return explicit;
+
+  if (typeof sessionOrScope === 'string') {
+    if (sessionOrScope === 'BTQ_ONLY' || sessionOrScope === 'HAFALAN_ONLY') {
+      return sessionOrScope;
+    }
+    return 'BOTH';
+  }
+
+  if (sessionOrScope) {
+    const sessionScope = getEffectiveSubjectScope(sessionOrScope);
+    if (sessionScope === 'BTQ_ONLY' || sessionScope === 'HAFALAN_ONLY') {
+      return sessionScope;
+    }
+  }
+
+  return 'BOTH';
+}
+
+/**
+ * Label singkat yang ramah guru untuk jalur mengaji siswa/kelompok.
+ */
+export function getBtqScopeShortLabel(btqScope: OralExamBtqScope): string {
+  if (btqScope === 'BTQ_ONLY') return 'BTQ Saja';
+  if (btqScope === 'HAFALAN_ONLY') return 'Hafalan Saja';
+  return 'BTQ & Hafalan';
 }
 
 /**

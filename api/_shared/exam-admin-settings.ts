@@ -399,14 +399,20 @@ export async function handleSaveOralExamAssignments(body: any, auth: AuthSuccess
       const students = Array.isArray(a.students)
         ? a.students
             .filter((s: any) => s && typeof s.studentName === 'string' && s.studentName.trim())
-            .map((s: any, sIdx: number) => ({
-              studentId: typeof s.studentId === 'string' && s.studentId.trim()
-                ? s.studentId.trim()
-                : `oral_std_${idx + 1}_${sIdx + 1}`,
-              studentName: String(s.studentName).trim(),
-              ...(s.nisn ? { nisn: String(s.nisn).trim() } : {}),
-              ...(s.className ? { className: String(s.className).trim() } : {}),
-            }))
+            .map((s: any, sIdx: number) => {
+              const studentBtqScope = ['BTQ_ONLY', 'HAFALAN_ONLY', 'BOTH'].includes(s.btqScope)
+                ? s.btqScope
+                : undefined;
+              return {
+                studentId: typeof s.studentId === 'string' && s.studentId.trim()
+                  ? s.studentId.trim()
+                  : `oral_std_${idx + 1}_${sIdx + 1}`,
+                studentName: String(s.studentName).trim(),
+                ...(s.nisn ? { nisn: String(s.nisn).trim() } : {}),
+                ...(s.className ? { className: String(s.className).trim() } : {}),
+                ...(studentBtqScope ? { btqScope: studentBtqScope } : {}),
+              };
+            })
         : [];
 
       const bahasaCriteria = Array.isArray(a.bahasaCriteria)

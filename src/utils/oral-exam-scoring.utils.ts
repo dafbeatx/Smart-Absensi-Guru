@@ -5,6 +5,7 @@
  */
 
 import {
+  getEffectiveStudentBtqScope,
   getEffectiveSubjectScope,
   ORAL_EXAM_SCHEDULE_DAYS,
   ORAL_EXAM_SCHEDULE_END,
@@ -204,16 +205,17 @@ export function isStudentOralExamCompleted(
     return engDone || araDone;
   }
 
-  const checkBtq = scope !== 'HAFALAN_ONLY';
-  const checkHaf = scope !== 'BTQ_ONLY';
+  const studentBtqScope = getEffectiveStudentBtqScope(student, scope);
+  const checkBtq = studentBtqScope !== 'HAFALAN_ONLY';
+  const checkHaf = studentBtqScope !== 'BTQ_ONLY';
   const hasBtq =
     checkBtq &&
     isOralSubjectAssessed(student.btqScore, student.btqCriteria, undefined, undefined, true);
   const hasHaf =
     checkHaf &&
     isOralSubjectAssessed(student.hafalanScore, student.hafalanCriteria, undefined, undefined, true);
-  if (scope === 'BTQ_ONLY') return hasBtq;
-  if (scope === 'HAFALAN_ONLY') return hasHaf;
+  if (studentBtqScope === 'BTQ_ONLY') return hasBtq;
+  if (studentBtqScope === 'HAFALAN_ONLY') return hasHaf;
   return hasBtq || hasHaf;
 }
 
@@ -271,11 +273,14 @@ export function calculateOralExamSummaryStats(
         if (pred) gradeDistribution[pred]++;
       }
     } else {
+      const studentBtqScope = getEffectiveStudentBtqScope(s, subjectScope);
+      const checkBtq = studentBtqScope !== 'HAFALAN_ONLY';
+      const checkHaf = studentBtqScope !== 'BTQ_ONLY';
       const hasBtq =
-        includeFirst &&
+        checkBtq &&
         isOralSubjectAssessed(s.btqScore, s.btqCriteria, undefined, undefined, true);
       const hasHaf =
-        includeSecond &&
+        checkHaf &&
         isOralSubjectAssessed(s.hafalanScore, s.hafalanCriteria, undefined, undefined, true);
       if (hasBtq || hasHaf) {
         completedStudents++;
@@ -363,5 +368,48 @@ export function getOralExamPeriodStatus(
     detailText: `Pelaksanaan utama (${ORAL_EXAM_SCHEDULE_LABEL}) telah selesai; nilai & rekap tetap dapat dilihat/dilengkapi.`,
     activeDayNumber: null,
     periodLabel: ORAL_EXAM_SCHEDULE_LABEL,
+  };
+}
+
+export interface StudentBtqScopeSummary {
+  btqOnly: number;
+  hafalanOnly: number;
+  both: number;
+  isMixed: boolean;
+  summaryLabel: string;
+}
+
+/**
+ * Meringkas komposisi jalur mengaji siswa (`BTQ Saja` vs `Hafalan Saja` vs `BTQ & Hafalan`)
+ * dalam 1 kelompok penguji atau 1 sesi ujian.
+ */
+export function summarizeStudentBtqScopes(
+  students: ReadonlyArray<{ btqScope?: 'BTQ_ONLY' | 'HAFALAN_ONLY' | 'BOTH' }> | null | undefined,
+  fallbackScope?: OralExamSubjectScope | null
+): StudentBtqScopeSummary {
+  let btqOnly = 0;
+  let hafalanOnly = 0;
+  let both = 0;
+
+  for (const st of students || []) {
+    const eff = getEffectiveStudentBtqScope(st, fallbackScope);
+    if (eff === 'BTQ_ONLY') btqOnly += 1;
+    else if (eff === 'HAFALAN_ONLY') hafalanOnly += 1;
+    else both += 1;
+  }
+
+  const activeBuckets = (btqOnly > 0 ? 1 : 0) + (hafalanOnly > 0 ? 1 : 0) + (both > 0 ? 1 : 0);
+  const isMixed = activeBuckets > 1;
+  const parts: string[] = [];
+  if (btqOnly > 0) parts.push(`${btqOnly} BTQ`);
+  if (hafalanOnly > 0) parts.push(`${hafalanOnly} Hafalan`);
+  if (both > 0) parts.push(`${both} BTQ & Hafalan`);
+
+  return {
+    btqOnly,
+    hafalanOnly,
+    both,
+    isMixed,
+    summaryLabel: parts.length > 0 ? parts.join(' • ') : 'Belum ada siswa',
   };
 }

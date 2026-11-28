@@ -52,14 +52,17 @@ import {
   resolveAssignmentDisplayForUser,
 } from '../../../data/oral-exam-groups';
 import {
+  getBtqScopeShortLabel,
   getDefaultCriteriaHelpers,
   getDefaultCriteriaLabels,
+  getEffectiveStudentBtqScope,
   getEffectiveSubjectScope,
   getOralExamSessionTrack,
   ORAL_EXAM_SCHEDULE_DAYS,
   ORAL_EXAM_SCHEDULE_LABEL,
   resolveCriteriaLabels,
   type OralExamAssignment,
+  type OralExamBtqScope,
   type OralExamCriteriaLabels,
   type OralExamSession,
   type OralExamStudentRecord,
@@ -78,6 +81,7 @@ import {
   isStudentOralExamCompleted,
   normalizeCriteriaScores,
   resolveDefaultOralExamDate,
+  summarizeStudentBtqScopes,
 } from '../../../utils/oral-exam-scoring.utils';
 import { areClassCodesEqual, normalizeClassCode } from '../../../utils/class.utils';
 import type { StudentItem, UserProfile } from '../../../types/database.types';
@@ -108,6 +112,12 @@ const getScopeLabel = (templateType: OralExamTemplateType, scope: OralExamSubjec
   if (scope === 'BTQ_ONLY') return 'BTQ Saja (3 Kriteria)';
   if (scope === 'HAFALAN_ONLY') return 'Hafalan Saja (3 Kriteria)';
   return 'BTQ & Hafalan';
+};
+
+const getBtqScopePillClass = (btqScope: OralExamBtqScope): string => {
+  if (btqScope === 'BTQ_ONLY') return 'bg-emerald-50 text-[#0D7A5F] border-emerald-200';
+  if (btqScope === 'HAFALAN_ONLY') return 'bg-sky-50 text-[#023246] border-sky-200';
+  return 'bg-slate-100 text-slate-700 border-slate-200';
 };
 
 export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = ({
@@ -580,7 +590,13 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       let targetExaminerName = examinerName.trim() || user?.full_name || 'Guru Penguji';
       let targetExaminerNpp: string | null = examinerNppDraft ?? user?.nip ?? null;
       let groupId: string | null = null;
-      let classStudents: Array<{ studentId: string; studentName: string; nisn?: string; className?: string }> = [];
+      let classStudents: Array<{
+        studentId: string;
+        studentName: string;
+        nisn?: string;
+        className?: string;
+        btqScope?: OralExamBtqScope;
+      }> = [];
 
       const singleSelectedGrp = selectedAssignments[0] || selectedAdminAssignment;
       if (rosterSourceMode === 'OFFICIAL_GROUP' && singleSelectedGrp) {
@@ -594,6 +610,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
           studentName: s.studentName,
           nisn: s.nisn,
           className: s.className || singleSelectedGrp.className,
+          ...(s.btqScope ? { btqScope: s.btqScope } : {}),
         }));
       } else {
         try {
@@ -843,6 +860,17 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
     const updatedStudents = [...currentSession.students];
     updatedStudents[studentIndex] = { ...updatedStudents[studentIndex], notes };
+    setCurrentSession({ ...currentSession, students: updatedStudents });
+    setIsDirty(true);
+  };
+
+  const handleStudentBtqScopeChange = (studentIndex: number, nextScope: OralExamBtqScope) => {
+    if (!currentSession || studentIndex < 0 || studentIndex >= currentSession.students.length) return;
+    const updatedStudents = [...currentSession.students];
+    updatedStudents[studentIndex] = {
+      ...updatedStudents[studentIndex],
+      btqScope: nextScope,
+    };
     setCurrentSession({ ...currentSession, students: updatedStudents });
     setIsDirty(true);
   };
@@ -1519,11 +1547,75 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   };
 
   const renderBtqAssessmentBody = (student: OralExamStudentRecord, studentIdx: number) => {
-    const showBtq = effectiveScope !== 'HAFALAN_ONLY';
-    const showHafalan = effectiveScope !== 'BTQ_ONLY';
+    const studentBtqScope = getEffectiveStudentBtqScope(student, effectiveScope);
+    const showBtq = studentBtqScope !== 'HAFALAN_ONLY';
+    const showHafalan = studentBtqScope !== 'BTQ_ONLY';
+
+    const scopeTheme =
+      studentBtqScope === 'BTQ_ONLY'
+        ? {
+            boxClass: 'bg-emerald-50/80 border-emerald-200',
+            badgeClass: 'bg-[#0D7A5F] text-white',
+            badgeText: 'Khusus BTQ Saja',
+            helper: "Siswa ini khusus mengikuti ujian BTQ. Penilaian Hafalan disembunyikan agar tidak salah input.",
+          }
+        : studentBtqScope === 'HAFALAN_ONLY'
+          ? {
+              boxClass: 'bg-sky-50/80 border-sky-200',
+              badgeClass: 'bg-[#023246] text-white',
+              badgeText: 'Khusus Hafalan Saja',
+              helper: 'Siswa ini khusus mengikuti ujian Hafalan (Tahfidz). Penilaian BTQ disembunyikan agar tidak salah input.',
+            }
+          : {
+              boxClass: 'bg-slate-50 border-slate-200',
+              badgeClass: 'bg-slate-800 text-white',
+              badgeText: 'BTQ & Hafalan',
+              helper: 'Siswa ini mengikuti ujian BTQ dan Hafalan sekaligus.',
+            };
 
     return (
       <div className="space-y-4">
+        {/* Penanda & Pengatur Jalur Mengaji Siswa */}
+        <div className={`p-3 rounded-xl border space-y-2.5 ${scopeTheme.boxClass}`}>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+              Jalur Ujian Siswa Ini
+            </span>
+            <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-extrabold ${scopeTheme.badgeClass}`}>
+              {scopeTheme.badgeText}
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-700 leading-snug">{scopeTheme.helper}</p>
+
+          {!isCurrentSessionReadOnly && (
+            <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+              {(
+                [
+                  { value: 'BTQ_ONLY' as const, label: 'BTQ Saja', activeClass: 'bg-[#0D7A5F] border-[#0D7A5F] text-white' },
+                  { value: 'HAFALAN_ONLY' as const, label: 'Hafalan Saja', activeClass: 'bg-[#023246] border-[#023246] text-white' },
+                  { value: 'BOTH' as const, label: 'Keduanya', activeClass: 'bg-slate-800 border-slate-800 text-white' },
+                ]
+              ).map((opt) => {
+                const isSelected = studentBtqScope === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleStudentBtqScopeChange(studentIdx, opt.value)}
+                    className={`min-h-10 px-2 rounded-lg border text-xs font-bold cursor-pointer transition-colors ${
+                      isSelected
+                        ? opt.activeClass
+                        : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {showBtq && renderCriteriaSubjectCard(student, studentIdx, 'btq', "Nilai BTQ (Baca Tulis Qur'an)")}
         {showHafalan && renderCriteriaSubjectCard(student, studentIdx, 'hafalan', 'Nilai Hafalan (Tahfidz)')}
         {renderExaminerNotesField(
@@ -1872,6 +1964,14 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                         <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">
                           {getScopeLabel(sess.templateType, scope)}
                         </span>
+                        {sess.templateType !== 'BAHASA_INGGRIS_ARAB' && (() => {
+                          const btqSum = summarizeStudentBtqScopes(sess.students, scope);
+                          return btqSum.isMixed ? (
+                            <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              Campuran: {btqSum.summaryLabel}
+                            </span>
+                          ) : null;
+                        })()}
                         {editable && !isAdminControl && (
                           <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             Sesi Anda
@@ -1968,7 +2068,8 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
           <div className="space-y-2">
             {flattenedRecapStudents.map(({ session: sess, student, originalIndex, scope, isDone }) => {
               const isBahasa = sess.templateType === 'BAHASA_INGGRIS_ARAB';
-              const items = isBahasa
+              const studentBtqScope = !isBahasa ? getEffectiveStudentBtqScope(student, scope) : 'BOTH';
+              const items: Array<{ text: string; detail: string | null; done: boolean; skipped?: boolean }> = isBahasa
                 ? [
                     scope !== 'ARABIC_ONLY'
                       ? formatCompactSubjectResult(
@@ -1992,27 +2093,27 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                       : null,
                   ].filter((x): x is NonNullable<typeof x> => x !== null)
                 : [
-                    scope !== 'HAFALAN_ONLY'
-                      ? formatCompactSubjectResult(
+                    studentBtqScope === 'HAFALAN_ONLY'
+                      ? { text: 'BTQ: Tidak Ikut', detail: null, done: false, skipped: true }
+                      : formatCompactSubjectResult(
                           'BTQ',
                           student.btqCriteria,
                           student.btqScore,
                           student.btqPredicate,
                           undefined,
                           true
-                        )
-                      : null,
-                    scope !== 'BTQ_ONLY'
-                      ? formatCompactSubjectResult(
+                        ),
+                    studentBtqScope === 'BTQ_ONLY'
+                      ? { text: 'Hafalan: Tidak Ikut', detail: null, done: false, skipped: true }
+                      : formatCompactSubjectResult(
                           'Hafalan',
                           student.hafalanCriteria,
                           student.hafalanScore,
                           student.hafalanPredicate,
                           undefined,
                           true
-                        )
-                      : null,
-                  ].filter((x): x is NonNullable<typeof x> => x !== null);
+                        ),
+                  ];
 
               return (
                 <div
@@ -2027,6 +2128,13 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                       <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold">
                         {student.className || sess.className} • {sess.roomNumber || 'Ruang 01'}
                       </span>
+                      {!isBahasa && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${getBtqScopePillClass(studentBtqScope)}`}
+                        >
+                          {getBtqScopeShortLabel(studentBtqScope)}
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11px] text-slate-500 truncate">
                       Penguji: {sess.examinerName}
@@ -2035,8 +2143,12 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                       {items.map((it) => (
                         <p
                           key={it.text}
-                          className={`text-[11px] font-semibold ${
-                            it.done ? 'text-emerald-700' : 'text-slate-500'
+                          className={`text-[11px] ${
+                            it.skipped
+                              ? 'text-slate-400 italic font-medium'
+                              : it.done
+                                ? 'text-emerald-700 font-semibold'
+                                : 'text-slate-500 font-semibold'
                           }`}
                         >
                           {it.text}
@@ -2335,17 +2447,32 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                       const totalCount = activeGuruAssignment.students.length;
                       const doneCount = stats?.completedStudents ?? 0;
                       const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+                      const btqMixSummary =
+                        activeTrack === 'BTQ'
+                          ? summarizeStudentBtqScopes(
+                              existingSessionForActiveGuruTrack?.students || activeGuruAssignment.students,
+                              scope
+                            )
+                          : null;
 
                       return (
                         <div className="p-4 rounded-2xl bg-white border border-emerald-200 space-y-3">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs font-bold text-slate-900">
-                              {getScopeLabel(template, scope)}
+                              {btqMixSummary?.isMixed
+                                ? `Campuran: ${btqMixSummary.summaryLabel}`
+                                : getScopeLabel(template, scope)}
                             </span>
                             <span className="text-xs font-bold text-emerald-700">
                               {doneCount} / {totalCount} siswa ({pct}%)
                             </span>
                           </div>
+
+                          {btqMixSummary?.isMixed && (
+                            <p className="text-[11px] text-[#023246] bg-sky-50 border border-sky-200 rounded-xl px-3 py-2 leading-snug font-medium">
+                              Ruangan ini berisi siswa campuran BTQ &amp; Hafalan. Saat menilai, form akan otomatis menyesuaikan jalur setiap siswa agar tidak tertukar.
+                            </p>
+                          )}
 
                           <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden">
                             <div
@@ -2957,9 +3084,12 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                           >
                             {currentSession.students.map((st, idx) => {
                               const done = isStudentOralExamCompleted(st, currentSession.templateType, effectiveScope);
+                              const btqTag = !isBahasaSession
+                                ? ` • ${getBtqScopeShortLabel(getEffectiveStudentBtqScope(st, effectiveScope))}`
+                                : '';
                               return (
                                 <option key={`${st.studentId}_${idx}`} value={idx}>
-                                  {idx + 1}. {st.studentName} {done ? '✓' : ''}
+                                  {idx + 1}. {st.studentName}{btqTag} {done ? '✓' : ''}
                                 </option>
                               );
                             })}
@@ -3129,6 +3259,9 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                       <div className="space-y-2">
                         {filteredStudentsWithIndex.map(({ student, originalIndex }) => {
                           const done = isStudentOralExamCompleted(student, currentSession.templateType, effectiveScope);
+                          const studentBtqScope = !isBahasaSession
+                            ? getEffectiveStudentBtqScope(student, effectiveScope)
+                            : 'BOTH';
                           const engSnap = getSubjectCriteriaSnapshot(student, 'english');
                           const araSnap = getSubjectCriteriaSnapshot(student, 'arabic');
                           const btqSnap = getSubjectCriteriaSnapshot(student, 'btq');
@@ -3140,7 +3273,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                             if (snap.filledCount > 0) {
                               return `${label}: ${snap.filledCount}/3 kriteria`;
                             }
-                            return `${label}: -`;
+                            return `${label}: Belum`;
                           };
                           const summaryText = isBahasaSession
                             ? [
@@ -3150,35 +3283,46 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                                 .filter(Boolean)
                                 .join(' • ')
                             : [
-                                effectiveScope !== 'HAFALAN_ONLY' ? formatSnapLabel('BTQ', btqSnap) : '',
-                                effectiveScope !== 'BTQ_ONLY' ? formatSnapLabel('Hafalan', hafSnap) : '',
-                              ]
-                                .filter(Boolean)
-                                .join(' • ');
+                                studentBtqScope === 'HAFALAN_ONLY'
+                                  ? 'BTQ: Tidak Ikut'
+                                  : formatSnapLabel('BTQ', btqSnap),
+                                studentBtqScope === 'BTQ_ONLY'
+                                  ? 'Hafalan: Tidak Ikut'
+                                  : formatSnapLabel('Hafalan', hafSnap),
+                              ].join(' • ');
 
-                          const hasPartialProgress =
-                            engSnap.filledCount > 0 ||
-                            araSnap.filledCount > 0 ||
-                            btqSnap.filledCount > 0 ||
-                            hafSnap.filledCount > 0;
+                          const hasPartialProgress = isBahasaSession
+                            ? (effectiveScope !== 'ARABIC_ONLY' && engSnap.filledCount > 0) ||
+                              (effectiveScope !== 'ENGLISH_ONLY' && araSnap.filledCount > 0)
+                            : (studentBtqScope !== 'HAFALAN_ONLY' && btqSnap.filledCount > 0) ||
+                              (studentBtqScope !== 'BTQ_ONLY' && hafSnap.filledCount > 0);
 
                           return (
                             <div
                               key={`${student.studentId}_${originalIndex}`}
                               className="p-3.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2.5"
                             >
-                              <div className="min-w-0">
-                                <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                                  {originalIndex + 1}. {student.studentName}
-                                </p>
-                                <p className={`text-[11px] mt-0.5 ${
+                              <div className="min-w-0 space-y-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                                    {originalIndex + 1}. {student.studentName}
+                                  </p>
+                                  {!isBahasaSession && (
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded border text-[10px] font-bold shrink-0 ${getBtqScopePillClass(studentBtqScope)}`}
+                                    >
+                                      {getBtqScopeShortLabel(studentBtqScope)}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className={`text-[11px] ${
                                   done
                                     ? 'text-emerald-700 font-semibold'
                                     : hasPartialProgress
                                       ? 'text-amber-700 font-semibold'
                                       : 'text-slate-500'
                                 }`}>
-                                  {done || hasPartialProgress ? summaryText : 'Belum dinilai'}
+                                  {done || hasPartialProgress || !isBahasaSession ? summaryText : 'Belum dinilai'}
                                 </p>
                               </div>
 

@@ -38,6 +38,7 @@ import type { StudentItem, UserProfile } from '../../../types/database.types';
 import {
   DEFAULT_BAHASA_CRITERIA,
   DEFAULT_BTQ_CRITERIA,
+  getEffectiveStudentBtqScope,
   ORAL_EXAM_SCHEDULE_LABEL,
   resolveCriteriaLabels,
   type OralExamAssignment,
@@ -46,6 +47,7 @@ import {
   type OralExamCriteriaLabels,
   type OralExamTrack,
 } from '../../../types/oral-exam.types';
+import { summarizeStudentBtqScopes } from '../../../utils/oral-exam-scoring.utils';
 
 export interface OralExamAdminSetupModalProps {
   isOpen: boolean;
@@ -837,38 +839,121 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                     </button>
                   </div>
 
+                  {editingGroup.examTracks.includes('BTQ') && editingGroup.students.length > 0 && (() => {
+                    const btqSummary = summarizeStudentBtqScopes(editingGroup.students, editingGroup.btqScope);
+                    const applyAllStudentBtqScope = (scopeValue: OralExamBtqScope) => {
+                      setEditingGroup({
+                        ...editingGroup,
+                        btqScope: scopeValue,
+                        students: editingGroup.students.map((st) => ({
+                          ...st,
+                          btqScope: scopeValue,
+                        })),
+                      });
+                    };
+                    return (
+                      <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-2">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="text-[11px] font-extrabold text-emerald-950">
+                            Jalur Mengaji per Siswa ({btqSummary.summaryLabel})
+                          </span>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {(
+                              [
+                                { value: 'BTQ_ONLY' as const, label: 'Semua BTQ' },
+                                { value: 'HAFALAN_ONLY' as const, label: 'Semua Hafalan' },
+                                { value: 'BOTH' as const, label: 'Semua Keduanya' },
+                              ]
+                            ).map((preset) => (
+                              <button
+                                key={preset.value}
+                                type="button"
+                                onClick={() => applyAllStudentBtqScope(preset.value)}
+                                className="h-7 px-2 rounded-lg bg-white hover:bg-emerald-100 border border-emerald-300 text-[10px] font-bold text-emerald-900 cursor-pointer"
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-emerald-900/80 leading-snug">
+                          Atur per nama siswa jika dalam 1 penguji ada siswa yang hanya ikut <strong>BTQ</strong> atau hanya <strong>Hafalan</strong>. Guru penguji akan langsung melihat form sesuai jalur anak tersebut.
+                        </p>
+                      </div>
+                    );
+                  })()}
+
                   {/* Assigned students list */}
-                  <div className="border border-slate-200 rounded-xl max-h-60 overflow-y-auto">
+                  <div className="border border-slate-200 rounded-xl max-h-80 overflow-y-auto">
                     {editingGroup.students.length === 0 ? (
                       <p className="p-4 text-xs text-slate-500 text-center">
                         Belum ada siswa di kelompok ini.
                       </p>
                     ) : (
-                      editingGroup.students.map((st, idx) => (
-                        <div
-                          key={`${st.studentId}_${idx}`}
-                          className={`px-3 py-2 flex items-center justify-between gap-2 text-xs bg-white ${
-                            idx < editingGroup.students.length - 1 ? 'border-b border-slate-100' : ''
-                          }`}
-                        >
-                          <span className="font-semibold text-slate-800 truncate">
-                            {idx + 1}. {st.studentName}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setEditingGroup({
-                                ...editingGroup,
-                                students: editingGroup.students.filter((_, i) => i !== idx),
-                              })
-                            }
-                            aria-label={`Hapus ${st.studentName}`}
-                            className="w-8 h-8 rounded-lg text-rose-500 hover:bg-rose-50 flex items-center justify-center cursor-pointer shrink-0"
+                      editingGroup.students.map((st, idx) => {
+                        const studentBtqScope = getEffectiveStudentBtqScope(st, editingGroup.btqScope);
+                        const hasBtqTrack = editingGroup.examTracks.includes('BTQ');
+                        return (
+                          <div
+                            key={`${st.studentId}_${idx}`}
+                            className={`px-3 py-2.5 space-y-2 bg-white ${
+                              idx < editingGroup.students.length - 1 ? 'border-b border-slate-100' : ''
+                            }`}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))
+                            <div className="flex items-center justify-between gap-2 text-xs">
+                              <span className="font-semibold text-slate-800 truncate">
+                                {idx + 1}. {st.studentName}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingGroup({
+                                    ...editingGroup,
+                                    students: editingGroup.students.filter((_, i) => i !== idx),
+                                  })
+                                }
+                                aria-label={`Hapus ${st.studentName}`}
+                                className="w-8 h-8 rounded-lg text-rose-500 hover:bg-rose-50 flex items-center justify-center cursor-pointer shrink-0"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {hasBtqTrack && (
+                              <div className="grid grid-cols-3 gap-1.5">
+                                {(
+                                  [
+                                    { value: 'BTQ_ONLY' as const, label: 'BTQ Saja', activeClass: 'bg-[#0D7A5F] border-[#0D7A5F] text-white' },
+                                    { value: 'HAFALAN_ONLY' as const, label: 'Hafalan Saja', activeClass: 'bg-[#023246] border-[#023246] text-white' },
+                                    { value: 'BOTH' as const, label: 'Keduanya', activeClass: 'bg-slate-800 border-slate-800 text-white' },
+                                  ]
+                                ).map((opt) => {
+                                  const isSelected = studentBtqScope === opt.value;
+                                  return (
+                                    <button
+                                      key={opt.value}
+                                      type="button"
+                                      onClick={() => {
+                                        const nextStudents = editingGroup.students.map((item, sIdx) =>
+                                          sIdx === idx ? { ...item, btqScope: opt.value } : item
+                                        );
+                                        setEditingGroup({ ...editingGroup, students: nextStudents });
+                                      }}
+                                      className={`min-h-8 px-2 rounded-lg border text-[11px] font-bold cursor-pointer transition-colors ${
+                                        isSelected
+                                          ? opt.activeClass
+                                          : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                                      }`}
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -969,6 +1054,10 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                           <p className="text-[11px] text-slate-500">
                             {grp.students.length} siswa •{' '}
                             {grp.examTracks.map((t) => (t === 'BAHASA' ? 'Ujian Bahasa' : 'Ujian BTQ')).join(' + ')}
+                            {grp.examTracks.includes('BTQ') && (() => {
+                              const summary = summarizeStudentBtqScopes(grp.students, grp.btqScope);
+                              return summary.isMixed ? ` (${summary.summaryLabel})` : '';
+                            })()}
                           </p>
                         </div>
 
