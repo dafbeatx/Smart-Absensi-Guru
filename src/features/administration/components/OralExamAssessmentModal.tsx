@@ -1410,6 +1410,32 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     );
   };
 
+  const renderExaminerNotesField = (
+    student: OralExamStudentRecord,
+    studentIdx: number,
+    focusRingClass: string,
+    editablePlaceholder: string
+  ) => (
+    <div className="space-y-1">
+      <label className="text-xs font-bold text-slate-700 block">
+        Catatan Penguji (Opsional)
+      </label>
+      <input
+        type="text"
+        readOnly={isCurrentSessionReadOnly}
+        disabled={isCurrentSessionReadOnly}
+        value={student.notes || ''}
+        onChange={(e) => handleNotesChange(studentIdx, e.target.value)}
+        placeholder={isCurrentSessionReadOnly ? 'Tidak ada catatan penguji' : editablePlaceholder}
+        className={`w-full h-11 px-3.5 border border-slate-200 rounded-xl text-base sm:text-sm focus:outline-none ${
+          isCurrentSessionReadOnly
+            ? 'bg-slate-100 text-slate-600 cursor-default'
+            : `bg-white text-slate-900 focus:ring-2 ${focusRingClass}`
+        }`}
+      />
+    </div>
+  );
+
   const renderBahasaAssessmentBody = (student: OralExamStudentRecord, studentIdx: number) => {
     const showEnglishTab = effectiveScope !== 'ARABIC_ONLY';
     const showArabicTab = effectiveScope !== 'ENGLISH_ONLY';
@@ -1477,20 +1503,12 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
           currentLang === 'english' ? 'Nilai Ujian Lisan Bahasa Inggris' : 'Nilai Ujian Lisan Bahasa Arab'
         )}
 
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-slate-700 block">
-            Catatan Penguji (Opsional)
-          </label>
-          <input
-            type="text"
-            readOnly={isCurrentSessionReadOnly}
-            disabled={isCurrentSessionReadOnly}
-            value={student.notes || ''}
-            onChange={(e) => handleNotesChange(studentIdx, e.target.value)}
-            placeholder={isCurrentSessionReadOnly ? 'Tidak ada catatan penguji' : 'Contoh: Pelafalan jelas, kosakata perlu diperkaya...'}
-            className="w-full h-11 px-3.5 bg-white border border-slate-200 rounded-xl text-base sm:text-sm text-slate-900 disabled:bg-slate-100 disabled:text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#023246]"
-          />
-        </div>
+        {renderExaminerNotesField(
+          student,
+          studentIdx,
+          'focus:ring-[#023246]',
+          'Contoh: Pelafalan jelas, kosakata perlu diperkaya...'
+        )}
       </div>
     );
   };
@@ -1503,20 +1521,12 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       <div className="space-y-4">
         {showBtq && renderCriteriaSubjectCard(student, studentIdx, 'btq', "Nilai BTQ (Baca Tulis Qur'an)")}
         {showHafalan && renderCriteriaSubjectCard(student, studentIdx, 'hafalan', 'Nilai Hafalan (Tahfidz)')}
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-slate-700 block">
-            Catatan Penguji (Opsional)
-          </label>
-          <input
-            type="text"
-            readOnly={isCurrentSessionReadOnly}
-            disabled={isCurrentSessionReadOnly}
-            value={student.notes || ''}
-            onChange={(e) => handleNotesChange(studentIdx, e.target.value)}
-            placeholder={isCurrentSessionReadOnly ? 'Tidak ada catatan penguji' : 'Contoh: Bacaan lancar, perbaiki makhraj...'}
-            className="w-full h-11 px-3.5 bg-white border border-slate-200 rounded-xl text-base sm:text-sm text-slate-900 disabled:bg-slate-100 disabled:text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
-          />
-        </div>
+        {renderExaminerNotesField(
+          student,
+          studentIdx,
+          'focus:ring-[#0D7A5F]',
+          'Contoh: Bacaan lancar, perbaiki makhraj...'
+        )}
       </div>
     );
   };
