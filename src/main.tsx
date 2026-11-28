@@ -7,9 +7,13 @@ import { logger } from './utils/logger.utils';
 
 import { AutoUpdateService } from './services/auto-update.service';
 import { pwaService } from './services/pwa.service';
+import { stripGamePidDeepLinkParams } from './config/game-pid.config';
 
 // Global Unhandled Error & Promise Rejection Handlers
 if (typeof window !== 'undefined') {
+  // Bersihkan parameter ?portal=game-pid sejak awal bootstrap agar masuk selalu ke Beranda utama
+  stripGamePidDeepLinkParams();
+
   // Seamless Native APK API Resolver: Routes relative /api/* requests to production Vercel backend
   // when the application is running inside a Capacitor/Android native container.
   const isLocalContainer =

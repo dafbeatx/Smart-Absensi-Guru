@@ -269,6 +269,48 @@ export function setLokaNusantara3dUrl(url: string): void {
   }
 }
 
+const GAME_PID_DEEP_LINK_QUERY_KEYS = ['portal', 'open', 'tab'] as const;
+
+/**
+ * Menghapus parameter deep-link Game PID (?portal=game-pid / ?open=game-pid / ?tab=game_pid)
+ * dari URL browser tanpa memuat ulang halaman agar guru langsung masuk ke Beranda utama.
+ */
+export function stripGamePidDeepLinkParams(): boolean {
+  if (typeof window === 'undefined' || !window.location?.search) {
+    return false;
+  }
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    let removed = false;
+
+    for (const key of GAME_PID_DEEP_LINK_QUERY_KEYS) {
+      const value = params.get(key)?.trim().toLowerCase();
+      if (value === 'game-pid' || value === 'game_pid') {
+        params.delete(key);
+        removed = true;
+      }
+    }
+
+    if (!removed) {
+      return false;
+    }
+
+    const nextSearch = params.toString();
+    const pathname = window.location.pathname || '/';
+    const hash = window.location.hash || '';
+    const cleanUrl = `${pathname}${nextSearch ? `?${nextSearch}` : ''}${hash}`;
+
+    if (typeof window.history?.replaceState === 'function') {
+      window.history.replaceState(window.history.state, '', cleanUrl);
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Mendapatkan tautan deep-link khusus yang langsung membuka portal Game PID saat diakses
  */

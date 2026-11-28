@@ -29,6 +29,7 @@ import {
   getLokaNusantara3dUrl,
   setLokaNusantara3dUrl,
   getDirectGamePidShareUrl,
+  stripGamePidDeepLinkParams,
   shouldShowPidPromoToday,
   markPidPromoShown,
   STORAGE_KEY_PID_PROMO_DISMISSED_DATE,
@@ -821,6 +822,72 @@ Siti (Ketua Kelas),Teman Sebangku,Hai kawan!,Perangkat masukan komputer?,Monitor
     failed++;
     results.push({
       testName: 'Loka Nusantara 3D File & Roblox Thumbnail Integrity: Berkas HTML & cover Roblox terverifikasi utuh',
+      status: 'FAIL',
+      details: (err as Error)?.message || String(err),
+    });
+  }
+
+  // Test 15: Sanitasi Parameter ?portal=game-pid di URL Masuk (stripGamePidDeepLinkParams)
+  try {
+    let replacedUrl = '';
+    const originalWindowRef = globalThis.window;
+
+    (globalThis as unknown as { window: unknown }).window = {
+      location: {
+        pathname: '/',
+        search: '?portal=game-pid',
+        hash: '',
+      },
+      history: {
+        state: { sagAppActive: true },
+        replaceState: (_state: unknown, _title: string, url?: string | URL | null) => {
+          replacedUrl = String(url ?? '');
+        },
+      },
+    };
+
+    const strippedPortal = stripGamePidDeepLinkParams();
+    if (!strippedPortal || replacedUrl !== '/') {
+      throw new Error(`Gagal membersihkan ?portal=game-pid: stripped=${strippedPortal}, replacedUrl=${replacedUrl}`);
+    }
+
+    // Test campuran query param: hanya parameter game-pid yang dihapus, param lain tetap utuh
+    replacedUrl = '';
+    (globalThis as unknown as { window: { location: { pathname: string; search: string; hash: string } } }).window.location = {
+      pathname: '/',
+      search: '?open=game-pid&openSurvey=true',
+      hash: '#home',
+    };
+    const strippedOpen = stripGamePidDeepLinkParams();
+    if (!strippedOpen || replacedUrl !== '/?openSurvey=true#home') {
+      throw new Error(`Gagal membersihkan ?open=game-pid secara selektif: ${replacedUrl}`);
+    }
+
+    // Test query non-PID: tidak boleh menyentuh URL
+    replacedUrl = '';
+    (globalThis as unknown as { window: { location: { pathname: string; search: string; hash: string } } }).window.location = {
+      pathname: '/',
+      search: '?tab=LEAVES',
+      hash: '',
+    };
+    const untouched = stripGamePidDeepLinkParams();
+    if (untouched || replacedUrl !== '') {
+      throw new Error(`Parameter non-PID ikut berubah: untouched=${untouched}, replacedUrl=${replacedUrl}`);
+    }
+
+    (globalThis as unknown as { window: unknown }).window = originalWindowRef;
+
+    passed++;
+    results.push({
+      testName: 'Sanitasi URL Masuk Game PID: stripGamePidDeepLinkParams membersihkan ?portal=game-pid tanpa reload',
+      status: 'PASS',
+      details: '?portal=game-pid dibersihkan ke /, parameter lain tetap aman',
+    });
+  } catch (err: unknown) {
+    cleanupMockBrowser();
+    failed++;
+    results.push({
+      testName: 'Sanitasi URL Masuk Game PID: stripGamePidDeepLinkParams membersihkan ?portal=game-pid tanpa reload',
       status: 'FAIL',
       details: (err as Error)?.message || String(err),
     });

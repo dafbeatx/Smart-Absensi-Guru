@@ -178,6 +178,7 @@ import { TeacherDailyChallengeWidget } from '../../guru/components/TeacherDailyC
 import { TeacherChallengeModal } from '../../guru/components/TeacherChallengeModal';
 import { GamePidView } from '../../guru/components/GamePidView';
 import { GamePidPromoModal } from '../../guru/components/GamePidPromoModal';
+import { stripGamePidDeepLinkParams } from '../../../config/game-pid.config';
 import { TeacherChallengeService } from '../../../services/teacher-challenge.service';
 import { CheckoutReminderBanner } from '../components/CheckoutReminderBanner';
 import { AttendancePolicyAgreementModal } from '../../guru/components/AttendancePolicyAgreementModal';
@@ -2211,24 +2212,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   const todayDateStr = useMemo(() => getTodayDateInJakarta(), []);
 
-  // Promosi Pop-up Game PID & Deep Link Handler (Pop-up hanya SETELAH absen masuk)
+  // Pastikan tautan deep-link lama (?portal=game-pid) tidak otomatis mengarahkan guru ke Game PID saat masuk
   useEffect(() => {
-    if (!effectiveUser?.id) return;
-
-    // 1. Periksa Tautan Deep Link (?portal=game-pid / ?open=game-pid / ?tab=game_pid)
-    if (typeof window !== 'undefined' && window.location?.search) {
-      const searchParams = new URLSearchParams(window.location.search);
-      const portalParam = searchParams.get('portal') || searchParams.get('open') || searchParams.get('tab');
-      if (portalParam === 'game-pid' || portalParam === 'game_pid') {
-        setActiveTab('BERANDA');
-        setGamePidReturnTarget('HOME');
-        setBerandaLayer('GAME_PID');
-        return; // Deep-link langsung membuka portal game tanpa memunculkan popup promo
-      }
-    }
-
-    // Auto-popup PID dinonaktifkan: modal hanya dibuka melalui aksi eksplisit pengguna
-  }, [effectiveUser?.id, todayDateStr]);
+    stripGamePidDeepLinkParams();
+  }, []);
 
   const hasFilledMoodToday = useMemo(() => {
     if (todayMood) return true;
