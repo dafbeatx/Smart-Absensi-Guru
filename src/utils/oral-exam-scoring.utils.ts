@@ -6,12 +6,17 @@
 
 import {
   getEffectiveSubjectScope,
+  ORAL_EXAM_SCHEDULE_DAYS,
+  ORAL_EXAM_SCHEDULE_END,
+  ORAL_EXAM_SCHEDULE_LABEL,
+  ORAL_EXAM_SCHEDULE_START,
   type OralExamCriteriaScores,
   type OralExamGrade,
   type OralExamStudentRecord,
   type OralExamSubjectScope,
   type OralExamTemplateType,
 } from '../types/oral-exam.types';
+import { getTodayDateInJakarta } from './time.utils';
 
 /**
  * Menghitung predikat untuk nilai akhir skala 0 - 100
@@ -296,5 +301,67 @@ export function calculateOralExamSummaryStats(
     averageScore1: countScore1 > 0 ? Math.round(totalScore1 / countScore1) : 0,
     averageScore2: countScore2 > 0 ? Math.round(totalScore2 / countScore2) : 0,
     gradeDistribution,
+  };
+}
+
+/**
+ * Mengembalikan tanggal default sesi ujian lisan yang diselaraskan ke periode resmi
+ * pelaksanaan (30 November - 04 Desember 2026).
+ */
+export function resolveDefaultOralExamDate(
+  todayIso: string = getTodayDateInJakarta()
+): string {
+  if (!todayIso || todayIso < ORAL_EXAM_SCHEDULE_START) {
+    return ORAL_EXAM_SCHEDULE_START;
+  }
+  if (todayIso > ORAL_EXAM_SCHEDULE_END) {
+    return ORAL_EXAM_SCHEDULE_END;
+  }
+  return todayIso;
+}
+
+export interface OralExamPeriodStatusInfo {
+  phase: 'UPCOMING' | 'ONGOING' | 'COMPLETED';
+  badgeText: string;
+  detailText: string;
+  activeDayNumber: number | null;
+  periodLabel: string;
+}
+
+/**
+ * Menghitung status pelaksanaan Ujian Lisan berdasarkan rentang resmi 30 Nov - 04 Des 2026.
+ */
+export function getOralExamPeriodStatus(
+  todayIso: string = getTodayDateInJakarta()
+): OralExamPeriodStatusInfo {
+  if (!todayIso || todayIso < ORAL_EXAM_SCHEDULE_START) {
+    return {
+      phase: 'UPCOMING',
+      badgeText: 'Mulai 30 Nov 2026',
+      detailText: `Pelaksanaan dimulai Senin, 30 November s.d. 04 Desember 2026 (5 hari).`,
+      activeDayNumber: null,
+      periodLabel: ORAL_EXAM_SCHEDULE_LABEL,
+    };
+  }
+
+  if (todayIso <= ORAL_EXAM_SCHEDULE_END) {
+    const matchedDay = ORAL_EXAM_SCHEDULE_DAYS.find((d) => d.date === todayIso) || null;
+    const dayNumber = matchedDay?.dayNumber ?? 1;
+    const dayName = matchedDay?.dayName ?? 'Hari Pelaksanaan';
+    return {
+      phase: 'ONGOING',
+      badgeText: `Berlangsung • Hari ke-${dayNumber}/5`,
+      detailText: `Hari ke-${dayNumber} (${dayName}) dari periode ${ORAL_EXAM_SCHEDULE_LABEL}.`,
+      activeDayNumber: dayNumber,
+      periodLabel: ORAL_EXAM_SCHEDULE_LABEL,
+    };
+  }
+
+  return {
+    phase: 'COMPLETED',
+    badgeText: 'Periode Selesai',
+    detailText: `Pelaksanaan utama (${ORAL_EXAM_SCHEDULE_LABEL}) telah selesai; nilai & rekap tetap dapat dilihat/dilengkapi.`,
+    activeDayNumber: null,
+    periodLabel: ORAL_EXAM_SCHEDULE_LABEL,
   };
 }

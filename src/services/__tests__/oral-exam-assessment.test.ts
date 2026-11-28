@@ -8,7 +8,9 @@ import {
   calculateDirectScorePredicate,
   calculateCriteriaAverageAndPredicate,
   calculateOralExamSummaryStats,
+  getOralExamPeriodStatus,
   isStudentOralExamCompleted,
+  resolveDefaultOralExamDate,
 } from '../../utils/oral-exam-scoring.utils';
 import { OralExamRepository } from '../../repositories/OralExamRepository';
 import { OralExamAssignmentRepository } from '../../repositories/OralExamAssignmentRepository';
@@ -33,6 +35,8 @@ import {
 import {
   getEffectiveSubjectScope,
   getOralExamSessionTrack,
+  ORAL_EXAM_SCHEDULE_DAYS,
+  ORAL_EXAM_SCHEDULE_LABEL,
   type OralExamSession,
   type OralExamAssignment,
 } from '../../types/oral-exam.types';
@@ -420,6 +424,7 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
         !engOnlyHtml.includes('BAHASA ARAB') &&
         engOnlyHtml.includes('Ruang SMA') &&
         engOnlyHtml.includes('SMA TERPADU AS SALAAM') &&
+        engOnlyHtml.includes(ORAL_EXAM_SCHEDULE_LABEL) &&
         btqOnlyHtml.includes('BTQ') &&
         !btqOnlyHtml.includes('HAFALAN'),
       `HasEng=${engOnlyHtml.includes('BAHASA INGGRIS')}, NoArab=${!engOnlyHtml.includes('BAHASA ARAB')}, HasSma=${engOnlyHtml.includes('SMA TERPADU AS SALAAM')}, NoHaf=${!btqOnlyHtml.includes('HAFALAN')}`
@@ -990,6 +995,28 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
     );
 
     await OralExamAssignmentRepository.resetToOfficialDefaults('2026/2027', 'MOCK_TOKEN');
+
+    // =========================================================================
+    // Test 14: Jadwal Resmi Pelaksanaan Ujian Lisan (30 Nov - 04 Des 2026)
+    // =========================================================================
+    const upcomingStatus = getOralExamPeriodStatus('2026-11-28');
+    const ongoingDay3Status = getOralExamPeriodStatus('2026-12-02');
+    const completedStatus = getOralExamPeriodStatus('2026-12-05');
+
+    assert(
+      'Jadwal Pelaksanaan 30 Nov - 04 Des 2026: Rentang 5 hari, default date clamp, & status periode akurat',
+      ORAL_EXAM_SCHEDULE_DAYS.length === 5 &&
+        ORAL_EXAM_SCHEDULE_DAYS[0].date === '2026-11-30' &&
+        ORAL_EXAM_SCHEDULE_DAYS[4].date === '2026-12-04' &&
+        resolveDefaultOralExamDate('2026-11-28') === '2026-11-30' &&
+        resolveDefaultOralExamDate('2026-12-02') === '2026-12-02' &&
+        resolveDefaultOralExamDate('2026-12-10') === '2026-12-04' &&
+        upcomingStatus.phase === 'UPCOMING' &&
+        ongoingDay3Status.phase === 'ONGOING' &&
+        ongoingDay3Status.activeDayNumber === 3 &&
+        completedStatus.phase === 'COMPLETED',
+      `days=${ORAL_EXAM_SCHEDULE_DAYS.length}, before=${resolveDefaultOralExamDate('2026-11-28')}, mid=${resolveDefaultOralExamDate('2026-12-02')}, after=${resolveDefaultOralExamDate('2026-12-10')}, phases=${upcomingStatus.phase}/${ongoingDay3Status.phase}(d${ongoingDay3Status.activeDayNumber})/${completedStatus.phase}`
+    );
   } finally {
     ProviderFactory.setProvider(prevProvider);
   }

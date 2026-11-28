@@ -113,7 +113,8 @@ import {
   ORAL_EXAM_ASSIGNMENTS_CHANGED_EVENT,
 } from '../../../repositories/OralExamAssignmentRepository';
 import { findAssignmentsForTeacher } from '../../../data/oral-exam-groups';
-import type { OralExamAssignment } from '../../../types/oral-exam.types';
+import { ORAL_EXAM_SCHEDULE_LABEL, type OralExamAssignment } from '../../../types/oral-exam.types';
+import { getOralExamPeriodStatus } from '../../../utils/oral-exam-scoring.utils';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
 import { BiometricService } from '../../../services/biometric.service';
@@ -4652,15 +4653,20 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       <Languages className="w-4 h-4" />
                     </div>
                     <div className="text-left min-w-0">
-                      <span className="block truncate font-extrabold text-xs">
-                        Penilaian Ujian Lisan (Bahasa &amp; BTQ)
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-extrabold text-xs">
+                          Penilaian Ujian Lisan (Bahasa &amp; BTQ)
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-white/90 border border-emerald-200 text-[9.5px] font-extrabold text-emerald-800 shrink-0">
+                          {getOralExamPeriodStatus().badgeText}
+                        </span>
+                      </div>
                       <span className={`block truncate text-[10.5px] font-medium ${
                         guruOralAssignments.length > 0 ? 'text-emerald-700' : 'text-slate-500'
                       }`}>
                         {guruOralAssignments.length > 0
-                          ? `Siap pakai: ${guruOralAssignments[0].roomNumber} (${guruOralAssignments[0].className === 'SMA' ? 'SMA' : `Kls ${guruOralAssignments[0].className}`}) • ${guruOralAssignments[0].students.length} siswa`
-                          : 'Lihat hasil nilai seluruh penguji & ruang (Bahasa & BTQ)'}
+                          ? `Siap pakai: ${guruOralAssignments[0].roomNumber} (${guruOralAssignments[0].className === 'SMA' ? 'SMA' : `Kls ${guruOralAssignments[0].className}`}) • ${ORAL_EXAM_SCHEDULE_LABEL}`
+                          : `Lihat hasil nilai semua penguji • Jadwal: ${ORAL_EXAM_SCHEDULE_LABEL}`}
                       </span>
                     </div>
                   </div>
@@ -5384,7 +5390,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                    title="Penilaian Ujian Lisan Bahasa & BTQ (Penempatan diatur Admin)"
+                    title={`Penilaian Ujian Lisan Bahasa & BTQ (${ORAL_EXAM_SCHEDULE_LABEL})`}
                   >
                     <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-emerald-700 to-teal-900 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
                       <Languages className="w-6 h-6 stroke-[1.8]" />

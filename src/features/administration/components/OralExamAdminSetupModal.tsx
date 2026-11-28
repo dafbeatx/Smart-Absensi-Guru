@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
   BookOpen,
+  Calendar,
   Check,
   Languages,
   Plus,
@@ -37,6 +38,7 @@ import type { StudentItem, UserProfile } from '../../../types/database.types';
 import {
   DEFAULT_BAHASA_CRITERIA,
   DEFAULT_BTQ_CRITERIA,
+  ORAL_EXAM_SCHEDULE_LABEL,
   resolveCriteriaLabels,
   type OralExamAssignment,
   type OralExamBahasaScope,
@@ -879,6 +881,10 @@ export const OralExamAdminSetupModal: React.FC<OralExamAdminSetupModalProps> = (
                     <p className="text-xs font-bold text-slate-900">
                       Total {assignments.filter((a) => a.isActive).length} Penguji Aktif •{' '}
                       {assignments.reduce((sum, a) => sum + (a.isActive ? a.students.length : 0), 0)} Siswa
+                    </p>
+                    <p className="text-[11px] font-semibold text-emerald-800 inline-flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 shrink-0" />
+                      <span>Pelaksanaan Resmi: {ORAL_EXAM_SCHEDULE_LABEL}</span>
                     </p>
                     <p className="text-[11px] text-slate-500">
                       Guru yang ditugaskan akan langsung melihat ruangan &amp; daftar siswanya tanpa pengaturan manual.

@@ -5,6 +5,25 @@
  * 2. Ujian BTQ & Hafalan (3 Kriteria: Tajwid & Makhraj, Kelancaran Bacaan, Hafalan & Adab)
  */
 
+export const ORAL_EXAM_SCHEDULE_START = '2026-11-30';
+export const ORAL_EXAM_SCHEDULE_END = '2026-12-04';
+export const ORAL_EXAM_SCHEDULE_LABEL = '30 November – 04 Desember 2026';
+
+export interface OralExamScheduleDay {
+  dayNumber: number;
+  dayName: string;
+  shortLabel: string;
+  date: string; // YYYY-MM-DD
+}
+
+export const ORAL_EXAM_SCHEDULE_DAYS: OralExamScheduleDay[] = [
+  { dayNumber: 1, dayName: 'Senin', shortLabel: 'Sen, 30 Nov', date: '2026-11-30' },
+  { dayNumber: 2, dayName: 'Selasa', shortLabel: 'Sel, 01 Des', date: '2026-12-01' },
+  { dayNumber: 3, dayName: 'Rabu', shortLabel: 'Rab, 02 Des', date: '2026-12-02' },
+  { dayNumber: 4, dayName: 'Kamis', shortLabel: 'Kam, 03 Des', date: '2026-12-03' },
+  { dayNumber: 5, dayName: 'Jumat', shortLabel: 'Jum, 04 Des', date: '2026-12-04' },
+];
+
 export type OralExamTemplateType = 'BTQ_HAFALAN' | 'BAHASA_INGGRIS_ARAB' | 'CUSTOM';
 
 export type OralExamTrack = 'BAHASA' | 'BTQ';

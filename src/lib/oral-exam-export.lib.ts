@@ -12,6 +12,7 @@ import { escapeHtml, formatNppHtmlLine, getLevelSchoolBranding } from '../utils/
 import {
   getEffectiveSubjectScope,
   getOralExamSessionTrack,
+  ORAL_EXAM_SCHEDULE_LABEL,
   resolveCriteriaLabels,
   type OralExamCriteriaScores,
   type OralExamGrade,
@@ -218,7 +219,7 @@ export class OralExamExportService {
             ${escapeHtml(session.title || defaultDocTitle)}
           </h1>
           <p style="margin: 3px 0 0 0; font-size: 11px; font-weight: 600; color: #4b5563;">
-            Tahun Ajaran ${escapeHtml(session.academicYear)} • Semester ${escapeHtml(session.semester)}
+            Tahun Ajaran ${escapeHtml(session.academicYear)} • Semester ${escapeHtml(session.semester)} • Pelaksanaan: ${escapeHtml(ORAL_EXAM_SCHEDULE_LABEL)}
           </p>
         </div>
 
@@ -302,7 +303,7 @@ export class OralExamExportService {
     rows.push([headerSchoolLine]);
     rows.push([session.title || (isBahasa ? 'DAFTAR PENILAIAN UJIAN LISAN BAHASA' : 'DAFTAR PENILAIAN BTQ DAN HAFALAN')]);
     rows.push([`Tahun Ajaran: ${session.academicYear}`, `Semester: ${session.semester}`, `Kelas: ${session.className}`, `Ruang: ${session.roomNumber || '-'}`]);
-    rows.push([`Penguji: ${session.examinerName}`, `Tanggal: ${session.date}`]);
+    rows.push([`Penguji: ${session.examinerName}`, `Tanggal Sesi: ${session.date}`, `Pelaksanaan Resmi: ${ORAL_EXAM_SCHEDULE_LABEL}`]);
     rows.push([`3 Kriteria: 1) ${criteriaLabels[0]}, 2) ${criteriaLabels[1]}, 3) ${criteriaLabels[2]}`]);
     rows.push([]);
 
@@ -376,7 +377,7 @@ export class OralExamExportService {
 
     const rows: any[] = [
       ['REKAPITULASI GABUNGAN HASIL UJIAN LISAN - SEMUA RUANG & PENGUJI'],
-      [isBahasa ? 'Kategori: Ujian Bahasa (Bahasa Inggris & Arab)' : 'Kategori: Ujian Mengaji BTQ & Hafalan', `Tahun Ajaran: ${yearLabel}`, `Jumlah Sesi: ${filtered.length}`],
+      [isBahasa ? 'Kategori: Ujian Bahasa (Bahasa Inggris & Arab)' : 'Kategori: Ujian Mengaji BTQ & Hafalan', `Tahun Ajaran: ${yearLabel}`, `Pelaksanaan: ${ORAL_EXAM_SCHEDULE_LABEL}`, `Jumlah Sesi: ${filtered.length}`],
       [`3 Kriteria Utama: 1) ${criteriaLabels[0]}, 2) ${criteriaLabels[1]}, 3) ${criteriaLabels[2]}`],
       [],
       [

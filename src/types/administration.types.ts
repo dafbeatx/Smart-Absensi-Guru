@@ -100,7 +100,7 @@ export const DEFAULT_ADMINISTRATION_MODULES: AdministrationModuleItem[] = [
     id: 'oral_exam_assessment',
     title: 'Penilaian Ujian Lisan',
     category: 'UJIAN',
-    description: 'Penilaian langsung 3 kriteria (skala 0–100 & otomatis predikat A–D) untuk Ujian Bahasa & BTQ',
+    description: 'Penilaian langsung 3 kriteria (skala 0–100 & otomatis predikat A–D) untuk Ujian Bahasa & BTQ (30 Nov – 04 Des 2026)',
     icon: '🗣️',
     colorClass: 'from-emerald-700 to-teal-900',
     badge: 'Lisan & BTQ',

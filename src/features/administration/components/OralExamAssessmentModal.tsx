@@ -14,6 +14,7 @@ import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
   BookOpen,
+  Calendar,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -55,6 +56,8 @@ import {
   getDefaultCriteriaLabels,
   getEffectiveSubjectScope,
   getOralExamSessionTrack,
+  ORAL_EXAM_SCHEDULE_DAYS,
+  ORAL_EXAM_SCHEDULE_LABEL,
   resolveCriteriaLabels,
   type OralExamAssignment,
   type OralExamCriteriaLabels,
@@ -68,14 +71,15 @@ import {
 import {
   calculateCriteriaAverageAndPredicate,
   calculateDirectScorePredicate,
+  getOralExamPeriodStatus,
   getOralExamPredicateBadgeStyle,
   calculateOralExamSummaryStats,
   isOralSubjectAssessed,
   isStudentOralExamCompleted,
   normalizeCriteriaScores,
+  resolveDefaultOralExamDate,
 } from '../../../utils/oral-exam-scoring.utils';
 import { areClassCodesEqual, normalizeClassCode } from '../../../utils/class.utils';
-import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import type { StudentItem, UserProfile } from '../../../types/database.types';
 import { OralExamAdminSetupModal } from './OralExamAdminSetupModal';
 
@@ -165,7 +169,8 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   const [useManualExaminerInput, setUseManualExaminerInput] = useState<boolean>(false);
   const [roomNumber, setRoomNumber] = useState<string>('Ruang 01');
   const [sessionTitle, setSessionTitle] = useState<string>('');
-  const [sessionDate, setSessionDate] = useState<string>(() => getTodayDateInJakarta());
+  const [sessionDate, setSessionDate] = useState<string>(() => resolveDefaultOralExamDate());
+  const oralPeriodStatus = getOralExamPeriodStatus();
   const [isCreatingLoading, setIsCreatingLoading] = useState<boolean>(false);
 
   // Assess screen controls
@@ -419,7 +424,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     setActiveTrack(track);
     setSubjectScopeDraft(track === 'BAHASA' ? 'ENGLISH_ONLY' : 'BOTH');
     setSessionTitle('');
-    setSessionDate(getTodayDateInJakarta());
+    setSessionDate(resolveDefaultOralExamDate());
     setGroupChecklistSearch('');
     const allIds = activeSelectableAssignments.map((g) => g.id);
     setSelectedGroupIds(allIds);
@@ -511,7 +516,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
           academicYear: activeAcademicYear,
           semester: activeSemester,
           examinerNpp: user?.nip ?? assignment.examinerNpp ?? null,
-          date: getTodayDateInJakarta(),
+          date: resolveDefaultOralExamDate(),
         },
         token || undefined
       );
@@ -1594,6 +1599,67 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     );
   };
 
+  const renderScheduleBanner = () => (
+    <div className="p-3.5 rounded-2xl bg-sky-50/80 border border-sky-200 flex items-center justify-between gap-2.5 flex-wrap">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="w-9 h-9 rounded-xl bg-[#023246] text-white flex items-center justify-center shrink-0">
+          <Calendar className="w-4 h-4" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-extrabold text-slate-900">
+            Pelaksanaan Ujian Lisan: {ORAL_EXAM_SCHEDULE_LABEL}
+          </p>
+          <p className="text-[11px] text-slate-600">{oralPeriodStatus.detailText}</p>
+        </div>
+      </div>
+      <span
+        className={`px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold border shrink-0 ${
+          oralPeriodStatus.phase === 'ONGOING'
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+            : oralPeriodStatus.phase === 'UPCOMING'
+              ? 'bg-sky-100 text-[#023246] border-sky-300'
+              : 'bg-slate-100 text-slate-700 border-slate-200'
+        }`}
+      >
+        {oralPeriodStatus.badgeText}
+      </span>
+    </div>
+  );
+
+  const renderExecutionDateField = (labelText: string) => (
+    <div className="space-y-2">
+      <label className="text-xs font-bold text-slate-700 block">{labelText}</label>
+      <div className="flex flex-wrap gap-1.5">
+        {ORAL_EXAM_SCHEDULE_DAYS.map((day) => {
+          const isSelected = sessionDate === day.date;
+          return (
+            <button
+              key={day.date}
+              type="button"
+              onClick={() => setSessionDate(day.date)}
+              className={`h-9 px-2.5 rounded-lg border text-[11px] font-bold transition-colors cursor-pointer ${
+                isSelected
+                  ? 'bg-[#023246] border-[#023246] text-white'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+              }`}
+            >
+              {day.shortLabel}
+            </button>
+          );
+        })}
+      </div>
+      <input
+        type="date"
+        value={sessionDate}
+        onChange={(e) => setSessionDate(e.target.value)}
+        className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+      />
+      <p className="text-[11px] text-slate-500">
+        Jadwal resmi pelaksanaan: <strong>{ORAL_EXAM_SCHEDULE_LABEL}</strong>.
+      </p>
+    </div>
+  );
+
   const renderAllResultsSection = () => {
     const formatCompactSubjectResult = (
       label: string,
@@ -2177,6 +2243,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
         <div className={isPageMode ? (isAdminControl || isKepsekControl ? 'w-full max-w-3xl mx-auto space-y-4' : 'w-full space-y-4') : 'w-full max-w-lg mx-auto space-y-4'}>
           {inlineConfirmCard}
           {inlineAddStudentCard}
+          {screen === 'LIST' && renderScheduleBanner()}
             {/* ==================== SCREEN 1: GURU READY-TO-USE HOME + SCHOOL RECAP ==================== */}
             {screen === 'LIST' && !isAdminControl && !isKepsekControl && (
               <>
@@ -2683,15 +2750,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                         dan kelas sesuai penempatan resminya masing-masing di Supabase. Jika sesi sudah ada, nilai siswa
                         tetap aman terjaga.
                       </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Tanggal Ujian</label>
-                        <input
-                          type="date"
-                          value={sessionDate}
-                          onChange={(e) => setSessionDate(e.target.value)}
-                          className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
-                        />
-                      </div>
+                      {renderExecutionDateField('Tanggal Ujian')}
                     </div>
                   ) : (
                   <div className="space-y-2.5">
@@ -2743,28 +2802,18 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Ruangan</label>
-                        <input
-                          type="text"
-                          value={roomNumber}
-                          onChange={(e) => setRoomNumber(e.target.value)}
-                          placeholder="Ruang 01"
-                          className="w-full h-11 px-3.5 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Tanggal</label>
-                        <input
-                          type="date"
-                          value={sessionDate}
-                          onChange={(e) => setSessionDate(e.target.value)}
-                          className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
-                        />
-                      </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Ruangan</label>
+                      <input
+                        type="text"
+                        value={roomNumber}
+                        onChange={(e) => setRoomNumber(e.target.value)}
+                        placeholder="Ruang 01"
+                        className="w-full h-11 px-3.5 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                      />
                     </div>
+
+                    {renderExecutionDateField('Tanggal')}
 
                     <div>
                       <label className="text-xs font-bold text-slate-700 block mb-1">

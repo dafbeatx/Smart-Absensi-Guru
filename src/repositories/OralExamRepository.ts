@@ -15,6 +15,7 @@ import {
   type OralExamSubjectScope,
   type OralExamTrack,
 } from '../types/oral-exam.types';
+import { resolveDefaultOralExamDate } from '../utils/oral-exam-scoring.utils';
 import { ProviderFactory } from '../providers/provider-factory';
 
 export const ORAL_EXAM_CHANGED_EVENT = 'smart_absensi_oral_exam_changed';
@@ -184,7 +185,7 @@ export class OralExamRepository {
       academicYear: string;
       semester: 'GANJIL' | 'GENAP';
       examinerNpp?: string | null;
-      date: string;
+      date?: string;
       subjectScopeOverride?: OralExamSubjectScope;
       criteriaLabelsOverride?: OralExamCriteriaLabels;
       existingSessionsCache?: OralExamSession[];
@@ -197,7 +198,7 @@ export class OralExamRepository {
       academicYear,
       semester,
       examinerNpp,
-      date,
+      date = resolveDefaultOralExamDate(),
       subjectScopeOverride,
       criteriaLabelsOverride,
       existingSessionsCache,
@@ -330,7 +331,7 @@ export class OralExamRepository {
       track: OralExamTrack;
       academicYear: string;
       semester: 'GANJIL' | 'GENAP';
-      date: string;
+      date?: string;
       subjectScopeOverride?: OralExamSubjectScope;
       criteriaLabelsOverride?: OralExamCriteriaLabels;
     },
