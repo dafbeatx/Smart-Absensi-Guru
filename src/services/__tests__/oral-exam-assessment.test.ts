@@ -627,6 +627,52 @@ export const runOralExamAssessmentTestSuite = async (): Promise<{
       `room=${resyncedSession.roomNumber}, crit0=${resyncedSession.criteriaLabels?.[0]}, count=${resyncedSession.students.length}, preserved=${resyncedSession.students[0].englishScore}`
     );
 
+    // Test 11b: Ceklis Massal Penguji Admin (openOrSyncBatchSessions anti-duplikasi & jaga nilai)
+    const batchTargets = defaultAssignments.slice(0, 3);
+    const firstPass = await OralExamRepository.openOrSyncBatchSessions(
+      {
+        assignments: [batchTargets[0]],
+        track: 'BAHASA',
+        academicYear: '2026/2027',
+        semester: 'GANJIL',
+        date: '2026-11-28',
+      },
+      'MOCK_TOKEN'
+    );
+    if (firstPass.sessions[0]) {
+      firstPass.sessions[0].students[0].englishCriteria = [90, 92, 88];
+      firstPass.sessions[0].students[0].englishScore = 90;
+      firstPass.sessions[0].students[0].englishPredicate = 'B';
+      firstPass.sessions[0].students[0].englishAssessed = true;
+      await OralExamRepository.saveSession(firstPass.sessions[0], 'MOCK_TOKEN');
+    }
+
+    const secondPass = await OralExamRepository.openOrSyncBatchSessions(
+      {
+        assignments: batchTargets,
+        track: 'BAHASA',
+        academicYear: '2026/2027',
+        semester: 'GANJIL',
+        date: '2026-11-28',
+        subjectScopeOverride: 'ENGLISH_ONLY',
+      },
+      'MOCK_TOKEN'
+    );
+    const batchPreservedScore = secondPass.sessions[0]?.students[0]?.englishScore;
+    for (const bs of secondPass.sessions) {
+      await OralExamRepository.deleteSession(bs.id, 'MOCK_TOKEN');
+    }
+
+    assert(
+      'Batch Examiner Checklist: openOrSyncBatchSessions membuat sesi baru untuk penguji lain & menyinkronkan sesi lama tanpa duplikasi',
+      firstPass.createdCount === 1 &&
+        secondPass.sessions.length === 3 &&
+        secondPass.createdCount === 2 &&
+        secondPass.syncedCount === 1 &&
+        batchPreservedScore === 90,
+      `created=${secondPass.createdCount}, synced=${secondPass.syncedCount}, preserved=${batchPreservedScore}`
+    );
+
     // Test 12: Sinkronisasi Nama Penguji dari Data Manajemen Guru & Staf
     const prevGetAllUsers = mockProv.getAllUsers.bind(mockProv);
     const mockStaffFromManagement: UserProfile[] = [

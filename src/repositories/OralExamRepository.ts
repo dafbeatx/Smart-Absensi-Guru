@@ -185,20 +185,33 @@ export class OralExamRepository {
       semester: 'GANJIL' | 'GENAP';
       examinerNpp?: string | null;
       date: string;
+      subjectScopeOverride?: OralExamSubjectScope;
+      criteriaLabelsOverride?: OralExamCriteriaLabels;
+      existingSessionsCache?: OralExamSession[];
     },
     token?: string
   ): Promise<OralExamSession> {
-    const { assignment, track, academicYear, semester, examinerNpp, date } = params;
+    const {
+      assignment,
+      track,
+      academicYear,
+      semester,
+      examinerNpp,
+      date,
+      subjectScopeOverride,
+      criteriaLabelsOverride,
+      existingSessionsCache,
+    } = params;
     const templateType: OralExamTemplateType =
       track === 'BAHASA' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN';
     const subjectScope: OralExamSubjectScope =
-      track === 'BAHASA' ? assignment.bahasaScope : assignment.btqScope;
+      subjectScopeOverride ?? (track === 'BAHASA' ? assignment.bahasaScope : assignment.btqScope);
     const assignedCriteria = resolveCriteriaLabels(
-      track === 'BAHASA' ? assignment.bahasaCriteria : assignment.btqCriteria,
+      criteriaLabelsOverride ?? (track === 'BAHASA' ? assignment.bahasaCriteria : assignment.btqCriteria),
       track
     );
 
-    const allSessions = await this.getAllSessions(academicYear, token);
+    const allSessions = existingSessionsCache ?? (await this.getAllSessions(academicYear, token));
     const existing = allSessions.find(
       (s) => s.groupId === assignment.id && getOralExamSessionTrack(s) === track
     );
@@ -305,5 +318,60 @@ export class OralExamRepository {
     };
 
     return this.saveSession(syncedSession, token);
+  }
+
+  /**
+   * Menyiapkan atau menyinkronkan sesi untuk banyak kelompok penguji sekaligus (ceklis massal Admin),
+   * mencegah duplikasi sesi jika penguji sudah memiliki sesi pada kategori/track tersebut.
+   */
+  public static async openOrSyncBatchSessions(
+    params: {
+      assignments: OralExamAssignment[];
+      track: OralExamTrack;
+      academicYear: string;
+      semester: 'GANJIL' | 'GENAP';
+      date: string;
+      subjectScopeOverride?: OralExamSubjectScope;
+      criteriaLabelsOverride?: OralExamCriteriaLabels;
+    },
+    token?: string
+  ): Promise<{
+    sessions: OralExamSession[];
+    createdCount: number;
+    syncedCount: number;
+  }> {
+    const existingSessionsCache = await this.getAllSessions(params.academicYear, token);
+    const existingKeys = new Set(
+      existingSessionsCache
+        .filter((s) => s.groupId && getOralExamSessionTrack(s) === params.track)
+        .map((s) => String(s.groupId))
+    );
+
+    const sessions: OralExamSession[] = [];
+    let createdCount = 0;
+    let syncedCount = 0;
+
+    for (const assignment of params.assignments) {
+      const hadExisting = existingKeys.has(assignment.id);
+      const saved = await this.openOrSyncAssignedSession(
+        {
+          assignment,
+          track: params.track,
+          academicYear: params.academicYear,
+          semester: params.semester,
+          examinerNpp: assignment.examinerNpp ?? null,
+          date: params.date,
+          subjectScopeOverride: params.subjectScopeOverride,
+          criteriaLabelsOverride: params.criteriaLabelsOverride,
+          existingSessionsCache,
+        },
+        token
+      );
+      sessions.push(saved);
+      if (hadExisting) syncedCount++;
+      else createdCount++;
+    }
+
+    return { sessions, createdCount, syncedCount };
   }
 }

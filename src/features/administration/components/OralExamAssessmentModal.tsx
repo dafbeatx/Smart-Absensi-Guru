@@ -9,7 +9,7 @@
  * - Mode GURU (`roleMode === 'GURU'`): Tinggal siap pakai langsung menilai siswa pada 3 kriteria sesuai penempatan Admin.
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
@@ -148,6 +148,9 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   );
   const [rosterSourceMode, setRosterSourceMode] = useState<RosterSourceMode>('OFFICIAL_GROUP');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [groupChecklistSearch, setGroupChecklistSearch] = useState<string>('');
+  const hasSeededGroupChecklistRef = useRef<boolean>(false);
   const [selectedClass, setSelectedClass] = useState<string>('7');
   const [selectedExaminerUserId, setSelectedExaminerUserId] = useState<string>('');
   const [examinerName, setExaminerName] = useState<string>('');
@@ -299,21 +302,56 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   );
 
   // Sync admin create wizard defaults when assignments finish loading
+  const activeSelectableAssignments = useMemo(() => {
+    const actives = allAssignments.filter((a) => a.isActive !== false);
+    return actives.length > 0 ? actives : allAssignments;
+  }, [allAssignments]);
+
   useEffect(() => {
-    if (allAssignments.length === 0) return;
-    if (!selectedGroupId || !allAssignments.some((a) => a.id === selectedGroupId)) {
+    if (activeSelectableAssignments.length === 0) return;
+    if (!selectedGroupId || !activeSelectableAssignments.some((a) => a.id === selectedGroupId)) {
       const matchedGroup = findMatchingOfficialOralGroup(user?.full_name);
-      const firstId = matchedGroup?.id && allAssignments.some((a) => a.id === matchedGroup.id)
+      const firstId = matchedGroup?.id && activeSelectableAssignments.some((a) => a.id === matchedGroup.id)
         ? matchedGroup.id
-        : allAssignments[0].id;
+        : activeSelectableAssignments[0].id;
       setSelectedGroupId(firstId);
     }
-  }, [allAssignments, selectedGroupId, user?.full_name]);
+    if (!hasSeededGroupChecklistRef.current) {
+      hasSeededGroupChecklistRef.current = true;
+      setSelectedGroupIds(activeSelectableAssignments.map((a) => a.id));
+    }
+  }, [activeSelectableAssignments, selectedGroupId, user?.full_name]);
 
   // Sessions filtered STRICTLY by active track (Bahasa vs BTQ separated)
   const trackSessions = useMemo(
     () => sessions.filter((s) => getOralExamSessionTrack(s) === activeTrack),
     [sessions, activeTrack]
+  );
+
+  const existingTrackGroupIds = useMemo(
+    () => new Set(trackSessions.map((s) => s.groupId).filter(Boolean) as string[]),
+    [trackSessions]
+  );
+
+  const selectedAssignments = useMemo(
+    () => activeSelectableAssignments.filter((a) => selectedGroupIds.includes(a.id)),
+    [activeSelectableAssignments, selectedGroupIds]
+  );
+
+  const filteredChecklistAssignments = useMemo(() => {
+    const q = groupChecklistSearch.trim().toLowerCase();
+    if (!q) return activeSelectableAssignments;
+    return activeSelectableAssignments.filter(
+      (g) =>
+        g.examinerName.toLowerCase().includes(q) ||
+        g.roomNumber.toLowerCase().includes(q) ||
+        g.className.toLowerCase().includes(q)
+    );
+  }, [activeSelectableAssignments, groupChecklistSearch]);
+
+  const totalSelectedStudentCount = useMemo(
+    () => selectedAssignments.reduce((acc, grp) => acc + grp.students.length, 0),
+    [selectedAssignments]
   );
 
   const bahasaCount = useMemo(
@@ -326,8 +364,12 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   );
 
   const selectedAdminAssignment = useMemo(
-    () => allAssignments.find((g) => g.id === selectedGroupId) || allAssignments[0] || null,
-    [allAssignments, selectedGroupId]
+    () =>
+      selectedAssignments[0] ||
+      allAssignments.find((g) => g.id === selectedGroupId) ||
+      activeSelectableAssignments[0] ||
+      null,
+    [selectedAssignments, allAssignments, selectedGroupId, activeSelectableAssignments]
   );
 
   const existingSessionForActiveGuruTrack = useMemo(() => {
@@ -339,26 +381,36 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     );
   }, [sessions, activeGuruAssignment, activeTrack]);
 
+  const applySingleGroupDraft = (grp: OralExamAssignment, track: OralExamTrack = activeTrack) => {
+    setSelectedGroupId(grp.id);
+    setSelectedExaminerUserId(grp.examinerUserId || '');
+    setExaminerName(grp.examinerName);
+    setExaminerNppDraft(grp.examinerNpp || null);
+    setUseManualExaminerInput(!grp.examinerUserId && Boolean(grp.examinerName));
+    setRoomNumber(grp.roomNumber);
+    setSelectedClass(grp.className);
+    setCriteriaLabelsDraft(
+      resolveCriteriaLabels(track === 'BAHASA' ? grp.bahasaCriteria : grp.btqCriteria, track)
+    );
+  };
+
   const openCreateScreen = (track: OralExamTrack = activeTrack) => {
     if (!isAdminControl) return;
     setActiveTrack(track);
     setSubjectScopeDraft(track === 'BAHASA' ? 'ENGLISH_ONLY' : 'BOTH');
     setSessionTitle('');
     setSessionDate(getTodayDateInJakarta());
-    const targetGrp = selectedAdminAssignment;
+    setGroupChecklistSearch('');
+    const allIds = activeSelectableAssignments.map((g) => g.id);
+    setSelectedGroupIds(allIds);
+    const targetGrp = selectedAdminAssignment || activeSelectableAssignments[0] || null;
     const grpCriteria = targetGrp
       ? resolveCriteriaLabels(track === 'BAHASA' ? targetGrp.bahasaCriteria : targetGrp.btqCriteria, track)
       : getDefaultCriteriaLabels(track);
     setCriteriaLabelsDraft(grpCriteria);
     if (targetGrp) {
       setRosterSourceMode('OFFICIAL_GROUP');
-      setSelectedGroupId(targetGrp.id);
-      setSelectedExaminerUserId(targetGrp.examinerUserId || '');
-      setExaminerName(targetGrp.examinerName);
-      setExaminerNppDraft(targetGrp.examinerNpp || null);
-      setUseManualExaminerInput(!targetGrp.examinerUserId && Boolean(targetGrp.examinerName));
-      setRoomNumber(targetGrp.roomNumber);
-      setSelectedClass(targetGrp.className);
+      applySingleGroupDraft(targetGrp, track);
     } else {
       const firstStaff = staffDirectory[0];
       setSelectedExaminerUserId(firstStaff?.id || user?.id || '');
@@ -369,20 +421,24 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     setScreen('CREATE');
   };
 
-  const handleGroupChange = (groupId: string) => {
-    setSelectedGroupId(groupId);
-    const grp = allAssignments.find((g) => g.id === groupId);
-    if (grp) {
-      setSelectedExaminerUserId(grp.examinerUserId || '');
-      setExaminerName(grp.examinerName);
-      setExaminerNppDraft(grp.examinerNpp || null);
-      setUseManualExaminerInput(!grp.examinerUserId && Boolean(grp.examinerName));
-      setRoomNumber(grp.roomNumber);
-      setSelectedClass(grp.className);
-      setCriteriaLabelsDraft(
-        resolveCriteriaLabels(activeTrack === 'BAHASA' ? grp.bahasaCriteria : grp.btqCriteria, activeTrack)
-      );
-    }
+  const handleToggleGroupChecklist = (groupId: string) => {
+    setSelectedGroupIds((prev) => {
+      const exists = prev.includes(groupId);
+      const next = exists ? prev.filter((id) => id !== groupId) : [...prev, groupId];
+      if (next.length === 1) {
+        const loneGrp = activeSelectableAssignments.find((g) => g.id === next[0]);
+        if (loneGrp) applySingleGroupDraft(loneGrp);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllGroupChecklists = () => {
+    setSelectedGroupIds(activeSelectableAssignments.map((g) => g.id));
+  };
+
+  const handleClearAllGroupChecklists = () => {
+    setSelectedGroupIds([]);
   };
 
   const handleSelectExaminerStaff = (staffId: string) => {
@@ -446,8 +502,44 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   };
 
   const handleCreateSessionSubmit = async () => {
+    if (rosterSourceMode === 'OFFICIAL_GROUP' && selectedAssignments.length === 0) {
+      showToast(
+        'error',
+        'Pilih Minimal 1 Penguji',
+        'Centang minimal satu kelompok penguji pada Langkah 2 terlebih dahulu.'
+      );
+      return;
+    }
+
     setIsCreatingLoading(true);
     try {
+      const resolvedCriteria = resolveCriteriaLabels(criteriaLabelsDraft, activeTrack);
+
+      // Batch creation when > 1 examiners are checked
+      if (rosterSourceMode === 'OFFICIAL_GROUP' && selectedAssignments.length > 1) {
+        const batchResult = await OralExamRepository.openOrSyncBatchSessions(
+          {
+            assignments: selectedAssignments,
+            track: activeTrack,
+            academicYear: activeAcademicYear,
+            semester: activeSemester,
+            date: sessionDate,
+            subjectScopeOverride: subjectScopeDraft,
+            criteriaLabelsOverride: resolvedCriteria,
+          },
+          token || undefined
+        );
+
+        await loadSessions();
+        setScreen('LIST');
+        showToast(
+          'success',
+          'Semua Penguji Terpilih Tersimpan di Supabase',
+          `${batchResult.createdCount} sesi baru dibuat & ${batchResult.syncedCount} sesi disinkronkan (${totalSelectedStudentCount} siswa).`
+        );
+        return;
+      }
+
       const templateType: OralExamTemplateType =
         activeTrack === 'BAHASA' ? 'BAHASA_INGGRIS_ARAB' : 'BTQ_HAFALAN';
 
@@ -458,17 +550,18 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       let groupId: string | null = null;
       let classStudents: Array<{ studentId: string; studentName: string; nisn?: string; className?: string }> = [];
 
-      if (rosterSourceMode === 'OFFICIAL_GROUP' && selectedAdminAssignment) {
-        targetClassName = selectedAdminAssignment.className;
-        targetRoomNumber = roomNumber.trim() || selectedAdminAssignment.roomNumber;
-        targetExaminerName = examinerName.trim() || selectedAdminAssignment.examinerName;
-        targetExaminerNpp = examinerNppDraft ?? selectedAdminAssignment.examinerNpp ?? null;
-        groupId = selectedAdminAssignment.id;
-        classStudents = selectedAdminAssignment.students.map((s) => ({
+      const singleSelectedGrp = selectedAssignments[0] || selectedAdminAssignment;
+      if (rosterSourceMode === 'OFFICIAL_GROUP' && singleSelectedGrp) {
+        targetClassName = singleSelectedGrp.className;
+        targetRoomNumber = roomNumber.trim() || singleSelectedGrp.roomNumber;
+        targetExaminerName = examinerName.trim() || singleSelectedGrp.examinerName;
+        targetExaminerNpp = examinerNppDraft ?? singleSelectedGrp.examinerNpp ?? null;
+        groupId = singleSelectedGrp.id;
+        classStudents = singleSelectedGrp.students.map((s) => ({
           studentId: s.studentId,
           studentName: s.studentName,
           nisn: s.nisn,
-          className: s.className || selectedAdminAssignment.className,
+          className: s.className || singleSelectedGrp.className,
         }));
       } else {
         try {
@@ -1982,7 +2075,9 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                       type="button"
                       onClick={() => {
                         setRosterSourceMode('OFFICIAL_GROUP');
-                        handleGroupChange(selectedGroupId);
+                        if (selectedGroupIds.length === 0 && activeSelectableAssignments.length > 0) {
+                          setSelectedGroupIds(activeSelectableAssignments.map((g) => g.id));
+                        }
                       }}
                       className={`min-h-11 px-3 py-2 rounded-xl border text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5 ${
                         rosterSourceMode === 'OFFICIAL_GROUP'
@@ -2009,24 +2104,97 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                   </div>
 
                   {rosterSourceMode === 'OFFICIAL_GROUP' ? (
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-700 block">
-                        Pilih Penguji &amp; Penempatan:
-                      </label>
-                      <select
-                        value={selectedGroupId}
-                        onChange={(e) => handleGroupChange(e.target.value)}
-                        className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
-                      >
-                        {allAssignments.map((grp) => (
-                          <option key={grp.id} value={grp.id}>
-                            {grp.examinerName} — {grp.roomNumber} ({grp.className === 'SMA' ? 'SMA' : `Kls ${grp.className}`}, {grp.students.length} siswa)
-                          </option>
-                        ))}
-                      </select>
-                      {selectedAdminAssignment && (
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <label className="text-xs font-bold text-slate-700">
+                          Ceklis Penguji &amp; Penempatan ({selectedAssignments.length}/{activeSelectableAssignments.length})
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={handleSelectAllGroupChecklists}
+                            className="h-8 px-2.5 rounded-lg bg-[#023246] hover:bg-[#034560] text-white text-[11px] font-bold cursor-pointer"
+                          >
+                            Pilih Semua ({activeSelectableAssignments.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleClearAllGroupChecklists}
+                            className="h-8 px-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-bold cursor-pointer"
+                          >
+                            Kosongkan
+                          </button>
+                        </div>
+                      </div>
+
+                      {activeSelectableAssignments.length > 5 && (
+                        <div className="relative">
+                          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            value={groupChecklistSearch}
+                            onChange={(e) => setGroupChecklistSearch(e.target.value)}
+                            placeholder="Cari nama penguji, ruang, atau kelas..."
+                            className="w-full h-10 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                          />
+                        </div>
+                      )}
+
+                      <div className="border border-slate-200 rounded-xl max-h-72 overflow-y-auto bg-white">
+                        {filteredChecklistAssignments.length === 0 ? (
+                          <p className="p-4 text-xs text-slate-500 text-center">
+                            Tidak ada penguji yang cocok dengan pencarian.
+                          </p>
+                        ) : (
+                          filteredChecklistAssignments.map((grp, idx) => {
+                            const checked = selectedGroupIds.includes(grp.id);
+                            const alreadyExists = existingTrackGroupIds.has(grp.id);
+                            const rowBorder =
+                              idx < filteredChecklistAssignments.length - 1
+                                ? 'border-b border-slate-100'
+                                : '';
+                            return (
+                              <label
+                                key={grp.id}
+                                className={`flex items-center gap-3 px-3 py-2.5 min-h-12 cursor-pointer transition-colors ${rowBorder} ${
+                                  checked ? 'bg-sky-50/70' : 'bg-white hover:bg-slate-50'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => handleToggleGroupChecklist(grp.id)}
+                                  className="w-5 h-5 accent-[#023246] rounded cursor-pointer shrink-0"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                                      {grp.examinerName}
+                                    </span>
+                                    {alreadyExists && (
+                                      <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold shrink-0">
+                                        Sudah Ada Sesi
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[11px] text-slate-500 block">
+                                    {grp.roomNumber} • {grp.className === 'SMA' ? 'SMA' : `Kelas ${grp.className}`} •{' '}
+                                    {grp.students.length} siswa
+                                  </span>
+                                </div>
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {selectedAssignments.length > 0 ? (
                         <p className="text-[11px] text-emerald-700 font-semibold">
-                          Terpilih {selectedAdminAssignment.students.length} siswa di {selectedAdminAssignment.roomNumber} ({selectedAdminAssignment.className === 'SMA' ? 'SMA' : `Kelas ${selectedAdminAssignment.className}`}).
+                          Terpilih {selectedAssignments.length} penguji (total {totalSelectedStudentCount} siswa).
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-rose-600 font-semibold">
+                          Centang minimal 1 penguji untuk membuat atau menyiapkan sesi ujian.
                         </p>
                       )}
                     </div>
@@ -2057,10 +2225,31 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                       Langkah 3 dari 3
                     </span>
                     <h3 className="text-sm font-extrabold text-slate-900">
-                      Cek Nama Penguji &amp; Ruang
+                      {rosterSourceMode === 'OFFICIAL_GROUP' && selectedAssignments.length > 1
+                        ? `Tanggal & Ringkasan (${selectedAssignments.length} Penguji)`
+                        : 'Cek Nama Penguji & Ruang'}
                     </h3>
                   </div>
 
+                  {rosterSourceMode === 'OFFICIAL_GROUP' && selectedAssignments.length > 1 ? (
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-950 leading-relaxed">
+                        Mode ceklis massal aktif: <strong>{selectedAssignments.length} penguji</strong> (total{' '}
+                        <strong>{totalSelectedStudentCount} siswa</strong>) akan menggunakan nama penguji, NPP, ruangan,
+                        dan kelas sesuai penempatan resminya masing-masing di Supabase. Jika sesi sudah ada, nilai siswa
+                        tetap aman terjaga.
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Tanggal Ujian</label>
+                        <input
+                          type="date"
+                          value={sessionDate}
+                          onChange={(e) => setSessionDate(e.target.value)}
+                          className="w-full h-11 px-3 bg-white border border-slate-300 rounded-xl text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                        />
+                      </div>
+                    </div>
+                  ) : (
                   <div className="space-y-2.5">
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-1">
@@ -2146,6 +2335,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                       />
                     </div>
                   </div>
+                  )}
                 </div>
               </div>
             )}
@@ -2561,11 +2751,18 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                   </button>
                   <button
                     type="button"
-                    disabled={isCreatingLoading}
+                    disabled={
+                      isCreatingLoading ||
+                      (rosterSourceMode === 'OFFICIAL_GROUP' && selectedAssignments.length === 0)
+                    }
                     onClick={handleCreateSessionSubmit}
                     className="flex-1 h-12 px-4 rounded-xl bg-[#023246] hover:bg-[#034560] disabled:opacity-50 text-white text-xs sm:text-sm font-bold cursor-pointer transition-colors"
                   >
-                    {isCreatingLoading ? 'Menyiapkan...' : 'Mulai Menilai Sekarang'}
+                    {isCreatingLoading
+                      ? 'Menyiapkan...'
+                      : rosterSourceMode === 'OFFICIAL_GROUP' && selectedAssignments.length > 1
+                        ? `Buat Sesi (${selectedAssignments.length} Penguji)`
+                        : 'Mulai Menilai Sekarang'}
                   </button>
                 </div>
               )}
